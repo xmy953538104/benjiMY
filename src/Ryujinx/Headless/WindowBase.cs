@@ -1,3 +1,5 @@
+using Ryujinx.Ava;
+using Ryujinx.Common;
 using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Configuration.Hid;
 using Ryujinx.Common.Logging;
@@ -10,6 +12,7 @@ using Ryujinx.HLE.HOS.Services.Am.AppletOE.ApplicationProxyService.ApplicationPr
 using Ryujinx.HLE.UI;
 using Ryujinx.Input;
 using Ryujinx.Input.HLE;
+using Ryujinx.Input.SDL2;
 using Ryujinx.SDL2.Common;
 using System;
 using System.Collections.Concurrent;
@@ -23,7 +26,7 @@ using AntiAliasing = Ryujinx.Common.Configuration.AntiAliasing;
 using ScalingFilter = Ryujinx.Common.Configuration.ScalingFilter;
 using Switch = Ryujinx.HLE.Switch;
 
-namespace Ryujinx.Headless.SDL2
+namespace Ryujinx.Headless
 {
     abstract partial class WindowBase : IHostUIHandler, IDisposable
     {
@@ -133,7 +136,7 @@ namespace Ryujinx.Headless.SDL2
 
         private void SetWindowIcon()
         {
-            Stream iconStream = typeof(WindowBase).Assembly.GetManifestResourceStream("Ryujinx.Headless.SDL2.Ryujinx.bmp");
+            Stream iconStream = EmbeddedResources.GetStream("Ryujinx.UI.Common/Resources/Logo_Ryujinx.png");
             byte[] iconBytes = new byte[iconStream!.Length];
 
             if (iconStream.Read(iconBytes, 0, iconBytes.Length) != iconBytes.Length)
@@ -315,7 +318,7 @@ namespace Ryujinx.Headless.SDL2
                             Device.VSyncMode.ToString(),
                             dockedMode,
                             Device.Configuration.AspectRatio.ToText(),
-                            $"Game: {Device.Statistics.GetGameFrameRate():00.00} FPS ({Device.Statistics.GetGameFrameTime():00.00} ms)",
+                            $"{Device.Statistics.GetGameFrameRate():00.00} FPS ({Device.Statistics.GetGameFrameTime():00.00} ms)",
                             $"FIFO: {Device.Statistics.GetFifoPercent():0.00} %",
                             $"GPU: {_gpuDriverName}"));
 

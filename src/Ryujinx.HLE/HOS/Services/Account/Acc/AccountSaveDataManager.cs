@@ -1,3 +1,4 @@
+using Gommon;
 using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Common.Utilities;
@@ -5,12 +6,13 @@ using Ryujinx.HLE.HOS.Services.Account.Acc.Types;
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 
 namespace Ryujinx.HLE.HOS.Services.Account.Acc
 {
-    class AccountSaveDataManager
+    public class AccountSaveDataManager
     {
-        private readonly string _profilesJsonPath = Path.Join(AppDataManager.BaseDirPath, "system", "Profiles.json");
+        private static readonly string _profilesJsonPath = Path.Join(AppDataManager.BaseDirPath, "system", "Profiles.json");
 
         private static readonly ProfilesJsonSerializerContext _serializerContext = new(JsonHelper.GetDefaultSerializerOptions());
 
@@ -46,6 +48,16 @@ namespace Ryujinx.HLE.HOS.Services.Account.Acc
             {
                 LastOpened = AccountManager.DefaultUserId;
             }
+        }
+
+        public static Optional<UserProfile> GetLastUsedUser()
+        {
+            ProfilesJson profilesJson = JsonHelper.DeserializeFromFile(_profilesJsonPath, _serializerContext.ProfilesJson);
+
+            return profilesJson.Profiles
+                .FindFirst(profile => profile.AccountState == AccountState.Open)
+                .Convert(profileJson => new UserProfile(new UserId(profileJson.UserId), profileJson.Name,
+                    profileJson.Image, profileJson.LastModifiedTimestamp));
         }
 
         public void Save(ConcurrentDictionary<string, UserProfile> profiles)

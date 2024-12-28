@@ -4,7 +4,7 @@ using System;
 using System.Drawing;
 using System.Numerics;
 
-namespace Ryujinx.Headless.SDL2
+namespace Ryujinx.Input.SDL2
 {
     class SDL2Mouse : IMouse
     {

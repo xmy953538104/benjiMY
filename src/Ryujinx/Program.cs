@@ -8,6 +8,7 @@ using Ryujinx.Common.GraphicsDriver;
 using Ryujinx.Common.Logging;
 using Ryujinx.Common.SystemInterop;
 using Ryujinx.Graphics.Vulkan.MoltenVK;
+using Ryujinx.Headless;
 using Ryujinx.Modules;
 using Ryujinx.SDL2.Common;
 using Ryujinx.UI.Common;
@@ -46,9 +47,15 @@ namespace Ryujinx.Ava
             }
 
             PreviewerDetached = true;
+            
+            if (args.Length > 0 && args[0] is "--no-gui" or "nogui")
+            {
+                HeadlessRyujinx.Entrypoint(args[1..]);
+                return;
+            }
 
             Initialize(args);
-
+            
             LoggerAdapter.Register();
 
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
@@ -98,7 +105,7 @@ namespace Ryujinx.Ava
             TaskScheduler.UnobservedTaskException += (sender, e)
                 => ProcessUnhandledException(e.Exception, false); 
             AppDomain.CurrentDomain.ProcessExit += (sender, e) => Exit();
-
+            
             // Setup base data directory.
             AppDataManager.Initialize(CommandLineState.BaseDirPathArg);
 
@@ -234,7 +241,7 @@ namespace Ryujinx.Ava
             }
         }
 
-        private static void PrintSystemInfo()
+        internal static void PrintSystemInfo()
         {
             Logger.Notice.Print(LogClass.Application, $"Ryujinx Version: {Version}");
             Logger.Notice.Print(LogClass.Application, $".NET Runtime: {RuntimeInformation.FrameworkDescription}");
@@ -252,7 +259,7 @@ namespace Ryujinx.Ava
             }
         }
 
-        private static void ProcessUnhandledException(Exception ex, bool isTerminating)
+        internal static void ProcessUnhandledException(Exception ex, bool isTerminating)
         {
             string message = $"Unhandled exception caught: {ex}";
 
@@ -269,7 +276,7 @@ namespace Ryujinx.Ava
             }
         }
 
-        public static void Exit()
+        internal static void Exit()
         {
             DiscordIntegrationModule.Exit();
 

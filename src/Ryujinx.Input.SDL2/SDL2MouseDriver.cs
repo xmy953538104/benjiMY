@@ -8,9 +8,9 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using static SDL2.SDL;
 
-namespace Ryujinx.Headless.SDL2
+namespace Ryujinx.Input.SDL2
 {
-    class SDL2MouseDriver : IGamepadDriver
+    public class SDL2MouseDriver : IGamepadDriver
     {
         private const int CursorHideIdleTime = 5; // seconds
 
