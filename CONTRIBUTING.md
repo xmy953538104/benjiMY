@@ -1,6 +1,6 @@
-# Contribution to Ryujinx
+# Contribution to Kenji-NX
 
-You can contribute to Ryujinx with PRs, testing of PRs and issues. Contributing code and other implementations is greatly appreciated alongside simply filing issues for problems you encounter.
+You can contribute to Kenji-NX with PRs, testing of PRs and issues. Contributing code and other implementations is greatly appreciated alongside simply filing issues for problems you encounter.
 Please read the entire document before continuing as it can potentially save everyone involved a significant amount of time.
 
 # Quick Links
@@ -14,17 +14,17 @@ We always welcome bug reports, feature proposals and overall feedback. Here are 
 
 ### Finding Existing Issues
 
-Before filing a new issue, please search our [open issues](https://github.com/KeatonTheBot/Ryujinx/issues) to check if it already exists.
+Before filing a new issue, please search our [open issues](https://git.ryujinx.app/kenji-nx/ryujinx/-/issues) to check if it already exists.
 
 If you do find an existing issue, please include your own feedback in the discussion. Do consider upvoting (👍 reaction) the original post, as this helps us prioritize popular issues in our backlog.
 
 ### Writing a Good Feature Request
 
-Please review any feature requests already opened to both check it has not already been suggested, and to familiarize yourself with the format. When ready to submit a proposal, please use the [Feature Request issue template](https://github.com/Ryujinx/Ryujinx/issues/new?assignees=&labels=&projects=&template=feature_request.yml&title=%5BFeature+Request%5D).
+Please review any feature requests already opened to both check it has not already been suggested, and to familiarize yourself with the format. When ready to submit a proposal, please go [here](https://git.ryujinx.app/kenji-nx/ryujinx/-/issues).
 
 ### Writing a Good Bug Report
 
-Good bug reports make it easier for maintainers to verify and root cause the underlying problem. The better a bug report, the faster the problem will be resolved. 
+Good bug reports make it easier for maintainers to verify and root cause the underlying problem. The better a bug report, the faster the problem will be resolved.
 Ideally, a bug report should contain the following information:
 
 * A high-level description of the problem.
@@ -34,13 +34,13 @@ Ideally, a bug report should contain the following information:
 * A Ryujinx log file of the run instance where the issue occurred. Log files can be found in `[Executable Folder]/Logs` and are named chronologically.
 * Additional information, e.g. is it a regression from previous versions? Are there any known workarounds?
 
-When ready to submit a bug report, please use the [Bug Report issue template](https://github.com/KeatonTheBot/Ryujinx/issues/new?assignees=&labels=bug&projects=&template=bug_report.yml&title=%5BBug%5D).
+When ready to submit a bug report, please go [here](https://git.ryujinx.app/kenji-nx/ryujinx/-/issues.
 
 ## Contributing Changes
 
 Project maintainers will merge changes that both improve the project and meet our standards for code quality.
 
-The [Pull Request Guide](docs/workflow/pr-guide.md) and [License](https://github.com/KeatonTheBot/Ryujinx/blob/master/LICENSE.txt) docs define additional guidance.
+The [Pull Request Guide](docs/workflow/pr-guide.md) and [License](LICENSE.txt) docs define additional guidance.
 
 ### DOs and DON'Ts
 
@@ -67,30 +67,25 @@ Please do not:
 We use and recommend the following workflow:
 
 1. Create or find an issue for your work.
-    - You can skip this step for trivial changes.
-    - Get agreement from the team and the community that your proposed change is a good one if it is of significant size or changes core functionality.
-    - Clearly state that you are going to take on implementing it, if that's the case. You can request that the issue be assigned to you. Note: The issue filer and the implementer don't have to be the same person.
+  - You can skip this step for trivial changes.
+  - Get agreement from the team and the community that your proposed change is a good one if it is of significant size or changes core functionality.
+  - Clearly state that you are going to take on implementing it, if that's the case. You can request that the issue be assigned to you. Note: The issue filer and the implementer don't have to be the same person.
 2. Create a personal fork of the repository on GitHub (if you don't already have one).
 3. In your fork, create a branch off of main (`git checkout -b mybranch`).
-    - Branches are useful since they isolate your changes from incoming changes from upstream. They also enable you to create multiple PRs from the same fork.
+  - Branches are useful since they isolate your changes from incoming changes from upstream. They also enable you to create multiple PRs from the same fork.
 4. Make and commit your changes to your branch.
-    - [Build Instructions](https://github.com/KeatonTheBot/Ryujinx#building) explains how to build and test.
-    - Commit messages should be clear statements of action and intent.
+  - [Build Instructions](https://git.ryujinx.app/kenji-nx/ryujinx#building) explains how to build and test.
+  - Commit messages should be clear statements of action and intent.
 6. Build the repository with your changes.
-    - Make sure that the builds are clean.
-    - Make sure that `dotnet format` has been run and any corrections tested and committed.
+  - Make sure that the builds are clean.
+  - Make sure that `dotnet format` has been run and any corrections tested and committed.
 7. Create a pull request (PR) against the Ryujinx/Ryujinx repository's **main** branch.
-    - State in the description what issue or improvement your change is addressing.
-    - Check if all the Continuous Integration checks are passing. Refer to [Actions](https://github.com/KeatonTheBot/Ryujinx/actions) to check for outstanding errors.
+  - State in the description what issue or improvement your change is addressing.
 8. Wait for feedback or approval of your changes from the core development team
-    - Details about the pull request [review procedure](docs/workflow/ci/pr-guide.md).
+  - Details about the pull request [review procedure](docs/workflow/ci/pr-guide.md).
 9. When the team members have signed off, and all checks are green, your PR will be merged.
-    - The next official build will automatically include your change.
-    - You can delete the branch you used for making the change.
-
-### Good First Issues
-
-The team marks the most straightforward issues as [good first issues](https://github.com/KeatonTheBot/Ryujinx/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22). This set of issues is the place to start if you are interested in contributing but new to the codebase.
+  - The next official build will automatically include your change.
+  - You can delete the branch you used for making the change.
 
 ### Commit Messages
 
@@ -111,15 +106,6 @@ Fix #42
 
 Also do your best to factor commits appropriately, not too large with unrelated things in the same commit, and not too small with the same small change applied N times in N different commits.
 
-### PR - CI Process
-
-The [Ryujinx continuous integration](https://github.com/KeatonTheBot/Ryujinx/actions) (CI) system will automatically perform the required builds and run tests (including the ones you are expected to run) for PRs. Builds and test runs must be clean or have bugs properly filed against flaky/unexpected failures that are unrelated to your change.
-
-If the CI build fails for any reason, the PR actions tab should be consulted for further information on the failure. There are a few usual suspects for such a failure:
-* `dotnet format` has not been run on the PR and has outstanding stylistic issues.
-* There is an error within the PR that fails a test or errors the compiler.
-* Random failure of the workflow can occasionally result in a CI failure. In this scenario a maintainer will manually restart the job.
-
 ### PR Feedback
 
 Ryujinx team and community members will provide feedback on your change. Community feedback is highly valued. You may see the absence of team feedback if the community has already provided good review feedback.
@@ -134,5 +120,5 @@ Ryujinx uses some implementations and frameworks from other projects. The follow
 
 - The license of the file is [permissive](https://en.wikipedia.org/wiki/Permissive_free_software_licence).
 - The license of the file is left in-tact.
-- The contribution is correctly attributed in the [3rd party notices](https://github.com/KeatonTheBot/Ryujinx/blob/master/distribution/legal/THIRDPARTY.md) file in the repository, as needed.
+- The contribution is correctly attributed in the [3rd party notices](distribution/legal/THIRDPARTY.md) file in the repository, as needed.
 

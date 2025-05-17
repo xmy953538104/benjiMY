@@ -2,7 +2,7 @@
 
 ## Contributing Rules
 
-All contributions to KeatonTheBot/Ryujinx repository are made via pull requests (PRs) rather than through direct commits. The pull requests are reviewed and merged by the maintainers after a review and at least two approvals from the core development team.
+All contributions to Kenji-NX repository are made via pull requests (PRs) rather than through direct commits. The pull requests are reviewed and merged by the maintainers after a review and at least two approvals from the core development team.
 
 To merge pull requests, you must have write permissions in the repository.
 
@@ -18,17 +18,13 @@ To merge pull requests, you must have write permissions in the repository.
 
 ## Pull Request Ownership
 
-Every pull request will have automatically have labels and reviewers assigned. The label not only indicates the code segment which the change touches but also the area reviewers to be assigned.
+Every pull request will automatically have labels and reviewers assigned. The label not only indicates the code segment which the change touches but also the area reviewers to be assigned.
 
 If during the code review process a merge conflict occurs, the PR author is responsible for its resolution. Help will be provided if necessary although GitHub makes this easier by allowing simple conflict resolution using the [conflict-editor](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/resolving-a-merge-conflict-on-github).
 
-## Pull Request Builds
-
-When submitting a PR to the `KeatonTheBot/Ryujinx` repository, various builds will run validating many areas to ensure we keep developer productivity and product quality high. These various workflows can be tracked in the [Actions](https://github.com/KeatonTheBot/Ryujinx/actions) tab of the repository. If the job continues to completion, the build artifacts will be uploaded and posted as a comment in the PR discussion.
-
 ## Review Turnaround Times
 
-Ryujinx is a project that is maintained by volunteers on a completely free-time basis. As such we cannot guarantee any particular timeframe for pull request review and approval. Weeks to months are common for larger (>500 line) PRs but there are some additional best practises to avoid review purgatory.
+Kenji-NX is a project that is maintained by volunteers on a completely free-time basis. As such we cannot guarantee any particular timeframe for pull request review and approval. Weeks to months are common for larger (>500 line) PRs but there are some additional best practises to avoid review purgatory.
 
 * Make the reviewers life easier wherever possible. Make use of descriptive commit names, code comments and XML docs where applicable.
 * If there is disagreement on feedback then always lean on the side of the development team and community over any personal opinion.
@@ -41,8 +37,7 @@ To re-iterate, make the review as easy for us as possible, respond promptly and 
 Anyone with write access can merge a pull request manually when the following conditions have been met:
 
 * The PR has been approved by two reviewers and any other objections are addressed.
-    * You can request follow up reviews from the original reviewers if they requested changes.
-* The PR successfully builds and passes all tests in the Continuous Integration (CI) system. In case of failures, refer to the [Actions](https://github.com/KeatonTheBot/Ryujinx/actions) tab of your PR.
+  * You can request follow-up reviews from the original reviewers if they requested changes.
 
 Typically, PRs are merged as one commit (squash merges). It creates a simpler history than a Merge Commit. "Special circumstances" are rare, and typically mean that there are a series of cleanly separated changes that will be too hard to understand if squashed together, or for some reason we want to preserve the ability to dissect them.
 

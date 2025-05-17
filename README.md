@@ -1,11 +1,11 @@
 <h1 align="center">
   <br>
-  <img src="distribution/misc/Logo.png" alt="Kenji-NX">
+  <img src="https://git.ryujinx.app/kenji-nx/ryujinx/-/raw/master/distribution/misc/Logo.png" alt="Kenji-NX">
   <br>
   <b>Kenji-NX</b>
   <br>
-    <a href="https://github.com/KeatonTheBot/Kenji-NX/releases/latest">
-        <img src="https://img.shields.io/github/v/release/KeatonTheBot/Kenji-NX"
+    <a href="https://github.com/Kenji-NX/Releases/releases/latest">
+        <img src="https://img.shields.io/github/v/release/Kenji-NX/Releases"
             alt="Latest Release">
     </a>
 </h1>
@@ -14,7 +14,7 @@
   Kenji-NX is an open-source Nintendo Switch emulator, originally created by gdkchan, written in C#.
   This emulator aims at providing excellent accuracy and performance, a user-friendly interface and consistent builds.
   It was written from scratch and development on the project began in September 2017.
-  Kenji-NX is available on GitHub under the <a href="https://github.com/KeatonTheBot/Kenji-NX/blob/master/LICENSE.txt" target="_blank">MIT license</a>.
+  Kenji-NX is available on GitHub under the <a href="https://git.ryujinx.app/kenji-nx/ryujinx/-/raw/master/LICENSE.txt" target="_blank">MIT license</a>.
   <br><br>
   On October 1st 2024, Ryujinx was discontinued as the creator was forced to abandon the project.
   <br><br>
@@ -59,11 +59,11 @@ If you wish to build the emulator yourself, follow these steps:
 ### Step 1
 
 Install the [.NET 9.0 (or higher) SDK](https://dotnet.microsoft.com/download/dotnet/9.0).
-Make sure your SDK version is higher or equal to the required version specified in [global.json](global.json). 
+Make sure your SDK version is higher or equal to the required version specified in [global.json](global.json).
 
 ### Step 2
 
-Either use `git clone https://github.com/KeatonTheBot/Kenji-NX` on the command line to clone the repository or use Code --> Download zip button to get the files.
+Either use `git clone https://git.ryujinx.app/kenji-nx/ryujinx` on the command line to clone the repository or use Code --> Download zip button to get the files.
 
 ### Step 3
 
