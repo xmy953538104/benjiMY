@@ -1343,7 +1343,7 @@ namespace Ryujinx.UI.App.Common
         {
             _ = Enum.TryParse(DesiredLanguage.ToString(), out TitleLanguage desiredTitleLanguage);
 
-            if (controlData.Title.ItemsRo.Length > (int)desiredTitleLanguage)
+            if (controlData.Title.Length > (int)desiredTitleLanguage)
             {
                 data.Name = controlData.Title[(int)desiredTitleLanguage].NameString.ToString();
                 data.Developer = controlData.Title[(int)desiredTitleLanguage].PublisherString.ToString();
@@ -1356,7 +1356,7 @@ namespace Ryujinx.UI.App.Common
 
             if (string.IsNullOrWhiteSpace(data.Name))
             {
-                foreach (ref readonly var controlTitle in controlData.Title.ItemsRo)
+                foreach (ref readonly var controlTitle in controlData.Title)
                 {
                     if (!controlTitle.NameString.IsEmpty())
                     {
@@ -1369,7 +1369,7 @@ namespace Ryujinx.UI.App.Common
 
             if (string.IsNullOrWhiteSpace(data.Developer))
             {
-                foreach (ref readonly var controlTitle in controlData.Title.ItemsRo)
+                foreach (ref readonly var controlTitle in controlData.Title)
                 {
                     if (!controlTitle.PublisherString.IsEmpty())
                     {

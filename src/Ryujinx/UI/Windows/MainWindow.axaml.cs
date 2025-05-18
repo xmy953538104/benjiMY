@@ -193,7 +193,7 @@ namespace Ryujinx.Ava.UI.Windows
         {
             if (application.ControlHolder.ByteSpan.Length > 0 && ViewModel.LastLdnGameData != null)
             {
-                IEnumerable<LdnGameData> ldnGameData = ViewModel.LastLdnGameData.Where(game => application.ControlHolder.Value.LocalCommunicationId.Items.Contains(Convert.ToUInt64(game.TitleId, 16)));
+                IEnumerable<LdnGameData> ldnGameData = ViewModel.LastLdnGameData.Where(game => application.ControlHolder.Value.LocalCommunicationId.AsSpan().Contains(Convert.ToUInt64(game.TitleId, 16)));
 
                 application.PlayerCount = ldnGameData.Sum(game => game.PlayerCount);
                 application.GameCount = ldnGameData.Count();

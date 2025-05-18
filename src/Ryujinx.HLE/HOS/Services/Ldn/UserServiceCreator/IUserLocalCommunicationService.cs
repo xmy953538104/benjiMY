@@ -65,7 +65,7 @@ namespace Ryujinx.HLE.HOS.Services.Ldn.UserServiceCreator
             // TODO: Call nn::arp::GetApplicationControlProperty here when implemented.
             ApplicationControlProperty controlProperty = context.Device.Processes.ActiveApplication.ApplicationControlProperties;
 
-            foreach (var localCommunicationId in controlProperty.LocalCommunicationId.ItemsRo)
+            foreach (ulong localCommunicationId in controlProperty.LocalCommunicationId)
             {
                 if (localCommunicationId == localCommunicationIdChecked)
                 {
@@ -1105,7 +1105,7 @@ namespace Ryujinx.HLE.HOS.Services.Ldn.UserServiceCreator
                                 }
                                 catch (Exception ex)
                                 {
-                                    Logger.Error?.Print(LogClass.ServiceLdn, "Could not locate LdnRyu server. Defaulting to stubbed wireless.");
+                                    Logger.Error?.Print(LogClass.ServiceLdn, "Could not locate RyuLDN server. Defaulting to stubbed wireless.");
                                     Logger.Error?.Print(LogClass.ServiceLdn, ex.Message);
                                     NetworkClient = new LdnDisabledClient();
                                 }
@@ -1119,7 +1119,7 @@ namespace Ryujinx.HLE.HOS.Services.Ldn.UserServiceCreator
                         }
 
                         // TODO: Call nn::arp::GetApplicationLaunchProperty here when implemented.
-                        NetworkClient.SetGameVersion(context.Device.Processes.ActiveApplication.ApplicationControlProperties.DisplayVersion.Items.ToArray());
+                        NetworkClient.SetGameVersion(context.Device.Processes.ActiveApplication.ApplicationControlProperties.DisplayVersion);
 
                         resultCode = ResultCode.Success;
 
