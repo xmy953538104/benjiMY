@@ -48,7 +48,7 @@ namespace Ryujinx.Ava.UI.Windows
         {
             if (sender is Button button)
             {
-                OpenHelper.OpenUrl(button.Tag.ToString());
+                OpenHelper.OpenUrl(button.Tag?.ToString());
             }
         }
 

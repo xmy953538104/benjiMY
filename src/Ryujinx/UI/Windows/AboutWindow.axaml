@@ -115,9 +115,22 @@
                         Background="Transparent"
                         Click="Button_OnClick"
                         CornerRadius="15"
-                        Tag="https://github.com/Kenji-NX/Kenji-NX"
-                        ToolTip.Tip="{locale:Locale AboutGithubUrlTooltipMessage}">
-                        <Image Source="{Binding GithubLogo}" />
+                        Tag="https://git.ryujinx.app/kenji-nx/ryujinx"
+                        ToolTip.Tip="{locale:Locale AboutGitLabUrlTooltipMessage}">
+                        <Image Source="{Binding GitLabLogo}" />
+                    </Button>
+                    <Button
+                        MinWidth="30"
+                        MinHeight="30"
+                        MaxWidth="30"
+                        MaxHeight="30"
+                        Padding="8"
+                        Background="Transparent"
+                        Click="Button_OnClick"
+                        CornerRadius="15"
+                        Tag="https://discord.gg/zBSAuZfKqe"
+                        ToolTip.Tip="{locale:Locale AboutDiscordUrlTooltipMessage}">
+                        <Image Source="{Binding DiscordLogo}" />
                     </Button>
                 </StackPanel>
             </StackPanel>
@@ -173,18 +186,6 @@
                     FontSize="10"
                     Text="{Binding FormerDevelopers}"
                     TextWrapping="Wrap" />
-                <Button
-                    Padding="5"
-                    HorizontalAlignment="Left"
-                    Background="Transparent"
-                    Click="Button_OnClick"
-                    Tag="https://github.com/Kenji-NX/Kenji-NX/graphs/contributors?type=a">
-                    <TextBlock
-                        FontSize="10"
-                        Text="{locale:Locale AboutRyujinxContributorsButtonHeader}"
-                        TextAlignment="End"
-                        ToolTip.Tip="{locale:Locale AboutRyujinxMaintainersContentTooltipMessage}" />
-                </Button>
             </StackPanel>
         </Grid>
     </Grid>
