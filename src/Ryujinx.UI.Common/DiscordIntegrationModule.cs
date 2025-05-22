@@ -322,6 +322,7 @@ namespace Ryujinx.UI.Common
             "010079901c898000", // Legacy of Kain: Soul Reaver 1 & 2 Remastered
             "010085500130a000", // Lego City: Undercover
             "010073c01af34000", // LEGO Horizon Adventures
+            "0100dcd01e9ee000", // LUNAR Remastered Collection
             "010069301e220000", // Marvel vs. Capcom Fighting Collection: Arcade Classics
             "0100d71004694000", // Minecraft
             "01007430037f6000", // Monopoly
