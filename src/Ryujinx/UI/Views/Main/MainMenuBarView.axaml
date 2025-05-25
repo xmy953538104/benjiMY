@@ -156,10 +156,11 @@
                     Header="{locale:Locale MenuBarShowFileTypes}" />
                 <Separator />
                 <MenuItem
-                    Click="OpenSettings"
                     Padding="-10,0,0,0"
+                    Command="{Binding OpenSettings}"
                     Header="{locale:Locale MenuBarOptionsSettings}"
-                    ToolTip.Tip="{locale:Locale OpenSettingsTooltip}" />
+                    ToolTip.Tip="{locale:Locale OpenSettingsTooltip}"
+                    InputGesture="Ctrl+," />
                 <MenuItem
                     Command="{Binding ManageProfiles}"
                     Padding="-10,0,0,0"

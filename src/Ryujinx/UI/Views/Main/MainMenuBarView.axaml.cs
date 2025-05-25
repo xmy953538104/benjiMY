@@ -119,17 +119,6 @@ namespace Ryujinx.Ava.UI.Views.Main
             Window.ViewModel.AppHost?.Resume();
         }
 
-        public async void OpenSettings(object sender, RoutedEventArgs e)
-        {
-            Window.SettingsWindow = new(Window.VirtualFileSystem, Window.ContentManager);
-
-            await Window.SettingsWindow.ShowDialog(Window);
-
-            Window.SettingsWindow = null;
-
-            ViewModel.LoadConfigurableHotKeys();
-        }
-
         public async void OpenMiiApplet(object sender, RoutedEventArgs e)
         {
             string contentPath = ViewModel.ContentManager.GetInstalledContentPath(0x0100000000001009, StorageId.BuiltInSystem, NcaContentType.Program);

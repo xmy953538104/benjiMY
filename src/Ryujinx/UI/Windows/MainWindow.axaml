@@ -41,6 +41,7 @@
         <KeyBinding Gesture="Escape" Command="{Binding ExitCurrentState}" />
         <KeyBinding Gesture="Ctrl+A" Command="{Binding OpenAmiiboWindow}" />
         <KeyBinding Gesture="Ctrl+B" Command="{Binding OpenBinFile}" />
+        <KeyBinding Gesture="Ctrl+," Command="{Binding OpenSettings}" />
     </Window.KeyBindings>
     <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
         <Grid.RowDefinitions>

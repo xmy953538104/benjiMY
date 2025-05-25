@@ -2206,6 +2206,18 @@ namespace Ryujinx.Ava.UI.ViewModels
             IsFullScreen = WindowState == WindowState.FullScreen;
         }
 
+        public async void OpenSettings()
+        {
+            Window.SettingsWindow = new(Window.VirtualFileSystem, Window.ContentManager);
+
+            await Window.SettingsWindow.ShowDialog(Window);
+
+            Window.SettingsWindow = null;
+
+            LoadConfigurableHotKeys();
+
+        }
+
         public static void SaveConfig()
         {
             ConfigurationState.Instance.ToFileFormat().SaveConfig(Program.ConfigurationPath);
