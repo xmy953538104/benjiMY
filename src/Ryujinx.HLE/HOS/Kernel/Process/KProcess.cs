@@ -135,7 +135,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
 
             InitializeMemoryManager(creationInfo.Flags);
 
-            ulong codeAddress = creationInfo.CodeAddress;
+            ulong codeAddress = creationInfo.CodeAddress + Context.ReservedSize;
 
             ulong codeSize = (ulong)creationInfo.CodePagesCount * KPageTableBase.PageSize;
 
@@ -149,6 +149,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
                 memRegion,
                 codeAddress,
                 codeSize,
+                Context.ReservedSize,
                 slabManager);
 
             if (result != Result.Success)
@@ -184,7 +185,8 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
             KResourceLimit resourceLimit,
             MemoryRegion memRegion,
             IProcessContextFactory contextFactory,
-            ThreadStart customThreadStart = null)
+            ThreadStart customThreadStart = null,
+            ulong entrypointOffset = 0UL)
         {
             ResourceLimit = resourceLimit;
             _memRegion = memRegion;
@@ -238,7 +240,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
 
             InitializeMemoryManager(creationInfo.Flags);
 
-            ulong codeAddress = creationInfo.CodeAddress;
+            ulong codeAddress = creationInfo.CodeAddress + Context.ReservedSize;
 
             ulong codeSize = codePagesCount * KPageTableBase.PageSize;
 
@@ -248,6 +250,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
                 memRegion,
                 codeAddress,
                 codeSize,
+                Context.ReservedSize,
                 slabManager);
 
             if (result != Result.Success)
@@ -293,6 +296,8 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
                 CleanUpForError();
             }
 
+            _entrypoint += entrypointOffset;
+
             return result;
         }
 
@@ -337,10 +342,12 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
 
             Flags = creationInfo.Flags;
             TitleId = creationInfo.TitleId;
-            _entrypoint = creationInfo.CodeAddress;
+            _entrypoint = creationInfo.CodeAddress + Context.ReservedSize;
             _imageSize = (ulong)creationInfo.CodePagesCount * KPageTableBase.PageSize;
 
-            switch (Flags & ProcessCreationFlags.AddressSpaceMask)
+            // 19.0.0+ sets all regions to same size
+            _memoryUsageCapacity = MemoryManager.HeapRegionEnd - MemoryManager.HeapRegionStart;
+            /*switch (Flags & ProcessCreationFlags.AddressSpaceMask)
             {
                 case ProcessCreationFlags.AddressSpace32Bit:
                 case ProcessCreationFlags.AddressSpace64BitDeprecated:
@@ -357,7 +364,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
                     break;
                 default:
                     throw new InvalidOperationException($"Invalid MMU flags value 0x{Flags:x2}.");
-            }
+            }*/
 
             GenerateRandomEntropy();
 
@@ -535,7 +542,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
                 {
                     throw new InvalidOperationException("Trying to start a process with an invalid state!");
                 }
-
+                // TODO: after 19.0.0+ alignment is not needed
                 ulong stackSizeRounded = BitUtils.AlignUp<ulong>(stackSize, KPageTableBase.PageSize);
 
                 ulong neededSize = stackSizeRounded + _imageSize;

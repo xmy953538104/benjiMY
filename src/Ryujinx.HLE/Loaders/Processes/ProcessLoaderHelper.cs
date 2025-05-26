@@ -1,4 +1,4 @@
-using LibHac.Account;
+﻿using LibHac.Account;
 using LibHac.Common;
 using LibHac.Fs;
 using LibHac.Fs.Fsa;
@@ -11,6 +11,7 @@ using LibHac.Tools.FsSystem;
 using LibHac.Tools.FsSystem.NcaUtils;
 using Ryujinx.Common;
 using Ryujinx.Common.Logging;
+using Ryujinx.Cpu.Nce;
 using Ryujinx.HLE.HOS;
 using Ryujinx.HLE.HOS.Kernel;
 using Ryujinx.HLE.HOS.Kernel.Common;
@@ -21,6 +22,7 @@ using Ryujinx.HLE.Loaders.Processes.Extensions;
 using Ryujinx.Horizon.Common;
 using Ryujinx.Horizon.Sdk.Arp;
 using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using ApplicationId = LibHac.Ncm.ApplicationId;
 
@@ -250,7 +252,7 @@ namespace Ryujinx.HLE.Loaders.Processes
             ulong argsStart = 0;
             uint argsSize = 0;
             ulong codeStart = ((meta.Flags & 1) != 0 ? 0x8000000UL : 0x200000UL) + CodeStartOffset;
-            uint codeSize = 0;
+            ulong codeSize = 0;
 
             string[] buildIds = new string[executables.Length];
 
@@ -264,6 +266,7 @@ namespace Ryujinx.HLE.Loaders.Processes
                 }).ToUpper();
             }
 
+            NceCpuCodePatch[] nsoPatch = new NceCpuCodePatch[executables.Length];
             ulong[] nsoBase = new ulong[executables.Length];
 
             for (int index = 0; index < executables.Length; index++)
@@ -287,6 +290,16 @@ namespace Ryujinx.HLE.Loaders.Processes
                 }
 
                 nsoSize = BitUtils.AlignUp<uint>(nsoSize, KPageTableBase.PageSize);
+
+                bool for64Bit = ((ProcessCreationFlags)meta.Flags).HasFlag(ProcessCreationFlags.Is64Bit);
+
+                NceCpuCodePatch codePatch = ArmProcessContextFactory.CreateCodePatchForNce(context, for64Bit, nso.Text);
+                nsoPatch[index] = codePatch;
+
+                if (codePatch != null)
+                {
+                    codeSize += codePatch.Size;
+                }
 
                 nsoBase[index] = codeStart + codeSize;
 
@@ -389,7 +402,8 @@ namespace Ryujinx.HLE.Loaders.Processes
                 MemoryMarshal.Cast<byte, uint>(npdm.KernelCapabilityData),
                 resourceLimit,
                 memoryRegion,
-                processContextFactory);
+                processContextFactory,
+                entrypointOffset: nsoPatch[0]?.Size ?? 0UL);
 
             if (result != Result.Success)
             {
@@ -400,9 +414,12 @@ namespace Ryujinx.HLE.Loaders.Processes
 
             for (int index = 0; index < executables.Length; index++)
             {
-                Logger.Info?.Print(LogClass.Loader, $"Loading image {index} at 0x{nsoBase[index]:x16}...");
+                ulong nsoBaseAddress = process.Context.ReservedSize + nsoBase[index];
 
-                result = LoadIntoMemory(process, executables[index], nsoBase[index]);
+                Logger.Info?.Print(LogClass.Loader, $"Loading image {index} at 0x{nsoBaseAddress:x16}...");
+
+                result = LoadIntoMemory(process, executables[index], nsoBaseAddress, nsoPatch[index]);
+
                 if (result != Result.Success)
                 {
                     Logger.Error?.Print(LogClass.Loader, $"Process initialization returned error \"{result}\".");
@@ -460,7 +477,7 @@ namespace Ryujinx.HLE.Loaders.Processes
             return processResult;
         }
 
-        public static Result LoadIntoMemory(KProcess process, IExecutable image, ulong baseAddress)
+        private static Result LoadIntoMemory(KProcess process, IExecutable image, ulong baseAddress, NceCpuCodePatch codePatch = null)
         {
             ulong textStart = baseAddress + image.TextOffset;
             ulong roStart = baseAddress + image.RoOffset;
@@ -479,6 +496,11 @@ namespace Ryujinx.HLE.Loaders.Processes
             process.CpuMemory.Write(dataStart, image.Data);
 
             process.CpuMemory.Fill(bssStart, image.BssSize, 0);
+
+            if (codePatch != null)
+            {
+                codePatch.Write(process.CpuMemory, baseAddress - codePatch.Size, textStart);
+            }
 
             Result SetProcessMemoryPermission(ulong address, ulong size, KMemoryPermission permission)
             {
