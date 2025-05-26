@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -136,11 +135,14 @@ namespace Ryujinx.Common.Logging
 
             _time = Stopwatch.StartNew();
 
-            // Logger should log to console by default
-            AddTarget(new AsyncLogTargetWrapper(
-                new ConsoleLogTarget("console"),
-                1000,
-                AsyncLogTargetOverflowAction.Discard));
+            if (!PlatformInfo.IsBionic)
+            {
+                // Logger should log to console by default
+                AddTarget(new AsyncLogTargetWrapper(
+                    new ConsoleLogTarget("console"),
+                    1000,
+                    AsyncLogTargetOverflowAction.Discard));
+            }
 
             Notice = new Log(LogLevel.Notice);
 
@@ -158,16 +160,21 @@ namespace Ryujinx.Common.Logging
             _time.Restart();
         }
 
-        private static ILogTarget GetTarget(string targetName) 
-            => _logTargets.FirstOrDefault(target => target.Name.Equals(targetName));
+        private static ILogTarget GetTarget(string targetName)
+        {
+            foreach (var target in _logTargets)
+            {
+                if (target.Name.Equals(targetName))
+                {
+                    return target;
+                }
+            }
+
+            return null;
+        }
 
         public static void AddTarget(ILogTarget target)
         {
-            if (_logTargets.Any(t => t.Name == target.Name))
-            {
-                return;
-            }
-
             _logTargets.Add(target);
 
             Updated += target.Log;

@@ -1,3 +1,4 @@
+using Ryujinx.Common;
 using Ryujinx.Common.Logging;
 using System;
 using System.Collections.Concurrent;
@@ -158,7 +159,7 @@ namespace Ryujinx.Memory
                     }
                 }
             }
-            else if (Ryujinx.Common.PlatformInfo.IsBionic)
+            else if (PlatformInfo.IsBionic)
             {
                 byte[] memName = "Ryujinx-XXXXXX"u8.ToArray();
 
