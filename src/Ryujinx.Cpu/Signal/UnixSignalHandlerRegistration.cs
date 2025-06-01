@@ -1,10 +1,12 @@
 using Ryujinx.Common;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 namespace Ryujinx.Cpu.Signal
 {
+    [SuppressMessage("Interoperability", "CA1416:Validate platform compatibility")]
     static partial class UnixSignalHandlerRegistration
     {
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
