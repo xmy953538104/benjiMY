@@ -353,7 +353,7 @@
                                             Width="{Binding Visualizer.UiDeadzoneLeft}" />
                                     </Grid>
                                     <Ellipse
-                                        Fill="{DynamicResource Warning}"
+                                        Fill="{DynamicResource SystemAccentColor}"
                                         Width="{Binding Visualizer.UiStickCircumference}"
                                         Height="{Binding Visualizer.UiStickCircumference}"
                                         Canvas.Bottom="{Binding Visualizer.UiStickLeftY}"
@@ -387,7 +387,7 @@
                                             Width="{Binding Visualizer.UiDeadzoneRight}" />
                                     </Grid>
                                     <Ellipse
-                                        Fill="{DynamicResource Warning}"
+                                        Fill="{DynamicResource SystemAccentColor}"
                                         Width="{Binding Visualizer.UiStickCircumference}"
                                         Height="{Binding Visualizer.UiStickCircumference}"
                                         Canvas.Bottom="{Binding Visualizer.UiStickRightY}"
