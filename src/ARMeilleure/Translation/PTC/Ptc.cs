@@ -190,7 +190,7 @@ namespace ARMeilleure.Translation.PTC
             _infosStream.Seek(0L, SeekOrigin.Begin);
             bool foundBadFunction = false;
 
-            for (int index = 0; index < GetEntriesCount(); index++)
+            for (int index = 0; index < _infosStream.Length / Unsafe.SizeOf<InfoEntry>(); index++)
             {
                 InfoEntry infoEntry = DeserializeStructure<InfoEntry>(_infosStream);
                 foreach (ulong address in blacklist)
