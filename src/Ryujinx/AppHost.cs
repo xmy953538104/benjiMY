@@ -1152,6 +1152,24 @@ namespace Ryujinx.Ava
 
                 _dialogShown = true;
 
+                // The hard-coded hotkey mapped to exit is Escape, but it's also the same key
+                // that causes the dialog we launch to close (without doing anything). In release
+                // mode, a race is observed that between ShowExitPrompt() appearing on KeyDown
+                // and the ContentDialog we create seeing the key state before KeyUp. Merely waiting
+                // for the key to no longer be pressed appears to be insufficient.
+                // NB: Using _keyboardInterface.IsPressed(Key.Escape) does not currently work.
+                if (OperatingSystem.IsWindows())
+                {
+                    while (GetAsyncKeyState(0x1B) != 0)
+                    {
+                        await Task.Delay(100);
+                    }
+                }
+                else
+                {
+                    await Task.Delay(250);
+                }
+
                 shouldExit = await ContentDialogHelper.CreateStopEmulationDialog();
 
                 _dialogShown = false;
