@@ -87,7 +87,7 @@ namespace Spv.Generator
 
         public bool Equals(LiteralInteger cmpObj)
         {
-            return Type == cmpObj.Type && _integerType == cmpObj._integerType && _data == cmpObj._data;
+            return cmpObj != null && Type == cmpObj.Type && _integerType == cmpObj._integerType && _data == cmpObj._data;
         }
 
         public override int GetHashCode()

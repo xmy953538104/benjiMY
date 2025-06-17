@@ -52,8 +52,8 @@ namespace Ryujinx.Ava.UI.Models
 
             if (InGameList)
             {
-                Icon = appData.Icon;
-                Title = appData.Name;
+                Icon = appData?.Icon;
+                Title = appData?.Name;
             }
             else
             {

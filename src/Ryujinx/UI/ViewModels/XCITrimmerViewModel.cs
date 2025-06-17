@@ -268,7 +268,11 @@ namespace Ryujinx.Ava.UI.ViewModels
                         result = String.Compare(x?.Name, y?.Name, StringComparison.Ordinal);
                         break;
                     case SortField.Saved:
-                        result = x.PotentialSavingsB.CompareTo(y.PotentialSavingsB);
+                        if (x != null && y != null)
+                        {
+                            result = x.PotentialSavingsB.CompareTo(y.PotentialSavingsB);
+                        }
+
                         break;
                 }
 

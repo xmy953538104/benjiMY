@@ -88,11 +88,16 @@ namespace Ryujinx.UI.App.Common
         private static byte[] GetResourceBytes(string resourceName)
         {
             Stream resourceStream = Assembly.GetCallingAssembly().GetManifestResourceStream(resourceName);
-            byte[] resourceByteArray = new byte[resourceStream.Length];
+            if (resourceStream != null)
+            {
+                byte[] resourceByteArray = new byte[resourceStream.Length];
 
-            resourceStream.ReadExactly(resourceByteArray);
+                resourceStream.ReadExactly(resourceByteArray);
 
-            return resourceByteArray;
+                return resourceByteArray;
+            }
+
+            return [];
         }
 
         /// <exception cref="Ryujinx.HLE.Exceptions.InvalidNpdmException">The npdm file doesn't contain valid data.</exception>
@@ -1178,7 +1183,7 @@ namespace Ryujinx.UI.App.Common
                 {
                     string extension = Path.GetExtension(applicationPath)?.ToLower();
 
-                    using FileStream file = new(applicationPath, FileMode.Open, FileAccess.Read);
+                    using FileStream file = new(applicationPath ?? string.Empty, FileMode.Open, FileAccess.Read);
 
                     if (extension == ".nsp" || extension == ".pfs0" || extension == ".xci")
                     {

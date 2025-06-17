@@ -62,7 +62,10 @@ namespace Ryujinx.HLE.HOS.Kernel.Ipc
 
             if (list.Count != 0)
             {
-                session = list.First.Value;
+                if (list.First != null)
+                {
+                    session = list.First.Value;
+                }
 
                 list.RemoveFirst();
             }

@@ -279,7 +279,7 @@ namespace Ryujinx.Ava.UI.ViewModels
 
             foreach (var dir in directories)
             {
-                string dirToCreate = dir.Replace(directory.Parent.ToString(), destinationDir);
+                string dirToCreate = dir.Replace(directory.Parent?.ToString() ?? string.Empty, destinationDir);
 
                 // Mod already exists
                 if (Directory.Exists(dirToCreate))
@@ -302,7 +302,7 @@ namespace Ryujinx.Ava.UI.ViewModels
 
             foreach (var file in files)
             {
-                File.Copy(file, file.Replace(directory.Parent.ToString(), destinationDir), true);
+                File.Copy(file, file.Replace(directory.Parent?.ToString() ?? string.Empty, destinationDir), true);
             }
 
             LoadMods(_applicationId, _installedDlcIds);

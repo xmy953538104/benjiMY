@@ -872,7 +872,7 @@ namespace Ryujinx.Cpu.LightningJit.Arm32.Target.Arm64
 
                 if (unscaled)
                 {
-                    writeInstUnscaled(rt, tempRegister.Operand, offs);
+                    writeInstUnscaled?.Invoke(rt, tempRegister.Operand, offs);
                 }
                 else
                 {

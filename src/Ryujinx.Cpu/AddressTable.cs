@@ -258,23 +258,26 @@ namespace ARMeilleure.Common
             for (int i = 0; i < Levels.Length - 1; i++)
             {
                 ref AddressTableLevel level = ref Levels[i];
-                ref TEntry* nextPage = ref page[level.GetValue(address)];
-
-                if (nextPage == null || nextPage == _fillBottomLevelPtr)
+                if (page != null)
                 {
-                    ref AddressTableLevel nextLevel = ref Levels[i + 1];
+                    ref TEntry* nextPage = ref page[level.GetValue(address)];
 
-                    if (i == Levels.Length - 2)
+                    if (nextPage == null || nextPage == _fillBottomLevelPtr)
                     {
-                        nextPage = (TEntry*)Allocate(1 << nextLevel.Length, Fill, leaf: true);
+                        ref AddressTableLevel nextLevel = ref Levels[i + 1];
+
+                        if (i == Levels.Length - 2)
+                        {
+                            nextPage = (TEntry*)Allocate(1 << nextLevel.Length, Fill, leaf: true);
+                        }
+                        else
+                        {
+                            nextPage = (TEntry*)Allocate(1 << nextLevel.Length, GetFillValue(i), leaf: false);
+                        }
                     }
-                    else
-                    {
-                        nextPage = (TEntry*)Allocate(1 << nextLevel.Length, GetFillValue(i), leaf: false);
-                    }
+
+                    page = (TEntry**)nextPage;
                 }
-
-                page = (TEntry**)nextPage;
             }
 
             return (TEntry*)page;

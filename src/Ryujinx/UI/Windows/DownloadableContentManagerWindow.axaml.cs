@@ -53,12 +53,12 @@ namespace Ryujinx.Ava.UI.Windows
         private void SaveAndClose(object sender, RoutedEventArgs routedEventArgs)
         {
             ViewModel.Save();
-            ((ContentDialog)Parent).Hide();
+            ((ContentDialog)Parent)?.Hide();
         }
 
         private void Close(object sender, RoutedEventArgs e)
         {
-            ((ContentDialog)Parent).Hide();
+            ((ContentDialog)Parent)?.Hide();
         }
 
         private void RemoveDLC(object sender, RoutedEventArgs e)

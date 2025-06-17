@@ -388,7 +388,12 @@ namespace Ryujinx.Cpu.Jit.HostTracked
                 _treeLock.ExitReadLock();
             }
 
-            return (_backingMemory, _firstPagePa.Value);
+            if (_firstPagePa != null)
+            {
+                return (_backingMemory, _firstPagePa.Value);
+            }
+
+            return (null, 0);
         }
 
         public PrivateRange GetPrivateAllocation(ulong va)

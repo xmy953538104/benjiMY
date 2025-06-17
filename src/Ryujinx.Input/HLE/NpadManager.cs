@@ -304,9 +304,12 @@ namespace Ryujinx.Input.HLE
                         buttons |= 1 << 4;
                     }
 
-                    var position = IMouse.GetScreenPosition(mouseInput.Position, mouse.ClientSize, aspectRatio);
+                    if (mouse != null)
+                    {
+                        var position = IMouse.GetScreenPosition(mouseInput.Position, mouse.ClientSize, aspectRatio);
 
-                    _device.Hid.Mouse.Update((int)position.X, (int)position.Y, buttons, (int)mouseInput.Scroll.X, (int)mouseInput.Scroll.Y, true);
+                        _device.Hid.Mouse.Update((int)position.X, (int)position.Y, buttons, (int)mouseInput.Scroll.X, (int)mouseInput.Scroll.Y, true);
+                    }
                 }
                 else
                 {

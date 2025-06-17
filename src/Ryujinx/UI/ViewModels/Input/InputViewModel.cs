@@ -254,10 +254,13 @@ namespace Ryujinx.Ava.UI.ViewModels.Input
 
                 AvaloniaKeyboardDriver = new AvaloniaKeyboardDriver(owner);
 
-                _mainWindow.InputManager.GamepadDriver.OnGamepadConnected += HandleOnGamepadConnected;
-                _mainWindow.InputManager.GamepadDriver.OnGamepadDisconnected += HandleOnGamepadDisconnected;
+                if (_mainWindow != null)
+                {
+                    _mainWindow.InputManager.GamepadDriver.OnGamepadConnected += HandleOnGamepadConnected;
+                    _mainWindow.InputManager.GamepadDriver.OnGamepadDisconnected += HandleOnGamepadDisconnected;
 
-                _mainWindow.ViewModel.AppHost?.NpadManager.BlockInputUpdates();
+                    _mainWindow.ViewModel.AppHost?.NpadManager.BlockInputUpdates();
+                }
 
                 _isLoaded = false;
 
@@ -783,11 +786,14 @@ namespace Ryujinx.Ava.UI.ViewModels.Input
                         config = (ConfigViewModel as ControllerInputViewModel)?.Config.GetConfig();
                     }
 
-                    config.ControllerType = Controllers[_controller].Type;
+                    if (config != null)
+                    {
+                        config.ControllerType = Controllers[_controller].Type;
 
-                    string jsonString = JsonHelper.Serialize(config, _serializerContext.InputConfig);
+                        string jsonString = JsonHelper.Serialize(config, _serializerContext.InputConfig);
 
-                    await File.WriteAllTextAsync(path, jsonString);
+                        await File.WriteAllTextAsync(path, jsonString);
+                    }
 
                     LoadProfiles();
                 }

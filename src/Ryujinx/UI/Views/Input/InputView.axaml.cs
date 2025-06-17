@@ -72,7 +72,10 @@ namespace Ryujinx.Ava.UI.Views.Input
                     {
                         ViewModel.IsModified = true;
                         var player = (PlayerModel)e.AddedItems[0];
-                        ViewModel.PlayerId = player.Id;
+                        if (player != null)
+                        {
+                            ViewModel.PlayerId = player.Id;
+                        }
                     }
                 }
             }

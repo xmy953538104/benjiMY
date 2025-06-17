@@ -34,8 +34,11 @@ namespace Ryujinx.HLE.HOS.Kernel.Memory
         {
             if (_pageList.Nodes.Count == 1)
             {
-                ulong address = _pageList.Nodes.First.Value.Address - DramMemoryMap.DramBase;
-                return ref _context.Memory.GetRef<T>(address + offset);
+                if (_pageList.Nodes.First != null)
+                {
+                    ulong address = _pageList.Nodes.First.Value.Address - DramMemoryMap.DramBase;
+                    return ref _context.Memory.GetRef<T>(address + offset);
+                }
             }
 
             throw new NotImplementedException("Non-contiguous shared memory is not yet supported.");

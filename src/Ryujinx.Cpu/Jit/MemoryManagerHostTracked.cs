@@ -135,7 +135,10 @@ namespace Ryujinx.Cpu.Jit
                     offset += (int)copySize;
                 }
 
-                return new ReadOnlySequence<byte>(first, 0, last, (int)(size - last.RunningIndex));
+                if (last != null)
+                {
+                    return new ReadOnlySequence<byte>(first, 0, last, (int)(size - last.RunningIndex));
+                }
             }
             catch (InvalidMemoryRegionException)
             {
@@ -146,6 +149,8 @@ namespace Ryujinx.Cpu.Jit
 
                 return ReadOnlySequence<byte>.Empty;
             }
+
+            return default;
         }
 
         /// <inheritdoc/>

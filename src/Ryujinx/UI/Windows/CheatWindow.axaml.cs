@@ -120,7 +120,7 @@ namespace Ryujinx.Ava.UI.Windows
                 }
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(_enabledCheatsPath));
+            Directory.CreateDirectory(Path.GetDirectoryName(_enabledCheatsPath) ?? string.Empty);
 
             File.WriteAllLines(_enabledCheatsPath, enabledCheats);
 

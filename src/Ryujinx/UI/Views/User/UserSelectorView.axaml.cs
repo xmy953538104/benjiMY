@@ -123,7 +123,7 @@ namespace Ryujinx.Ava.UI.Views.User
 
         private void Close(object sender, RoutedEventArgs e)
         {
-            ((ContentDialog)_parent.Parent).Hide();
+            ((ContentDialog)_parent.Parent)?.Hide();
         }
     }
 }

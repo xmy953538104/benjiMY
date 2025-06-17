@@ -111,7 +111,7 @@ namespace Ryujinx.Ava.UI.Controls
                     viewModel.VirtualFileSystem,
                     viewModel.SelectedApplication.IdString,
                     viewModel.SelectedApplication.Name,
-                    viewModel.SelectedApplication.Path).ShowDialog(viewModel.TopLevel as Window);
+                    viewModel.SelectedApplication.Path).ShowDialog((Window)viewModel.TopLevel);
             }
         }
 
@@ -396,9 +396,12 @@ namespace Ryujinx.Ava.UI.Controls
                     viewModel.SelectedApplication.Name);
 
                 var iconFile = await result[0].CreateFileAsync(selectedApp.IdString + ".png");
-                await using var fileStream = await iconFile.OpenWriteAsync();
+                if (iconFile != null)
+                {
+                    await using var fileStream = await iconFile.OpenWriteAsync();
 
-                fileStream.Write(selectedApp.Icon);
+                    fileStream.Write(selectedApp.Icon);
+                }
             }
         }
 

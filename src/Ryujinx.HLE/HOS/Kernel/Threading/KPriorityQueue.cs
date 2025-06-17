@@ -253,7 +253,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Threading
 
             thread.SiblingsPerCore[core] = queue.AddLast(thread);
 
-            return queue.First.Value;
+            return queue.First?.Value;
         }
 
         public void Unschedule(int prio, int core, KThread thread)

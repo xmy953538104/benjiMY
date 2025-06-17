@@ -25,7 +25,7 @@ namespace Ryujinx.Common.Configuration.Hid.Controller.Motion
                 {
                     string propertyName = tempReader.GetString();
 
-                    if (propertyName.Equals("motion_backend"))
+                    if (propertyName is "motion_backend")
                     {
                         tempReader.Read();
 

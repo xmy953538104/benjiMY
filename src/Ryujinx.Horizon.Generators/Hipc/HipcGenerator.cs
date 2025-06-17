@@ -61,42 +61,45 @@ namespace Ryujinx.Horizon.Generators.Hipc
         {
             HipcSyntaxReceiver syntaxReceiver = (HipcSyntaxReceiver)context.SyntaxReceiver;
 
-            foreach (var commandInterface in syntaxReceiver.CommandInterfaces)
+            if (syntaxReceiver?.CommandInterfaces != null)
             {
-                if (!NeedsIServiceObjectImplementation(context.Compilation, commandInterface.ClassDeclarationSyntax))
+                foreach (var commandInterface in syntaxReceiver.CommandInterfaces)
                 {
-                    continue;
-                }
+                    if (!NeedsIServiceObjectImplementation(context.Compilation, commandInterface.ClassDeclarationSyntax))
+                    {
+                        continue;
+                    }
 
-                CodeGenerator generator = new CodeGenerator();
-                string className = commandInterface.ClassDeclarationSyntax.Identifier.ToString();
+                    CodeGenerator generator = new CodeGenerator();
+                    string className = commandInterface.ClassDeclarationSyntax.Identifier.ToString();
 
-                generator.AppendLine("using Ryujinx.Horizon.Common;");
-                generator.AppendLine("using Ryujinx.Horizon.Sdk.Sf;");
-                generator.AppendLine("using Ryujinx.Horizon.Sdk.Sf.Cmif;");
-                generator.AppendLine("using Ryujinx.Horizon.Sdk.Sf.Hipc;");
-                generator.AppendLine("using System;");
-                generator.AppendLine("using System.Collections.Frozen;");
-                generator.AppendLine("using System.Collections.Generic;");
-                generator.AppendLine("using System.Runtime.CompilerServices;");
-                generator.AppendLine("using System.Runtime.InteropServices;");
-                generator.AppendLine();
-                generator.EnterScope($"namespace {GetNamespaceName(commandInterface.ClassDeclarationSyntax)}");
-                generator.EnterScope($"partial class {className}");
-
-                GenerateMethodTable(generator, context.Compilation, commandInterface);
-
-                foreach (var method in commandInterface.CommandImplementations)
-                {
+                    generator.AppendLine("using Ryujinx.Horizon.Common;");
+                    generator.AppendLine("using Ryujinx.Horizon.Sdk.Sf;");
+                    generator.AppendLine("using Ryujinx.Horizon.Sdk.Sf.Cmif;");
+                    generator.AppendLine("using Ryujinx.Horizon.Sdk.Sf.Hipc;");
+                    generator.AppendLine("using System;");
+                    generator.AppendLine("using System.Collections.Frozen;");
+                    generator.AppendLine("using System.Collections.Generic;");
+                    generator.AppendLine("using System.Runtime.CompilerServices;");
+                    generator.AppendLine("using System.Runtime.InteropServices;");
                     generator.AppendLine();
+                    generator.EnterScope($"namespace {GetNamespaceName(commandInterface.ClassDeclarationSyntax)}");
+                    generator.EnterScope($"partial class {className}");
 
-                    GenerateMethod(generator, context.Compilation, method);
+                    GenerateMethodTable(generator, context.Compilation, commandInterface);
+
+                    foreach (var method in commandInterface.CommandImplementations)
+                    {
+                        generator.AppendLine();
+
+                        GenerateMethod(generator, context.Compilation, method);
+                    }
+
+                    generator.LeaveScope();
+                    generator.LeaveScope();
+
+                    context.AddSource($"{GetNamespaceName(commandInterface.ClassDeclarationSyntax)}.{className}.g.cs", generator.ToString());
                 }
-
-                generator.LeaveScope();
-                generator.LeaveScope();
-
-                context.AddSource($"{GetNamespaceName(commandInterface.ClassDeclarationSyntax)}.{className}.g.cs", generator.ToString());
             }
         }
 
@@ -191,11 +194,15 @@ namespace Ryujinx.Horizon.Generators.Hipc
         {
             ISymbol symbol = compilation.GetSemanticModel(syntaxNode.SyntaxTree).GetDeclaredSymbol(syntaxNode);
 
-            foreach (var attribute in symbol.GetAttributes())
+            if (symbol != null)
             {
-                if (attribute.AttributeClass.ToDisplayString() == attributeName && (uint)argIndex < (uint)attribute.ConstructorArguments.Length)
+                foreach (var attribute in symbol.GetAttributes())
                 {
-                    yield return attribute.ConstructorArguments[argIndex].ToCSharpString();
+                    if (attribute.AttributeClass?.ToDisplayString() == attributeName &&
+                        (uint)argIndex < (uint)attribute.ConstructorArguments.Length)
+                    {
+                        yield return attribute.ConstructorArguments[argIndex].ToCSharpString();
+                    }
                 }
             }
         }
@@ -507,18 +514,21 @@ namespace Ryujinx.Horizon.Generators.Hipc
         {
             TypeInfo typeInfo = compilation.GetSemanticModel(syntaxNode.SyntaxTree).GetTypeInfo(syntaxNode);
 
-            return typeInfo.Type.ToDisplayString();
+            return typeInfo.Type?.ToDisplayString();
         }
 
         private static string GetCanonicalTypeName(Compilation compilation, SyntaxNode syntaxNode)
         {
             TypeInfo typeInfo = compilation.GetSemanticModel(syntaxNode.SyntaxTree).GetTypeInfo(syntaxNode);
-            string typeName = typeInfo.Type.ToDisplayString();
+            string typeName = typeInfo.Type?.ToDisplayString();
 
-            int genericArgsStartIndex = typeName.IndexOf('<');
-            if (genericArgsStartIndex >= 0)
+            if (typeName != null)
             {
-                return typeName.Substring(0, genericArgsStartIndex);
+                int genericArgsStartIndex = typeName.IndexOf('<');
+                if (genericArgsStartIndex >= 0)
+                {
+                    return typeName.Substring(0, genericArgsStartIndex);
+                }
             }
 
             return typeName;
@@ -528,7 +538,7 @@ namespace Ryujinx.Horizon.Generators.Hipc
         {
             TypeInfo typeInfo = compilation.GetSemanticModel(syntaxNode.SyntaxTree).GetTypeInfo(syntaxNode);
 
-            return typeInfo.Type.SpecialType;
+            return typeInfo.Type?.SpecialType ?? SpecialType.None;
         }
 
         private static string GetTypeAlignmentExpression(Compilation compilation, SyntaxNode syntaxNode)
@@ -539,7 +549,7 @@ namespace Ryujinx.Horizon.Generators.Hipc
             // "special" types are primitive types aligned to their own length.
             // Otherwise, assume that the type is a custom struct, that either defines an explicit alignment
             // or has an alignment of 1 which is the lowest possible value.
-            if (typeInfo.Type.SpecialType == SpecialType.None)
+            if (typeInfo.Type is { SpecialType: SpecialType.None })
             {
                 string pack = GetTypeFirstNamedAttributeAgument(compilation, syntaxNode, TypeStructLayoutAttribute, "Pack");
 
@@ -547,7 +557,7 @@ namespace Ryujinx.Horizon.Generators.Hipc
             }
             else
             {
-                return $"Unsafe.SizeOf<{typeInfo.Type.ToDisplayString()}>()";
+                return $"Unsafe.SizeOf<{typeInfo.Type?.ToDisplayString()}>()";
             }
         }
 
@@ -555,13 +565,13 @@ namespace Ryujinx.Horizon.Generators.Hipc
         {
             ISymbol symbol = compilation.GetSemanticModel(syntaxNode.SyntaxTree).GetTypeInfo(syntaxNode).Type;
 
-            foreach (var attribute in symbol.GetAttributes())
+            if (symbol != null)
             {
-                if (attribute.AttributeClass.ToDisplayString() == attributeName)
+                foreach (var attribute in symbol.GetAttributes())
                 {
-                    foreach (var kv in attribute.NamedArguments)
+                    if (attribute.AttributeClass?.ToDisplayString() == attributeName)
                     {
-                        if (kv.Key == argName)
+                        foreach (var kv in attribute.NamedArguments.Where(kv => kv.Key == argName))
                         {
                             return kv.Value.ToCSharpString();
                         }
@@ -664,7 +674,7 @@ namespace Ryujinx.Horizon.Generators.Hipc
         {
             TypeInfo typeInfo = compilation.GetSemanticModel(syntaxNode.SyntaxTree).GetTypeInfo(syntaxNode);
 
-            return typeInfo.Type.IsUnmanagedType;
+            return typeInfo.Type is { IsUnmanagedType: true };
         }
 
         private static bool IsMemory(Compilation compilation, ParameterSyntax parameter)
@@ -707,10 +717,11 @@ namespace Ryujinx.Horizon.Generators.Hipc
         private static bool IsObject(Compilation compilation, ParameterSyntax parameter)
         {
             SyntaxNode syntaxNode = parameter.Type;
-            TypeInfo typeInfo = compilation.GetSemanticModel(syntaxNode.SyntaxTree).GetTypeInfo(syntaxNode);
+            TypeInfo typeInfo = compilation.GetSemanticModel(syntaxNode!.SyntaxTree).GetTypeInfo(syntaxNode);
 
-            return typeInfo.Type.ToDisplayString() == TypeIServiceObject ||
-                   typeInfo.Type.AllInterfaces.Any(x => x.ToDisplayString() == TypeIServiceObject);
+            return typeInfo.Type != null &&
+                   (typeInfo.Type.ToDisplayString() == TypeIServiceObject ||
+                    typeInfo.Type.AllInterfaces.Any(x => x.ToDisplayString() == TypeIServiceObject));
         }
 
         private static bool IsProcessId(Compilation compilation, ParameterSyntax parameter)
@@ -781,7 +792,7 @@ namespace Ryujinx.Horizon.Generators.Hipc
         private static bool NeedsIServiceObjectImplementation(Compilation compilation, ClassDeclarationSyntax classDeclarationSyntax)
         {
             ITypeSymbol type = compilation.GetSemanticModel(classDeclarationSyntax.SyntaxTree).GetDeclaredSymbol(classDeclarationSyntax);
-            var serviceObjectInterface = type.AllInterfaces.FirstOrDefault(x => x.ToDisplayString() == TypeIServiceObject);
+            var serviceObjectInterface = type?.AllInterfaces.FirstOrDefault(x => x.ToDisplayString() == TypeIServiceObject);
             var interfaceMember = serviceObjectInterface?.GetMembers().FirstOrDefault(x => x.Name == "GetCommandHandlers");
 
             // Return true only if the class implements IServiceObject but does not actually implement the method

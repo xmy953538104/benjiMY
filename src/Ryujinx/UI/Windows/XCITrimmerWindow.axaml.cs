@@ -59,7 +59,7 @@ namespace Ryujinx.Ava.UI.Windows
 
         private void Close(object sender, RoutedEventArgs e)
         {
-            ((ContentDialog)Parent).Hide();
+            ((ContentDialog)Parent)?.Hide();
         }
 
         private void Cancel(Object sender, RoutedEventArgs e)

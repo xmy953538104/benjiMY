@@ -372,7 +372,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
 
             if (rangeCount == -1)
             {
-                _migrationTarget.WaitForAndFlushRanges(address, size);
+                _migrationTarget?.WaitForAndFlushRanges(address, size);
 
                 return;
             }

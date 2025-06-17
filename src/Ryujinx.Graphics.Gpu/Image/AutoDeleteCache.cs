@@ -173,24 +173,27 @@ namespace Ryujinx.Graphics.Gpu.Image
         /// </summary>
         private void RemoveLeastUsedTexture()
         {
-            Texture oldestTexture = _textures.First.Value;
-
-            _totalSize -= oldestTexture.Size;
-
-            if (!oldestTexture.CheckModified(false))
+            if (_textures.First != null)
             {
-                // The texture must be flushed if it falls out of the auto delete cache.
-                // Flushes out of the auto delete cache do not trigger write tracking,
-                // as it is expected that other overlapping textures exist that have more up-to-date contents.
+                Texture oldestTexture = _textures.First.Value;
 
-                oldestTexture.Group.SynchronizeDependents(oldestTexture);
-                oldestTexture.FlushModified(false);
+                _totalSize -= oldestTexture.Size;
+
+                if (!oldestTexture.CheckModified(false))
+                {
+                    // The texture must be flushed if it falls out of the auto delete cache.
+                    // Flushes out of the auto delete cache do not trigger write tracking,
+                    // as it is expected that other overlapping textures exist that have more up-to-date contents.
+
+                    oldestTexture.Group.SynchronizeDependents(oldestTexture);
+                    oldestTexture.FlushModified(false);
+                }
+
+                _textures.RemoveFirst();
+
+                oldestTexture.DecrementReferenceCount();
+                oldestTexture.CacheNode = null;
             }
-
-            _textures.RemoveFirst();
-
-            oldestTexture.DecrementReferenceCount();
-            oldestTexture.CacheNode = null;
         }
 
         /// <summary>

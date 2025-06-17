@@ -481,7 +481,7 @@ namespace Ryujinx.Graphics.Gpu.Shader.DiskCache
             }
 
             int offset = Unsafe.SizeOf<TocHeader>() + programIndex * Unsafe.SizeOf<OffsetAndSize>();
-            if (offset + Unsafe.SizeOf<OffsetAndSize>() > tocFileStream.Length)
+            if (tocFileStream != null && offset + Unsafe.SizeOf<OffsetAndSize>() > tocFileStream.Length)
             {
                 return (null, null);
             }
@@ -491,7 +491,7 @@ namespace Ryujinx.Graphics.Gpu.Shader.DiskCache
                 throw new DiskCacheLoadException(DiskCacheLoadResult.FileCorruptedGeneric);
             }
 
-            tocFileStream.Seek(offset, SeekOrigin.Begin);
+            tocFileStream?.Seek(offset, SeekOrigin.Begin);
 
             BinarySerializer tocReader = new(tocFileStream);
 

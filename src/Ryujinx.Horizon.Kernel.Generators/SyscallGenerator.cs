@@ -147,20 +147,26 @@ namespace Ryujinx.Horizon.Kernel.Generators
 
             List<SyscallIdAndName> syscalls = [];
 
-            foreach (var method in syntaxReceiver.SvcImplementations)
+            if (syntaxReceiver != null)
             {
-                GenerateMethod32(generator, context.Compilation, method);
-                GenerateMethod64(generator, context.Compilation, method);
-
-                foreach (AttributeSyntax attribute in method.AttributeLists.SelectMany(attributeList =>
-                             attributeList.Attributes.Where(attribute =>
-                                 GetCanonicalTypeName(context.Compilation, attribute) == TypeSvcAttribute)))
+                foreach (var method in syntaxReceiver.SvcImplementations)
                 {
-                    syscalls.AddRange(from attributeArg in attribute.ArgumentList.Arguments
-                                      where attributeArg.Expression.Kind() == SyntaxKind.NumericLiteralExpression
-                                      select (LiteralExpressionSyntax)attributeArg.Expression
-                                      into numericLiteral
-                                      select new SyscallIdAndName((int)numericLiteral.Token.Value, method.Identifier.Text));
+                    GenerateMethod32(generator, context.Compilation, method);
+                    GenerateMethod64(generator, context.Compilation, method);
+
+                    foreach (AttributeSyntax attribute in method.AttributeLists.SelectMany(attributeList =>
+                                 attributeList.Attributes.Where(attribute =>
+                                     GetCanonicalTypeName(context.Compilation, attribute) == TypeSvcAttribute)))
+                    {
+                        if (attribute.ArgumentList != null)
+                        {
+                            syscalls.AddRange(from attributeArg in attribute.ArgumentList.Arguments
+                                where attributeArg.Expression.Kind() == SyntaxKind.NumericLiteralExpression
+                                select (LiteralExpressionSyntax)attributeArg.Expression
+                                into numericLiteral
+                                select new SyscallIdAndName((int)numericLiteral.Token.Value, method.Identifier.Text));
+                        }
+                    }
                 }
             }
 

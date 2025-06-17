@@ -273,7 +273,7 @@ namespace Ryujinx.Common.Configuration
                     {
                         FileSystemInfo resolvedDirectoryInfo =
                             Directory.ResolveLinkTarget(correctApplicationDataDirectoryPath, true);
-                        string resolvedPath = resolvedDirectoryInfo.FullName;
+                        string resolvedPath = resolvedDirectoryInfo?.FullName;
                         Logger.Error?.Print(LogClass.Application, $"Please manually move your Ryujinx data from {resolvedPath} to {correctApplicationDataDirectoryPath}, and remove the symlink.");
                     }
                     catch (Exception symlinkException)
@@ -297,7 +297,7 @@ namespace Ryujinx.Common.Configuration
                     {
                         FileSystemInfo resolvedDirectoryInfo =
                             Directory.ResolveLinkTarget(correctApplicationDataDirectoryPath, true);
-                        string resolvedPath = resolvedDirectoryInfo.FullName;
+                        string resolvedPath = resolvedDirectoryInfo?.FullName;
                         Logger.Error?.Print(LogClass.Application, $"Please manually move your Ryujinx data from {resolvedPath} to {correctApplicationDataDirectoryPath}, and remove the symlink.");
                     }
                     catch (Exception symlinkException)

@@ -37,7 +37,7 @@ namespace Ryujinx.Ava.UI.ViewModels
                 return app.Favorite ? -1 : 1;
             }
 
-            throw new InvalidCastException($"Cannot cast {o.GetType()} to {nameof(AppListFavoriteComparable)}");
+            throw new InvalidCastException($"Cannot cast {o?.GetType()} to {nameof(AppListFavoriteComparable)}");
         }
     }
 }

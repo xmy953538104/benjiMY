@@ -1302,7 +1302,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Threading
         {
             Owner?.RemoveThread(this);
 
-            if (_tlsAddress != 0 && Owner.FreeThreadLocalStorage(_tlsAddress) != Result.Success)
+            if (_tlsAddress != 0 && Owner?.FreeThreadLocalStorage(_tlsAddress) != Result.Success)
             {
                 throw new InvalidOperationException("Unexpected failure freeing thread local storage.");
             }

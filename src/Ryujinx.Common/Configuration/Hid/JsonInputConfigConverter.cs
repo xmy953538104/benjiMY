@@ -27,7 +27,7 @@ namespace Ryujinx.Common.Configuration.Hid
                 {
                     string propertyName = tempReader.GetString();
 
-                    if (propertyName.Equals("backend"))
+                    if (propertyName is "backend")
                     {
                         tempReader.Read();
 

@@ -1369,44 +1369,50 @@ namespace Ryujinx.HLE.HOS.Kernel.Memory
 
                 LinkedListNode<KPageNode> pageListNode = pageList.Nodes.First;
 
-                KPageNode pageNode = pageListNode.Value;
-
-                ulong srcPa = pageNode.Address;
-                ulong srcPaPages = pageNode.PagesCount;
-
-                foreach (KMemoryInfo info in IterateOverRange(address, endAddr))
+                if (pageListNode != null)
                 {
-                    if (info.State != MemoryState.Unmapped)
+                    KPageNode pageNode = pageListNode.Value;
+
+                    ulong srcPa = pageNode.Address;
+                    ulong srcPaPages = pageNode.PagesCount;
+
+                    foreach (KMemoryInfo info in IterateOverRange(address, endAddr))
                     {
-                        continue;
-                    }
-
-                    ulong blockSize = GetSizeInRange(info, address, endAddr);
-
-                    ulong dstVaPages = blockSize / PageSize;
-
-                    ulong dstVa = GetAddrInRange(info, address);
-
-                    while (dstVaPages > 0)
-                    {
-                        if (srcPaPages == 0)
+                        if (info.State != MemoryState.Unmapped)
                         {
-                            pageListNode = pageListNode.Next;
-
-                            pageNode = pageListNode.Value;
-
-                            srcPa = pageNode.Address;
-                            srcPaPages = pageNode.PagesCount;
+                            continue;
                         }
 
-                        ulong currentPagesCount = Math.Min(srcPaPages, dstVaPages);
+                        ulong blockSize = GetSizeInRange(info, address, endAddr);
 
-                        MapPages(dstVa, currentPagesCount, srcPa, KMemoryPermission.ReadAndWrite, MemoryMapFlags.Private);
+                        ulong dstVaPages = blockSize / PageSize;
 
-                        dstVa += currentPagesCount * PageSize;
-                        srcPa += currentPagesCount * PageSize;
-                        srcPaPages -= currentPagesCount;
-                        dstVaPages -= currentPagesCount;
+                        ulong dstVa = GetAddrInRange(info, address);
+
+                        while (dstVaPages > 0)
+                        {
+                            if (srcPaPages == 0)
+                            {
+                                pageListNode = pageListNode?.Next;
+
+                                if (pageListNode != null)
+                                {
+                                    pageNode = pageListNode.Value;
+                                }
+
+                                srcPa = pageNode.Address;
+                                srcPaPages = pageNode.PagesCount;
+                            }
+
+                            ulong currentPagesCount = Math.Min(srcPaPages, dstVaPages);
+
+                            MapPages(dstVa, currentPagesCount, srcPa, KMemoryPermission.ReadAndWrite, MemoryMapFlags.Private);
+
+                            dstVa += currentPagesCount * PageSize;
+                            srcPa += currentPagesCount * PageSize;
+                            srcPaPages -= currentPagesCount;
+                            dstVaPages -= currentPagesCount;
+                        }
                     }
                 }
 

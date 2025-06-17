@@ -36,11 +36,11 @@ namespace Ryujinx.UI.Common.SystemInfo
             {
                 foreach (var cpuObj in cpuObjs)
                 {
-                    return cpuObj["Name"].ToString().Trim();
+                    return cpuObj["Name"].ToString()?.Trim();
                 }
             }
 
-            return Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER").Trim();
+            return Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER")?.Trim();
         }
 
         [StructLayout(LayoutKind.Sequential)]

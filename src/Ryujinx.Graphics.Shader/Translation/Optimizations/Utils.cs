@@ -189,7 +189,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Optimizations
 
         public static void DeleteNode(LinkedListNode<INode> node, Operation operation)
         {
-            node.List.Remove(node);
+            node.List?.Remove(node);
 
             for (int srcIndex = 0; srcIndex < operation.SourcesCount; srcIndex++)
             {

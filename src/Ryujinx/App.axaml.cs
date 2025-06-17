@@ -84,7 +84,7 @@ namespace Ryujinx.Ava
                     if (result == UserResult.Yes)
                     {
                         var path = Environment.ProcessPath;
-                        var proc = Process.Start(path, CommandLineState.Arguments);
+                        var proc = Process.Start(path ?? string.Empty, CommandLineState.Arguments);
                         desktop.Shutdown();
                         Environment.Exit(0);
                     }
@@ -144,7 +144,7 @@ namespace Ryujinx.Ava
 
         public static ThemeVariant DetectSystemTheme()
         {
-            if (Current is App app)
+            if (Current is App { PlatformSettings: not null } app)
             {
                 var colorValues = app.PlatformSettings.GetColorValues();
 

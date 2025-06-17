@@ -127,7 +127,11 @@ namespace Ryujinx.Horizon.Arp.Ipc
                 return ArpResult.InvalidInstanceId;
             }
 
-            applicationCertificate = _applicationInstanceManager.Entries[applicationInstanceId].Certificate.Value;
+            ApplicationCertificate? certificate = _applicationInstanceManager.Entries[applicationInstanceId].Certificate;
+            if (certificate != null)
+            {
+                applicationCertificate = certificate.Value;
+            }
 
             return Result.Success;
         }

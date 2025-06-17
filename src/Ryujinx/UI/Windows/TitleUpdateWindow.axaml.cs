@@ -50,14 +50,14 @@ namespace Ryujinx.Ava.UI.Windows
 
         private void Close(object sender, RoutedEventArgs e)
         {
-            ((ContentDialog)Parent).Hide();
+            ((ContentDialog)Parent)?.Hide();
         }
 
         public void Save(object sender, RoutedEventArgs e)
         {
             ViewModel.Save();
 
-            ((ContentDialog)Parent).Hide();
+            ((ContentDialog)Parent)?.Hide();
         }
 
         private void OpenLocation(object sender, RoutedEventArgs e)

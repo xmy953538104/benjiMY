@@ -59,7 +59,7 @@ namespace Ryujinx.Graphics.OpenGL
             IntPtr message,
             IntPtr userParam)
         {
-            string msg = Marshal.PtrToStringUTF8(message).Replace('\n', ' ');
+            string msg = Marshal.PtrToStringUTF8(message)?.Replace('\n', ' ');
 
             switch (type)
             {

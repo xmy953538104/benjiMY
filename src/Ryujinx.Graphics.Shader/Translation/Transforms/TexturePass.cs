@@ -79,7 +79,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
                         callArgs = [Const(functionId), texOp.GetSource(coordsIndex + index), Const(samplerIndex)];
                     }
 
-                    node.List.AddBefore(node, new Operation(Instruction.Call, 0, scaledCoord, callArgs));
+                    node.List?.AddBefore(node, new Operation(Instruction.Call, 0, scaledCoord, callArgs));
 
                     texOp.SetSource(coordsIndex + index, scaledCoord);
                 }
@@ -130,7 +130,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
 
                     Operand[] callArgs = [Const(functionId), dest, Const(samplerIndex)];
 
-                    node.List.AddAfter(node, new Operation(Instruction.Call, 0, unscaledSize, callArgs));
+                    node.List?.AddAfter(node, new Operation(Instruction.Call, 0, unscaledSize, callArgs));
                 }
             }
 
@@ -178,7 +178,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
 
                 Operand[] texSizeSources = [Const(0)];
 
-                LinkedListNode<INode> textureSizeNode = node.List.AddBefore(node, new TextureOperation(
+                LinkedListNode<INode> textureSizeNode = node.List?.AddBefore(node, new TextureOperation(
                     Instruction.TextureQuerySize,
                     texOp.Type,
                     texOp.Format,
@@ -195,7 +195,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
 
                 Operand coordNormalized = Local();
 
-                node.List.AddBefore(node, new Operation(Instruction.FP32 | Instruction.Divide, coordNormalized, source, GenerateI2f(node, coordSize)));
+                node.List?.AddBefore(node, new Operation(Instruction.FP32 | Instruction.Divide, coordNormalized, source, GenerateI2f(node, coordSize)));
 
                 texOp.SetSource(index, coordNormalized);
 
@@ -248,7 +248,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
                     texSizeSources = [Const(0)];
                 }
 
-                node.List.AddBefore(node, new TextureOperation(
+                node.List?.AddBefore(node, new TextureOperation(
                     Instruction.TextureQuerySize,
                     texOp.Type,
                     texOp.Format,
@@ -259,18 +259,18 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
                     [coordSize],
                     texSizeSources));
 
-                node.List.AddBefore(node, new Operation(
+                node.List?.AddBefore(node, new Operation(
                     Instruction.FP32 | Instruction.Multiply,
                     scaledSize,
                     GenerateI2f(node, coordSize),
                     ConstF((float)(1 << (gatherBiasPrecision + 1)))));
-                node.List.AddBefore(node, new Operation(Instruction.FP32 | Instruction.Divide, bias, ConstF(1f), scaledSize));
+                node.List?.AddBefore(node, new Operation(Instruction.FP32 | Instruction.Divide, bias, ConstF(1f), scaledSize));
 
                 Operand source = texOp.GetSource(coordsIndex + index);
 
                 Operand coordBiased = Local();
 
-                node.List.AddBefore(node, new Operation(Instruction.FP32 | Instruction.Add, coordBiased, source, bias));
+                node.List?.AddBefore(node, new Operation(Instruction.FP32 | Instruction.Add, coordBiased, source, bias));
 
                 texOp.SetSource(coordsIndex + index, coordBiased);
             }
@@ -573,7 +573,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
                     texSizeSources = [Const(0)];
                 }
 
-                node.List.AddBefore(node, new TextureOperation(
+                node.List?.AddBefore(node, new TextureOperation(
                     Instruction.TextureQuerySize,
                     texOp.Type,
                     texOp.Format,
@@ -604,7 +604,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
             {
                 lod = Local();
 
-                node.List.AddBefore(node, new TextureOperation(
+                node.List?.AddBefore(node, new TextureOperation(
                     Instruction.Lod,
                     texOp.Type,
                     texOp.Format,
@@ -635,7 +635,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
                     texSizeSources = [GenerateF2i(node, lod)];
                 }
 
-                node.List.AddBefore(node, new TextureOperation(
+                node.List?.AddBefore(node, new TextureOperation(
                     Instruction.TextureQuerySize,
                     texOp.Type,
                     texOp.Format,
@@ -692,8 +692,8 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
                 Operation convOp = new(Instruction.ConvertS32ToFP32, Local(), dest);
                 Operation normOp = new(Instruction.FP32 | Instruction.Multiply, Local(), convOp.Dest, ConstF(1f / maxPositive));
 
-                node = node.List.AddAfter(node, convOp);
-                node = node.List.AddAfter(node, normOp);
+                node = node?.List?.AddAfter(node, convOp);
+                node = node?.List?.AddAfter(node, normOp);
 
                 foreach (INode useOp in uses)
                 {
@@ -720,7 +720,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
         {
             Operand res = Local();
 
-            node.List.AddBefore(node, new Operation(Instruction.ConvertS32ToFP32, res, value));
+            node.List?.AddBefore(node, new Operation(Instruction.ConvertS32ToFP32, res, value));
 
             return res;
         }
@@ -729,7 +729,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Transforms
         {
             Operand res = Local();
 
-            node.List.AddBefore(node, new Operation(Instruction.ConvertFP32ToS32, res, value));
+            node.List?.AddBefore(node, new Operation(Instruction.ConvertFP32ToS32, res, value));
 
             return res;
         }

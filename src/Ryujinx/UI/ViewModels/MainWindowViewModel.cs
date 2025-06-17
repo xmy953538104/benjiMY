@@ -1332,7 +1332,7 @@ namespace Ryujinx.Ava.UI.ViewModels
             }
             catch (MissingKeyException ex)
             {
-                if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     Logger.Error?.Print(LogClass.Application, ex.ToString());
 
@@ -1553,7 +1553,7 @@ namespace Ryujinx.Ava.UI.ViewModels
             {
                 Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    Application.Current.Styles.TryGetResource(args.VSyncMode,
+                    Application.Current!.Styles.TryGetResource(args.VSyncMode,
                         Application.Current.ActualThemeVariant,
                         out object color);
 

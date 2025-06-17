@@ -92,9 +92,9 @@ namespace Ryujinx.Ava.UI.ViewModels
 
             _applicationData = applicationData;
 
-            if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                _storageProvider = desktop.MainWindow.StorageProvider;
+                _storageProvider = desktop.MainWindow?.StorageProvider;
             }
 
             LoadDownloadableContents();

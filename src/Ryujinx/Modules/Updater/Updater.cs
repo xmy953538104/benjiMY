@@ -192,7 +192,10 @@ namespace Ryujinx.Modules
 
                 HttpResponseMessage message = await buildSizeClient.GetAsync(new Uri(_buildUrl), HttpCompletionOption.ResponseHeadersRead);
 
-                _buildSize = message.Content.Headers.ContentRange.Length.Value;
+                if (message.Content.Headers.ContentRange?.Length != null)
+                {
+                    _buildSize = message.Content.Headers.ContentRange.Length.Value;
+                }
             }
             catch (Exception ex)
             {
@@ -376,10 +379,14 @@ namespace Ryujinx.Modules
 
                 client.DownloadProgressChanged += (_, args) =>
                 {
-                    int index = (int)args.UserState;
+                    if (args.UserState != null)
+                    {
+                        int index = (int)args.UserState;
 
-                    Interlocked.Add(ref totalProgressPercentage, -1 * progressPercentage[index]);
-                    Interlocked.Exchange(ref progressPercentage[index], args.ProgressPercentage);
+                        Interlocked.Add(ref totalProgressPercentage, -1 * progressPercentage[index]);
+                        Interlocked.Exchange(ref progressPercentage[index], args.ProgressPercentage);
+                    }
+
                     Interlocked.Add(ref totalProgressPercentage, args.ProgressPercentage);
 
                     taskDialog.SetProgressBarState(totalProgressPercentage / ConnectionCount, TaskDialogProgressState.Normal);
@@ -387,18 +394,22 @@ namespace Ryujinx.Modules
 
                 client.DownloadDataCompleted += (_, args) =>
                 {
-                    int index = (int)args.UserState;
-
-                    if (args.Cancelled)
+                    if (args.UserState != null)
                     {
-                        webClients[index].Dispose();
+                        int index = (int)args.UserState;
 
-                        taskDialog.Hide();
+                        if (args.Cancelled)
+                        {
+                            webClients[index].Dispose();
 
-                        return;
+                            taskDialog.Hide();
+
+                            return;
+                        }
+
+                        list[index] = args.Result;
                     }
 
-                    list[index] = args.Result;
                     Interlocked.Increment(ref completedRequests);
 
                     if (Equals(completedRequests, ConnectionCount))
@@ -465,25 +476,28 @@ namespace Ryujinx.Modules
             using Stream remoteFileStream = response.Content.ReadAsStreamAsync().Result;
             using Stream updateFileStream = File.Open(updateFile, FileMode.Create);
 
-            long totalBytes = response.Content.Headers.ContentLength.Value;
-            long byteWritten = 0;
-
-            byte[] buffer = new byte[32 * 1024];
-
-            while (true)
+            if (response.Content.Headers.ContentLength != null)
             {
-                int readSize = remoteFileStream.Read(buffer);
+                long totalBytes = response.Content.Headers.ContentLength.Value;
+                long byteWritten = 0;
 
-                if (readSize == 0)
+                byte[] buffer = new byte[32 * 1024];
+
+                while (true)
                 {
-                    break;
+                    int readSize = remoteFileStream.Read(buffer);
+
+                    if (readSize == 0)
+                    {
+                        break;
+                    }
+
+                    byteWritten += readSize;
+
+                    taskDialog.SetProgressBarState(GetPercentage(byteWritten, totalBytes), TaskDialogProgressState.Normal);
+
+                    updateFileStream.Write(buffer, 0, readSize);
                 }
-
-                byteWritten += readSize;
-
-                taskDialog.SetProgressBarState(GetPercentage(byteWritten, totalBytes), TaskDialogProgressState.Normal);
-
-                updateFileStream.Write(buffer, 0, readSize);
             }
 
             InstallUpdate(taskDialog, updateFile);
@@ -524,7 +538,7 @@ namespace Ryujinx.Modules
 
                 string outPath = Path.Combine(outputDirectoryPath, tarEntry.Name);
 
-                Directory.CreateDirectory(Path.GetDirectoryName(outPath));
+                Directory.CreateDirectory(Path.GetDirectoryName(outPath) ?? string.Empty);
 
                 using FileStream outStream = File.OpenWrite(outPath);
                 tarStream.CopyEntryContents(outStream);
@@ -560,7 +574,7 @@ namespace Ryujinx.Modules
 
                 string outPath = Path.Combine(outputDirectoryPath, zipEntry.Name);
 
-                Directory.CreateDirectory(Path.GetDirectoryName(outPath));
+                Directory.CreateDirectory(Path.GetDirectoryName(outPath) ?? string.Empty);
 
                 using Stream zipStream = zipFile.GetInputStream(zipEntry);
                 using FileStream outStream = File.OpenWrite(outPath);

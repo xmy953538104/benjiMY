@@ -59,7 +59,11 @@ namespace Ryujinx.Audio.Renderer.Dsp.Command
 
                         for (int y = 0; y < context.SampleCount; y++)
                         {
-                            context.MemoryManager.Write(targetOffset + (ulong)y * TargetChannelCount, PcmHelper.Saturate(inputBuffer[y]));
+                            if (inputBuffer != null)
+                            {
+                                context.MemoryManager.Write(targetOffset + (ulong)y * TargetChannelCount,
+                                    PcmHelper.Saturate(inputBuffer[y]));
+                            }
                         }
 
                         currentOffset += context.SampleCount * TargetChannelCount;

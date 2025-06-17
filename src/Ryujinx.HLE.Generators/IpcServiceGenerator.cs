@@ -28,15 +28,15 @@ namespace Ryujinx.HLE.Generators
                     continue;
                 var constructors = className.ChildNodes().Where(x => x.IsKind(SyntaxKind.ConstructorDeclaration)).Select(y => y as ConstructorDeclarationSyntax);
 
-                if (!constructors.Any(x => x.ParameterList.Parameters.Count >= 1))
+                if (!constructors.Any(x => x != null && x.ParameterList.Parameters.Count >= 1))
                     continue;
 
-                if (constructors.Where(x => x.ParameterList.Parameters.Count >= 1).FirstOrDefault().ParameterList.Parameters[0].Type.ToString() == "ServiceCtx")
+                if (constructors.FirstOrDefault(x => x != null && x.ParameterList.Parameters.Count >= 1).ParameterList.Parameters[0].Type.ToString() == "ServiceCtx")
                 {
                     generator.EnterScope($"if (type == typeof({GetFullName(className, context)}))");
-                    if (constructors.Any(x => x.ParameterList.Parameters.Count == 2))
+                    if (constructors.Any(x => x != null && x.ParameterList.Parameters.Count == 2))
                     {
-                        var type = constructors.Where(x => x.ParameterList.Parameters.Count == 2).FirstOrDefault().ParameterList.Parameters[1].Type;
+                        var type = constructors.FirstOrDefault(x => x != null && x.ParameterList.Parameters.Count == 2).ParameterList.Parameters[1].Type;
                         var model = context.Compilation.GetSemanticModel(type.SyntaxTree);
                         var typeSymbol = model.GetSymbolInfo(type).Symbol as INamedTypeSymbol;
                         var fullName = typeSymbol?.ToString();
@@ -45,7 +45,7 @@ namespace Ryujinx.HLE.Generators
                         generator.LeaveScope();
                     }
 
-                    if (constructors.Any(x => x.ParameterList.Parameters.Count == 1))
+                    if (constructors.Any(x => x != null && x.ParameterList.Parameters.Count == 1))
                     {
                         generator.AppendLine($"return new {GetFullName(className, context)}(context);");
                     }

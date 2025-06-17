@@ -494,7 +494,10 @@ namespace Ryujinx.Ava.UI.Windows
             /// <summary>
             /// Subscribe to the ColorValuesChanged event
             /// </summary>
-            PlatformSettings.ColorValuesChanged += OnPlatformColorValuesChanged;
+            if (PlatformSettings != null)
+            {
+                PlatformSettings.ColorValuesChanged += OnPlatformColorValuesChanged;
+            }
 
             ViewModel.Initialize(
                 ContentManager,
@@ -578,7 +581,7 @@ namespace Ryujinx.Ava.UI.Windows
             var volumeSplitButton = sender as ToggleSplitButton;
             if (ViewModel.IsGameRunning)
             {
-                if (!volumeSplitButton.IsChecked)
+                if (volumeSplitButton is not { IsChecked: true })
                 {
                     ViewModel.AppHost.Device.SetVolume(ViewModel.VolumeBeforeMute);
                 }

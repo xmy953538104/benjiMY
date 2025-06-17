@@ -34,7 +34,7 @@ namespace Ryujinx.Ava.UI.Views.Main
         {
             if (sender is RadioButton button)
             {
-                ViewModel.Sort(Enum.Parse<ApplicationSort>(button.Tag.ToString()));
+                ViewModel.Sort(Enum.Parse<ApplicationSort>(button.Tag?.ToString() ?? string.Empty));
             }
         }
 
@@ -42,7 +42,7 @@ namespace Ryujinx.Ava.UI.Views.Main
         {
             if (sender is RadioButton button)
             {
-                ViewModel.Sort(button.Tag.ToString() != "Descending");
+                ViewModel.Sort(button.Tag?.ToString() != "Descending");
             }
         }
 

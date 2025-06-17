@@ -36,7 +36,7 @@ namespace Spv.Generator
 
         public bool Equals(LiteralString cmpObj)
         {
-            return Type == cmpObj.Type && _value.Equals(cmpObj._value);
+            return cmpObj != null && Type == cmpObj.Type && _value.Equals(cmpObj._value);
         }
 
         public override int GetHashCode()

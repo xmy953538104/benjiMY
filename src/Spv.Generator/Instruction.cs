@@ -162,7 +162,7 @@ namespace Spv.Generator
 
         public bool Equals(Instruction cmpObj)
         {
-            bool result = Type == cmpObj.Type && Id == cmpObj.Id;
+            bool result = cmpObj != null && Type == cmpObj.Type && Id == cmpObj.Id;
 
             if (result)
             {

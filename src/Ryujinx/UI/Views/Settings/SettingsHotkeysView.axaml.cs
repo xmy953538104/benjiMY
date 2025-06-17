@@ -46,7 +46,7 @@ namespace Ryujinx.Ava.UI.Views.Settings
         {
             if (sender is ToggleButton button)
             {
-                if ((bool)button.IsChecked)
+                if (button.IsChecked != null && (bool)button.IsChecked)
                 {
                     if (_currentAssigner != null && button == _currentAssigner.ToggledButton)
                     {
@@ -69,41 +69,44 @@ namespace Ryujinx.Ava.UI.Views.Settings
                                 var viewModel = (DataContext) as SettingsViewModel;
                                 var buttonValue = e.ButtonValue.Value;
 
-                                switch (button.Name)
+                                if (viewModel != null)
                                 {
-                                    case "ToggleVSyncMode":
-                                        viewModel.KeyboardHotkey.ToggleVSyncMode = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "Screenshot":
-                                        viewModel.KeyboardHotkey.Screenshot = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "ShowUI":
-                                        viewModel.KeyboardHotkey.ShowUI = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "Pause":
-                                        viewModel.KeyboardHotkey.Pause = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "ToggleMute":
-                                        viewModel.KeyboardHotkey.ToggleMute = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "ResScaleUp":
-                                        viewModel.KeyboardHotkey.ResScaleUp = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "ResScaleDown":
-                                        viewModel.KeyboardHotkey.ResScaleDown = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "VolumeUp":
-                                        viewModel.KeyboardHotkey.VolumeUp = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "VolumeDown":
-                                        viewModel.KeyboardHotkey.VolumeDown = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "CustomVSyncIntervalIncrement":
-                                        viewModel.KeyboardHotkey.CustomVSyncIntervalIncrement = buttonValue.AsHidType<Key>();
-                                        break;
-                                    case "CustomVSyncIntervalDecrement":
-                                        viewModel.KeyboardHotkey.CustomVSyncIntervalDecrement = buttonValue.AsHidType<Key>();
-                                        break;
+                                    switch (button.Name)
+                                    {
+                                        case "ToggleVSyncMode":
+                                            viewModel.KeyboardHotkey.ToggleVSyncMode = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "Screenshot":
+                                            viewModel.KeyboardHotkey.Screenshot = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "ShowUI":
+                                            viewModel.KeyboardHotkey.ShowUI = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "Pause":
+                                            viewModel.KeyboardHotkey.Pause = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "ToggleMute":
+                                            viewModel.KeyboardHotkey.ToggleMute = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "ResScaleUp":
+                                            viewModel.KeyboardHotkey.ResScaleUp = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "ResScaleDown":
+                                            viewModel.KeyboardHotkey.ResScaleDown = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "VolumeUp":
+                                            viewModel.KeyboardHotkey.VolumeUp = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "VolumeDown":
+                                            viewModel.KeyboardHotkey.VolumeDown = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "CustomVSyncIntervalIncrement":
+                                            viewModel.KeyboardHotkey.CustomVSyncIntervalIncrement = buttonValue.AsHidType<Key>();
+                                            break;
+                                        case "CustomVSyncIntervalDecrement":
+                                            viewModel.KeyboardHotkey.CustomVSyncIntervalDecrement = buttonValue.AsHidType<Key>();
+                                            break;
+                                    }
                                 }
                             }
                         };

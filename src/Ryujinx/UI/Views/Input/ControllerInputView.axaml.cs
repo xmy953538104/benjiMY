@@ -70,8 +70,12 @@ namespace Ryujinx.Ava.UI.Views.Input
                 {
 
                      var viewModel = (DataContext as ControllerInputViewModel);
-                     viewModel.ParentModel.IsModified = true;
-                    _changeSlider = (float)check.Value;
+                     if (viewModel != null)
+                     {
+                         viewModel.ParentModel.IsModified = true;
+                     }
+
+                     _changeSlider = (float)check.Value;
                 }
             }
         }
@@ -82,9 +86,11 @@ namespace Ryujinx.Ava.UI.Views.Input
             {
                 if ((bool)check.IsPointerOver)
                 {
+                    if (DataContext is ControllerInputViewModel viewModel)
+                    {
+                        viewModel.ParentModel.IsModified = true;
+                    }
 
-                    var viewModel = (DataContext as ControllerInputViewModel);
-                    viewModel.ParentModel.IsModified = true;
                     _currentAssigner?.Cancel();
                     _currentAssigner = null;
                 }
@@ -96,7 +102,7 @@ namespace Ryujinx.Ava.UI.Views.Input
         {
             if (sender is ToggleButton button ) 
             {
-                if ((bool)button.IsChecked)
+                if (button.IsChecked != null && (bool)button.IsChecked)
                 {
                     if (_currentAssigner != null && button == _currentAssigner.ToggledButton)
                     {
@@ -233,7 +239,7 @@ namespace Ryujinx.Ava.UI.Views.Input
             var controllerInputViewModel = DataContext as ControllerInputViewModel;
 
             assigner = new GamepadButtonAssigner(
-                controllerInputViewModel.ParentModel.SelectedGamepad,
+                controllerInputViewModel?.ParentModel.SelectedGamepad,
                 (controllerInputViewModel.ParentModel.Config as StandardControllerInputConfig).TriggerThreshold,
                 forStick);
 

@@ -510,7 +510,7 @@ namespace Ryujinx.Input.HLE
         {
             var keyboard = KeyboardDriver.GetGamepad("0") as IKeyboard;
 
-            KeyboardStateSnapshot keyboardState = keyboard.GetKeyboardStateSnapshot();
+            KeyboardStateSnapshot keyboardState = keyboard?.GetKeyboardStateSnapshot();
 
             KeyboardInput hidKeyboard = new()
             {
@@ -520,14 +520,14 @@ namespace Ryujinx.Input.HLE
 
             foreach (HLEKeyboardMappingEntry entry in _keyMapping)
             {
-                ulong value = keyboardState.IsPressed(entry.TargetKey) ? 1UL : 0UL;
+                ulong value = keyboardState != null && keyboardState.IsPressed(entry.TargetKey) ? 1UL : 0UL;
 
                 hidKeyboard.Keys[entry.Target / 0x40] |= (value << (entry.Target % 0x40));
             }
 
             foreach (HLEKeyboardMappingEntry entry in _keyModifierMapping)
             {
-                int value = keyboardState.IsPressed(entry.TargetKey) ? 1 : 0;
+                int value = keyboardState != null && keyboardState.IsPressed(entry.TargetKey) ? 1 : 0;
 
                 hidKeyboard.Modifier |= value << entry.Target;
             }

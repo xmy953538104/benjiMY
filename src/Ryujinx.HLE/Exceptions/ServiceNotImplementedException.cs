@@ -147,7 +147,7 @@ namespace Ryujinx.HLE.Exceptions
             while ((frame = trace.GetFrame(i++)) != null)
             {
                 var method = frame.GetMethod();
-                var declType = method.DeclaringType;
+                var declType = method?.DeclaringType;
 
                 if (typeof(IpcService).IsAssignableFrom(declType))
                 {
