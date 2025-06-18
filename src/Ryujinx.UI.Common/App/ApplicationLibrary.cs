@@ -1,6 +1,5 @@
 using DynamicData;
 using DynamicData.Kernel;
-using Gommon;
 using LibHac;
 using LibHac.Common;
 using LibHac.Fs;
@@ -1079,8 +1078,8 @@ namespace Ryujinx.UI.App.Common
                     }
                 }
 
-                titleIdsToSave.ForEach(titleId => SaveTitleUpdatesForGame(titleId));
-                titleIdsToRefresh.ForEach(titleId => RefreshApplicationInfo(titleId));
+                foreach (var titleId in titleIdsToSave) SaveTitleUpdatesForGame(titleId);
+                foreach (var titleId in titleIdsToRefresh) RefreshApplicationInfo(titleId);
             }
             finally
             {
