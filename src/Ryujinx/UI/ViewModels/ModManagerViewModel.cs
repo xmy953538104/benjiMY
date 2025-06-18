@@ -4,7 +4,6 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using DynamicData;
-using Gommon;
 using Ryujinx.Ava.Common.Locale;
 using Ryujinx.Ava.UI.Helpers;
 using Ryujinx.Ava.UI.Models;
@@ -261,12 +260,7 @@ namespace Ryujinx.Ava.UI.ViewModels
             var destinationDir = ModLoader.GetApplicationDir(ModLoader.GetSdModsBasePath(), _applicationId.ToString("x16"));
 
             // TODO: More robust checking for valid mod folders
-            var isDirectoryValid = true;
-
-            if (directories.Length == 0)
-            {
-                isDirectoryValid = false;
-            }
+            var isDirectoryValid = directories.Length != 0;
 
             if (!isDirectoryValid)
             {
@@ -324,7 +318,7 @@ namespace Ryujinx.Ava.UI.ViewModels
 
         public void DeleteAll()
         {
-            Mods.ForEach(it => Delete(it, false));
+            foreach (var it in Mods) Delete(it, false);
             Mods.Clear();
             OnPropertyChanged(nameof(ModCount));
             Sort();
