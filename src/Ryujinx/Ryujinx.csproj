@@ -44,11 +44,11 @@
     <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)'=='Debug'" />
     <PackageReference Include="Avalonia.Controls.DataGrid" />
     <PackageReference Include="Avalonia.Markup.Xaml.Loader" />
-    <PackageReference Include="Avalonia.Svg" />
-    <PackageReference Include="Avalonia.Svg.Skia" />
+    <PackageReference Include="Svg.Controls.Avalonia" />
+    <PackageReference Include="Svg.Controls.Skia.Avalonia" />
     <PackageReference Include="CommandLineParser" />
     <PackageReference Include="DynamicData" />
-    <PackageReference Include="FluentAvaloniaUI" />
+    <PackageReference Include="FluentAvaloniaUI.NoAnim" />
 
     <PackageReference Include="OpenTK.Core" />
     <PackageReference Include="Ryujinx.Audio.OpenAL" Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == 'win-arm64'" />
