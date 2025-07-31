@@ -82,22 +82,27 @@
             Spacing="10"
             Margin="0 24 0 0"
             HorizontalAlignment="Right">
-            <ColorPicker
+            <ui:ColorPickerButton
+                FlyoutPlacement="Top"
+                IsMoreButtonVisible="False"
+                UseColorPalette="False"
+                UseColorTriangle="False"
+                UseColorWheel="False"
+                ShowAcceptDismissButtons="False"
                 IsAlphaEnabled="False"
                 Color="{Binding BackgroundColor, Mode=TwoWay}"
                 Name="ColorButton">
-                <ColorPicker.Styles>
+                <ui:ColorPickerButton.Styles>
                     <Style Selector="Grid#Root > DockPanel > Grid">
                         <Setter Property="IsVisible" Value="False" />
                     </Style>
-                </ColorPicker.Styles>
-            </ColorPicker>
+                </ui:ColorPickerButton.Styles>
+            </ui:ColorPickerButton>
             <Button
+                Content="{locale:Locale AvatarChoose}"
                 Height="35"
                 Name="ChooseButton"
-                Click="ChooseButton_OnClick">
-                <TextBlock Text="{locale:Locale AvatarChoose}" />
-                </Button>
+                Click="ChooseButton_OnClick" />
         </StackPanel>
     </Grid>
 </UserControl>
