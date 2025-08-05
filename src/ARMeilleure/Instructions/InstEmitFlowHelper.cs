@@ -142,6 +142,12 @@ namespace ARMeilleure.Instructions
 
         public static void EmitCall(ArmEmitterContext context, ulong immediate)
         {
+            if (context.IsSingleStep)
+            {
+                context.Return(Const(immediate));
+                return;
+            }
+
             bool isRecursive = immediate == context.EntryAddress;
 
             if (isRecursive)
@@ -156,12 +162,24 @@ namespace ARMeilleure.Instructions
 
         public static void EmitVirtualCall(ArmEmitterContext context, Operand target)
         {
-            EmitTableBranch(context, target, isJump: false);
+            if (context.IsSingleStep)
+            {
+                if (target.Type == OperandType.I32)
+                {
+                    target = context.ZeroExtend32(OperandType.I64, target);
+                }
+
+                context.Return(target);
+            }
+            else
+            {
+                EmitTableBranch(context, target, isJump: false);
+            }
         }
 
         public static void EmitVirtualJump(ArmEmitterContext context, Operand target, bool isReturn)
         {
-            if (isReturn)
+            if (isReturn || context.IsSingleStep)
             {
                 if (target.Type == OperandType.I32)
                 {

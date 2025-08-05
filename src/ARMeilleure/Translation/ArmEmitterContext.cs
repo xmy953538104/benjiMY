@@ -53,6 +53,7 @@ namespace ARMeilleure.Translation
         public bool HighCq { get; }
         public bool HasPtc { get; }
         public Aarch32Mode Mode { get; }
+        public bool IsSingleStep { get; }
 
         private int _ifThenBlockStateIndex = 0;
         private Condition[] _ifThenBlockState = [];
@@ -67,7 +68,8 @@ namespace ARMeilleure.Translation
             ulong entryAddress,
             bool highCq,
             bool hasPtc,
-            Aarch32Mode mode)
+            Aarch32Mode mode,
+            bool isSingleStep)
         {
             Memory = memory;
             CountTable = countTable;
@@ -77,6 +79,7 @@ namespace ARMeilleure.Translation
             HighCq = highCq;
             HasPtc = hasPtc;
             Mode = mode;
+            IsSingleStep = isSingleStep;
 
             _labels = new Dictionary<ulong, Operand>();
         }

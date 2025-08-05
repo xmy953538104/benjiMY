@@ -195,22 +195,6 @@ namespace ARMeilleure.Translation
 
         private ulong Step(State.ExecutionContext context, ulong address)
         {
-            try
-            {
-                OpCode opCode = Decoder.DecodeOpCode(Memory, address, context.ExecutionMode);
-
-                // For branch instructions during single-stepping, we handle them manually
-                // func.Execute() will sometimes execute the entire function call, which is not what we want
-                if (opCode.Instruction.Name is InstName.Bl or InstName.Blr or InstName.Blx or InstName.Br)
-                {
-                    return ExecuteBranchInstructionForStepping(context, address, opCode);
-                }
-            }
-            catch
-            {
-                // ignore
-            }
-
             TranslatedFunction func = Translate(address, context.ExecutionMode, highCq: false, singleStep: true);
 
             address = func.Execute(Stubs.ContextWrapper, context);
@@ -220,93 +204,7 @@ namespace ARMeilleure.Translation
             return address;
         }
 
-        private static ulong ExecuteBranchInstructionForStepping(State.ExecutionContext context, ulong address, OpCode opCode)
-        {
-            switch (opCode.Instruction.Name)
-            {
-                case InstName.Bl:
-                    if (opCode is IOpCodeBImm opBImm)
-                    {
-                        // Set link register
-                        if (context.ExecutionMode == ExecutionMode.Aarch64)
-                        {
-                            context.SetX(30, address + (ulong)opCode.OpCodeSizeInBytes); // LR = X30
-                        }
-                        else
-                        {
-                            // For ARM32, need to set the appropriate return address
-                            uint returnAddr = opCode is OpCode32 op32 && op32.IsThumb
-                                ? (uint)address + (uint)opCode.OpCodeSizeInBytes | 1u  // Thumb bit set
-                                : (uint)address + (uint)opCode.OpCodeSizeInBytes;
-                            context.SetX(14, returnAddr); // LR = R14
-                        }
-                        return (ulong)opBImm.Immediate;
-                    }
-                    break;
 
-                case InstName.Blr:
-                    if (opCode is OpCodeBReg opBReg)
-                    {
-                        // Set link register
-                        if (context.ExecutionMode == ExecutionMode.Aarch64)
-                        {
-                            context.SetX(30, address + (ulong)opCode.OpCodeSizeInBytes); // LR = X30
-                        }
-                        else
-                        {
-                            uint returnAddr = opCode is OpCode32 op32 && op32.IsThumb
-                                ? (uint)address + (uint)opCode.OpCodeSizeInBytes | 1u  // Thumb bit set
-                                : (uint)address + (uint)opCode.OpCodeSizeInBytes;
-                            context.SetX(14, returnAddr); // LR = R14
-                        }
-                        return context.GetX(opBReg.Rn);
-                    }
-                    break;
-
-                case InstName.Blx:
-                    if (opCode is IOpCodeBImm opBlxImm)
-                    {
-                        // Handle mode switching for BLX
-                        if (opCode is OpCode32 op32)
-                        {
-                            uint returnAddr = op32.IsThumb
-                                ? (uint)address + (uint)opCode.OpCodeSizeInBytes | 1u
-                                : (uint)address + (uint)opCode.OpCodeSizeInBytes;
-                            context.SetX(14, returnAddr);
-
-                            // BLX switches between ARM and Thumb modes
-                            context.SetPstateFlag(PState.TFlag, !op32.IsThumb);
-                        }
-                        return (ulong)opBlxImm.Immediate;
-                    }
-                    else if (opCode is IOpCode32BReg opBlxReg)
-                    {
-                        if (opCode is OpCode32 op32)
-                        {
-                            uint returnAddr = op32.IsThumb
-                                ? (uint)address + (uint)opCode.OpCodeSizeInBytes | 1u
-                                : (uint)address + (uint)opCode.OpCodeSizeInBytes;
-                            context.SetX(14, returnAddr);
-
-                            // For BLX register, the target address determines the mode
-                            ulong targetAddr = context.GetX(opBlxReg.Rm);
-                            context.SetPstateFlag(PState.TFlag, (targetAddr & 1) != 0);
-                            return targetAddr & ~1UL; // Clear the Thumb bit for the actual address
-                        }
-                    }
-                    break;
-
-                case InstName.Br:
-                    if (opCode is OpCodeBReg opBr)
-                    {
-                        // BR doesn't set link register, just branches to the target
-                        return context.GetX(opBr.Rn);
-                    }
-                    break;
-            }
-
-            throw new InvalidOperationException($"Unhandled branch instruction: {opCode.Instruction.Name}");
-        }
 
         internal TranslatedFunction GetOrTranslate(ulong address, ExecutionMode mode)
         {
@@ -351,7 +249,8 @@ namespace ARMeilleure.Translation
                 address,
                 highCq,
                 _ptc.State != PtcState.Disabled,
-                mode: Aarch32Mode.User);
+                mode: Aarch32Mode.User,
+                isSingleStep: singleStep);
 
             Logger.StartPass(PassName.Decoding);
 
