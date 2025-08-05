@@ -22,6 +22,12 @@ namespace ARMeilleure.State
             public ulong ExclusiveValueHigh;
             public int Running;
             public long Tpidr2El0;
+            
+            /// <summary>
+            /// Precise PC value used for debugging.
+            /// This will only be set when Optimizations.EnableDebugging is true.
+            /// </summary>
+            public ulong DebugPrecisePc;
         }
 
         private static NativeCtxStorage _dummyStorage = new();
@@ -39,6 +45,11 @@ namespace ARMeilleure.State
 
         public ulong GetPc()
         {
+            if (Optimizations.EnableDebugging)
+            {
+                return GetStorage().DebugPrecisePc;
+            }
+
             // TODO: More precise tracking of PC value.
             return GetStorage().DispatchAddress;
         }
@@ -264,6 +275,11 @@ namespace ARMeilleure.State
         public static int GetRunningOffset()
         {
             return StorageOffset(ref _dummyStorage, ref _dummyStorage.Running);
+        }
+
+        public static int GetDebugPrecisePcOffset()
+        {
+            return StorageOffset(ref _dummyStorage, ref _dummyStorage.DebugPrecisePc);
         }
 
         private static int StorageOffset<T>(ref NativeCtxStorage storage, ref T target)

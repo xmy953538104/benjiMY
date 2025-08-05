@@ -60,6 +60,8 @@ namespace Ryujinx.Cpu.Nce
             }
         }
 
+        public ulong ThreadUid { get; set; }
+
         public bool Running { get; private set; }
 
         private delegate bool SupervisorCallHandler(int imm);
@@ -165,6 +167,13 @@ namespace Ryujinx.Cpu.Nce
         {
             Running = false;
         }
+
+        public void RequestDebugStep()
+        {
+            throw new NotImplementedException();
+        }
+
+        public ulong DebugPc { get; set; }
 
         public void Dispose()
         {

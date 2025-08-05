@@ -384,6 +384,17 @@ namespace Ryujinx.Headless
         [Option("ignore-controller-applet", Required = false, Default = false, HelpText = "Enable ignoring the controller applet when your game loses connection to your controller.")]
         public bool IgnoreControllerApplet { get; set; }
 
+        // Debug
+
+        [Option("enable-gdb-stub", Required = false, Default = false, HelpText = "Enables the GDB stub so that a developer can attach a debugger to the emulated process.")]
+        public bool EnableGdbStub { get; set; }
+
+        [Option("gdb-stub-port", Required = false, Default = 55555, HelpText = "Specifies which TCP port the GDB stub listens on.")]
+        public ushort GdbStubPort { get; set; }
+
+        [Option("suspend-on-start", Required = false, Default = false, HelpText = "Suspend execution when starting an application.")]
+        public bool DebuggerSuspendOnStart { get; set; }
+
         // Values
 
         [Value(0, MetaName = "input", HelpText = "Input to load.", Required = true)]

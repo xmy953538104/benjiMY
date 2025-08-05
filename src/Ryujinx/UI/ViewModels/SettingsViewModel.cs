@@ -64,6 +64,10 @@ namespace Ryujinx.Ava.UI.ViewModels
         private string _ldnPassphrase;
         private string _LdnServer;
 
+        private bool _enableGDBStub;
+        private ushort _gdbStubPort;
+        private bool _debuggerSuspendOnStart;
+
         public int ResolutionScale
         {
             get => _resolutionScale;
@@ -384,6 +388,36 @@ namespace Ryujinx.Ava.UI.ViewModels
             }
         }
 
+        public bool EnableGdbStub
+        {
+            get => _enableGDBStub;
+            set
+            {
+                _enableGDBStub = value;
+                ConfigurationState.Instance.Debug.EnableGdbStub.Value = _enableGDBStub;
+            }
+        }
+
+        public ushort GDBStubPort
+        {
+            get => _gdbStubPort;
+            set
+            {
+                _gdbStubPort = value;
+                ConfigurationState.Instance.Debug.GdbStubPort.Value = _gdbStubPort;
+            }
+        }
+
+        public bool DebuggerSuspendOnStart
+        {
+            get => _debuggerSuspendOnStart;
+            set
+            {
+                _debuggerSuspendOnStart = value;
+                ConfigurationState.Instance.Debug.DebuggerSuspendOnStart.Value = _debuggerSuspendOnStart;
+            }
+        }
+
         public SettingsViewModel(VirtualFileSystem virtualFileSystem, ContentManager contentManager) : this()
         {
             _virtualFileSystem = virtualFileSystem;
@@ -612,10 +646,16 @@ namespace Ryujinx.Ava.UI.ViewModels
             FsGlobalAccessLogMode = config.System.FsGlobalAccessLogMode;
             OpenglDebugLevel = (int)config.Logger.GraphicsDebugLevel.Value;
 
+            // Multiplayer
             MultiplayerModeIndex = (int)config.Multiplayer.Mode.Value;
             DisableP2P = config.Multiplayer.DisableP2p.Value;
             LdnPassphrase = config.Multiplayer.LdnPassphrase.Value;
             LdnServer = config.Multiplayer.LdnServer.Value;
+
+            // Debug
+            EnableGdbStub = config.Debug.EnableGdbStub.Value;
+            GDBStubPort = config.Debug.GdbStubPort.Value;
+            DebuggerSuspendOnStart = config.Debug.DebuggerSuspendOnStart.Value;
         }
 
         public void SaveSettings()
@@ -732,11 +772,17 @@ namespace Ryujinx.Ava.UI.ViewModels
             config.System.FsGlobalAccessLogMode.Value = FsGlobalAccessLogMode;
             config.Logger.GraphicsDebugLevel.Value = (GraphicsDebugLevel)OpenglDebugLevel;
 
+            // Multiplayer
             config.Multiplayer.LanInterfaceId.Value = _networkInterfaces[NetworkInterfaceList[NetworkInterfaceIndex]];
             config.Multiplayer.Mode.Value = (MultiplayerMode)MultiplayerModeIndex;
             config.Multiplayer.DisableP2p.Value = DisableP2P;
             config.Multiplayer.LdnPassphrase.Value = LdnPassphrase;
             config.Multiplayer.LdnServer.Value = LdnServer;
+
+            // Debug
+            config.Debug.EnableGdbStub.Value = EnableGdbStub;
+            config.Debug.GdbStubPort.Value = GDBStubPort;
+            config.Debug.DebuggerSuspendOnStart.Value = DebuggerSuspendOnStart;
 
             config.ToFileFormat().SaveConfig(Program.ConfigurationPath);
 

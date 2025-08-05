@@ -5,6 +5,7 @@ using LibHac.Fs.Shim;
 using LibHac.FsSystem;
 using LibHac.Tools.FsSystem;
 using Ryujinx.Cpu;
+using Ryujinx.HLE.Debugger;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.HOS.Kernel;
 using Ryujinx.HLE.HOS.Kernel.Memory;
@@ -496,6 +497,22 @@ namespace Ryujinx.HLE.HOS
                 }
             }
             IsPaused = pause;
+        }
+
+        internal IDebuggableProcess DebugGetApplicationProcessDebugInterface()
+        {
+            lock (KernelContext.Processes)
+            {
+                return KernelContext.Processes.Values.FirstOrDefault(x => x.IsApplication)?.DebugInterface;
+            }
+        }
+
+        internal KProcess DebugGetApplicationProcess()
+        {
+            lock (KernelContext.Processes)
+            {
+                return KernelContext.Processes.Values.FirstOrDefault(x => x.IsApplication);
+            }
         }
     }
 }

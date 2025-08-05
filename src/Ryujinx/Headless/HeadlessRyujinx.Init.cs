@@ -354,6 +354,9 @@ namespace Ryujinx.Headless
                 false,
                 string.Empty,
                 string.Empty,
+                options.EnableGdbStub,
+                options.GdbStubPort,
+                options.DebuggerSuspendOnStart,
                 options.CustomVSyncInterval);
 
             return new Switch(configuration);

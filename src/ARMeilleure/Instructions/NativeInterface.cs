@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 #else
 using System.Runtime.InteropServices;
 #endif
+using ExecutionContext = ARMeilleure.State.ExecutionContext;
 
 namespace ARMeilleure.Instructions
 {
@@ -300,7 +301,11 @@ namespace ARMeilleure.Instructions
 
             ExecutionContext context = GetContext();
 
-            context.CheckInterrupt();
+            // If debugging, we'll handle interrupts outside
+            if (!Optimizations.EnableDebugging)
+            {
+                context.CheckInterrupt();
+            }
 
             Statistics.ResumeTimer();
 

@@ -213,6 +213,10 @@ namespace Ryujinx.Ava
             ConfigurationState.Instance.Multiplayer.LanInterfaceId.Event += UpdateLanInterfaceIdState;
             ConfigurationState.Instance.Multiplayer.Mode.Event += UpdateMultiplayerModeState;
 
+            ConfigurationState.Instance.Debug.EnableGdbStub.Event += UpdateEnableGdbStubState;
+            ConfigurationState.Instance.Debug.GdbStubPort.Event += UpdateGdbStubPortState;
+            ConfigurationState.Instance.Debug.DebuggerSuspendOnStart.Event += UpdateDebuggerSuspendOnStartState;
+
             _gpuCancellationTokenSource = new CancellationTokenSource();
             _gpuDoneEvent = new ManualResetEvent(false);
         }
@@ -552,6 +556,21 @@ namespace Ryujinx.Ava
         private void UpdateMultiplayerModeState(object sender, ReactiveEventArgs<MultiplayerMode> e)
         {
             Device.Configuration.MultiplayerMode = e.NewValue;
+        }
+
+        private void UpdateEnableGdbStubState(object sender, ReactiveEventArgs<bool> e)
+        {
+            Device.Configuration.EnableGdbStub = e.NewValue;
+        }
+
+        private void UpdateGdbStubPortState(object sender, ReactiveEventArgs<ushort> e)
+        {
+            Device.Configuration.GdbStubPort = e.NewValue;
+        }
+
+        private void UpdateDebuggerSuspendOnStartState(object sender, ReactiveEventArgs<bool> e)
+        {
+            Device.Configuration.DebuggerSuspendOnStart = e.NewValue;
         }
 
         public void Stop()
@@ -937,6 +956,9 @@ namespace Ryujinx.Ava
                                                      ConfigurationState.Instance.Multiplayer.DisableP2p,
                                                      ConfigurationState.Instance.Multiplayer.LdnPassphrase,
                                                      ConfigurationState.Instance.Multiplayer.LdnServer,
+                                                     ConfigurationState.Instance.Debug.EnableGdbStub,
+                                                     ConfigurationState.Instance.Debug.GdbStubPort,
+                                                     ConfigurationState.Instance.Debug.DebuggerSuspendOnStart,
                                                      ConfigurationState.Instance.Graphics.CustomVSyncInterval.Value);
 
             Device = new Switch(configuration);

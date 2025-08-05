@@ -96,7 +96,7 @@ namespace Ryujinx.HLE.HOS
                     mode = MemoryManagerMode.SoftwarePageTable;
                 }
 
-                ICpuEngine cpuEngine = isArm64Host && (mode == MemoryManagerMode.HostMapped || mode == MemoryManagerMode.HostMappedUnsafe)
+                ICpuEngine cpuEngine = isArm64Host && (mode == MemoryManagerMode.HostMapped || mode == MemoryManagerMode.HostMappedUnsafe) && !context.Device.Configuration.EnableGdbStub
                     ? new LightningJitEngine(_tickSource)
                     : new JitEngine(_tickSource);
 

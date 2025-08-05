@@ -12,6 +12,7 @@ using Ryujinx.UI.Common.Configuration.UI;
 using Ryujinx.UI.Common.Helper;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 
 namespace Ryujinx.UI.Common.Configuration
@@ -642,6 +643,37 @@ namespace Ryujinx.UI.Common.Configuration
         }
 
         /// <summary>
+        /// Debug configuration section
+        /// </summary>
+        public class DebugSection
+        {
+            /// <summary>
+            /// Enables or disables the GDB stub
+            /// </summary>
+            public ReactiveObject<bool> EnableGdbStub { get; private set; }
+
+            /// <summary>
+            /// Which TCP port should the GDB stub listen on
+            /// </summary>
+            public ReactiveObject<ushort> GdbStubPort { get; private set; }
+
+            /// <summary>
+            /// Suspend execution when starting an application
+            /// </summary>
+            public ReactiveObject<bool> DebuggerSuspendOnStart { get; private set; }
+
+            public DebugSection()
+            {
+                EnableGdbStub = new ReactiveObject<bool>();
+                EnableGdbStub.Event += static (_, e) => LogValueChange(e, nameof(EnableGdbStub));
+                GdbStubPort = new ReactiveObject<ushort>();
+                GdbStubPort.Event += static (_, e) => LogValueChange(e, nameof(GdbStubPort));
+                DebuggerSuspendOnStart = new ReactiveObject<bool>();
+                DebuggerSuspendOnStart.Event += static (_, e) => LogValueChange(e, nameof(DebuggerSuspendOnStart));
+            }
+        }
+
+        /// <summary>
         /// The default configuration instance
         /// </summary>
         public static ConfigurationState Instance { get; private set; }
@@ -676,6 +708,11 @@ namespace Ryujinx.UI.Common.Configuration
         /// </summary>
         public MultiplayerSection Multiplayer { get; private set; }
 
+        /// <summary>
+        /// The Debug
+        /// </summary>
+        public DebugSection Debug { get; private set; }
+        
         /// <summary>
         /// Enables or disables Discord Rich Presence
         /// </summary>
@@ -719,6 +756,7 @@ namespace Ryujinx.UI.Common.Configuration
             Graphics = new GraphicsSection();
             Hid = new HidSection();
             Multiplayer = new MultiplayerSection();
+            Debug = new DebugSection();
             EnableDiscordIntegration = new ReactiveObject<bool>();
             CheckUpdatesOnStart = new ReactiveObject<bool>();
             ShowConfirmExit = new ReactiveObject<bool>();
@@ -847,6 +885,9 @@ namespace Ryujinx.UI.Common.Configuration
                 MultiplayerDisableP2p = Multiplayer.DisableP2p,
                 MultiplayerLdnPassphrase = Multiplayer.LdnPassphrase,
                 LdnServer = Multiplayer.LdnServer,
+                EnableGdbStub = Debug.EnableGdbStub,
+                GdbStubPort = Debug.GdbStubPort,
+                DebuggerSuspendOnStart = Debug.DebuggerSuspendOnStart,
             };
 
             return configurationFile;
@@ -1242,6 +1283,10 @@ namespace Ryujinx.UI.Common.Configuration
                     }
 
                 ];
+
+                Debug.EnableGdbStub.Value = false;
+                Debug.GdbStubPort.Value = 55555;
+                Debug.DebuggerSuspendOnStart.Value = false;
 
                 configurationFileUpdated = true;
             }
@@ -1753,6 +1798,10 @@ namespace Ryujinx.UI.Common.Configuration
             Multiplayer.DisableP2p.Value = configurationFileFormat.MultiplayerDisableP2p;
             Multiplayer.LdnPassphrase.Value = configurationFileFormat.MultiplayerLdnPassphrase;
             Multiplayer.LdnServer.Value = configurationFileFormat.LdnServer;
+
+            Debug.EnableGdbStub.Value = configurationFileFormat.EnableGdbStub; // Get from global config only
+            Debug.GdbStubPort.Value = configurationFileFormat.GdbStubPort; // Get from global config only
+            Debug.DebuggerSuspendOnStart.Value = configurationFileFormat.DebuggerSuspendOnStart; // Get from global config only
 
             if (configurationFileUpdated)
             {

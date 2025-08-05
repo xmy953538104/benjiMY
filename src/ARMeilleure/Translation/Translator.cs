@@ -119,7 +119,25 @@ namespace ARMeilleure.Translation
 
             NativeInterface.RegisterThread(context, Memory, this);
 
-            if (Optimizations.UseUnmanagedDispatchLoop)
+            if (Optimizations.EnableDebugging)
+            {
+                context.DebugPc = address;
+                do
+                {
+                    if (Interlocked.CompareExchange(ref context.ShouldStep, 0, 1) == 1)
+                    {
+                        context.DebugPc = Step(context, context.DebugPc);
+                        context.StepHandler();
+                    }
+                    else
+                    {
+                        context.DebugPc = ExecuteSingle(context, context.DebugPc);
+                    }
+                    context.CheckInterrupt();
+                }
+                while (context.Running && context.DebugPc != 0);
+            }
+            else if (Optimizations.UseUnmanagedDispatchLoop)
             {
                 Stubs.DispatchLoop(context.NativeContextPtr, address);
             }
@@ -175,8 +193,24 @@ namespace ARMeilleure.Translation
             return nextAddr;
         }
 
-        public ulong Step(State.ExecutionContext context, ulong address)
+        private ulong Step(State.ExecutionContext context, ulong address)
         {
+            try
+            {
+                OpCode opCode = Decoder.DecodeOpCode(Memory, address, context.ExecutionMode);
+
+                // For branch instructions during single-stepping, we handle them manually
+                // func.Execute() will sometimes execute the entire function call, which is not what we want
+                if (opCode.Instruction.Name is InstName.Bl or InstName.Blr or InstName.Blx or InstName.Br)
+                {
+                    return ExecuteBranchInstructionForStepping(context, address, opCode);
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+
             TranslatedFunction func = Translate(address, context.ExecutionMode, highCq: false, singleStep: true);
 
             address = func.Execute(Stubs.ContextWrapper, context);
@@ -184,6 +218,94 @@ namespace ARMeilleure.Translation
             EnqueueForDeletion(address, func);
 
             return address;
+        }
+
+        private static ulong ExecuteBranchInstructionForStepping(State.ExecutionContext context, ulong address, OpCode opCode)
+        {
+            switch (opCode.Instruction.Name)
+            {
+                case InstName.Bl:
+                    if (opCode is IOpCodeBImm opBImm)
+                    {
+                        // Set link register
+                        if (context.ExecutionMode == ExecutionMode.Aarch64)
+                        {
+                            context.SetX(30, address + (ulong)opCode.OpCodeSizeInBytes); // LR = X30
+                        }
+                        else
+                        {
+                            // For ARM32, need to set the appropriate return address
+                            uint returnAddr = opCode is OpCode32 op32 && op32.IsThumb
+                                ? (uint)address + (uint)opCode.OpCodeSizeInBytes | 1u  // Thumb bit set
+                                : (uint)address + (uint)opCode.OpCodeSizeInBytes;
+                            context.SetX(14, returnAddr); // LR = R14
+                        }
+                        return (ulong)opBImm.Immediate;
+                    }
+                    break;
+
+                case InstName.Blr:
+                    if (opCode is OpCodeBReg opBReg)
+                    {
+                        // Set link register
+                        if (context.ExecutionMode == ExecutionMode.Aarch64)
+                        {
+                            context.SetX(30, address + (ulong)opCode.OpCodeSizeInBytes); // LR = X30
+                        }
+                        else
+                        {
+                            uint returnAddr = opCode is OpCode32 op32 && op32.IsThumb
+                                ? (uint)address + (uint)opCode.OpCodeSizeInBytes | 1u  // Thumb bit set
+                                : (uint)address + (uint)opCode.OpCodeSizeInBytes;
+                            context.SetX(14, returnAddr); // LR = R14
+                        }
+                        return context.GetX(opBReg.Rn);
+                    }
+                    break;
+
+                case InstName.Blx:
+                    if (opCode is IOpCodeBImm opBlxImm)
+                    {
+                        // Handle mode switching for BLX
+                        if (opCode is OpCode32 op32)
+                        {
+                            uint returnAddr = op32.IsThumb
+                                ? (uint)address + (uint)opCode.OpCodeSizeInBytes | 1u
+                                : (uint)address + (uint)opCode.OpCodeSizeInBytes;
+                            context.SetX(14, returnAddr);
+
+                            // BLX switches between ARM and Thumb modes
+                            context.SetPstateFlag(PState.TFlag, !op32.IsThumb);
+                        }
+                        return (ulong)opBlxImm.Immediate;
+                    }
+                    else if (opCode is IOpCode32BReg opBlxReg)
+                    {
+                        if (opCode is OpCode32 op32)
+                        {
+                            uint returnAddr = op32.IsThumb
+                                ? (uint)address + (uint)opCode.OpCodeSizeInBytes | 1u
+                                : (uint)address + (uint)opCode.OpCodeSizeInBytes;
+                            context.SetX(14, returnAddr);
+
+                            // For BLX register, the target address determines the mode
+                            ulong targetAddr = context.GetX(opBlxReg.Rm);
+                            context.SetPstateFlag(PState.TFlag, (targetAddr & 1) != 0);
+                            return targetAddr & ~1UL; // Clear the Thumb bit for the actual address
+                        }
+                    }
+                    break;
+
+                case InstName.Br:
+                    if (opCode is OpCodeBReg opBr)
+                    {
+                        // BR doesn't set link register, just branches to the target
+                        return context.GetX(opBr.Rn);
+                    }
+                    break;
+            }
+
+            throw new InvalidOperationException($"Unhandled branch instruction: {opCode.Instruction.Name}");
         }
 
         internal TranslatedFunction GetOrTranslate(ulong address, ExecutionMode mode)
@@ -367,9 +489,13 @@ namespace ARMeilleure.Translation
 
                 if (block.Exit)
                 {
-                    // Left option here as it may be useful if we need to return to managed rather than tail call in
-                    // future. (eg. for debug)
-                    bool useReturns = false;
+                    // Return to managed rather than tail call.
+                    bool useReturns = Optimizations.EnableDebugging;
+
+                    if (Optimizations.EnableDebugging)
+                    {
+                        EmitDebugPrecisePcUpdate(context, block.Address);
+                    }
 
                     InstEmitFlowHelper.EmitVirtualJump(context, Const(block.Address), isReturn: useReturns);
                 }
@@ -391,6 +517,11 @@ namespace ARMeilleure.Translation
                             {
                                 EmitSynchronization(context);
                             }
+                        }
+
+                        if (Optimizations.EnableDebugging)
+                        {
+                            EmitDebugPrecisePcUpdate(context, opCode.Address);
                         }
 
                         Operand lblPredicateSkip = default;
@@ -487,6 +618,14 @@ namespace ARMeilleure.Translation
             context.Store(countAddr, count);
 
             context.MarkLabel(lblExit);
+        }
+
+        internal static void EmitDebugPrecisePcUpdate(EmitterContext context, ulong address)
+        {
+            long debugPrecisePcOffs = NativeContext.GetDebugPrecisePcOffset();
+
+            Operand debugPrecisePcAddr = context.Add(context.LoadArgument(OperandType.I64, 0), Const(debugPrecisePcOffs));
+            context.Store(debugPrecisePcAddr, Const(address));
         }
 
         public void InvalidateJitCacheRegion(ulong address, ulong size)

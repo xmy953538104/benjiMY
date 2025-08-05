@@ -190,6 +190,21 @@ namespace Ryujinx.HLE
         /// </summary>
         public Action RefreshInputConfig { internal get; set; }
 
+        /// <summary>
+        /// Enables gdbstub to allow for debugging of the guest .
+        /// </summary>
+        public bool EnableGdbStub { internal get; set; }
+
+        /// <summary>
+        /// A TCP port to use to expose a gdbstub for a debugger to connect to.
+        /// </summary>
+        public ushort GdbStubPort { internal get; set; }
+
+        /// <summary>
+        /// Suspend execution when starting an application
+        /// </summary>
+        public bool DebuggerSuspendOnStart { internal get; set; }
+
         public HLEConfiguration(VirtualFileSystem virtualFileSystem,
                                 LibHacHorizonManager libHacHorizonManager,
                                 ContentManager contentManager,
@@ -219,6 +234,9 @@ namespace Ryujinx.HLE
                                 bool multiplayerDisableP2p,
                                 string multiplayerLdnPassphrase,
                                 string multiplayerLdnServer,
+                                bool enableGdbStub,
+                                ushort gdbStubPort,
+                                bool debuggerSuspendOnStart,
                                 int customVSyncInterval)
         {
             VirtualFileSystem = virtualFileSystem;
@@ -251,6 +269,9 @@ namespace Ryujinx.HLE
             MultiplayerDisableP2p = multiplayerDisableP2p;
             MultiplayerLdnPassphrase = multiplayerLdnPassphrase;
             MultiplayerLdnServer = multiplayerLdnServer;
+            EnableGdbStub = enableGdbStub;
+            GdbStubPort = gdbStubPort;
+            DebuggerSuspendOnStart = debuggerSuspendOnStart;
         }
     }
 }

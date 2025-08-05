@@ -897,5 +897,13 @@
   "GenLdnPassTooltip": "Generates a new passphrase, which can be shared with other players.",
   "ClearLdnPass": "Clear",
   "ClearLdnPassTooltip": "Clears the current passphrase, returning to the public network.",
-  "InvalidLdnPassphrase": "Invalid Passphrase! Must be in the format \"Ryujinx-<8 hex chars>\""
+  "InvalidLdnPassphrase": "Invalid Passphrase! Must be in the format \"Ryujinx-<8 hex chars>\"",
+  "SettingsTabDebug": "Debug",
+  "SettingsTabDebugTitle": "Debug",
+  "SettingsTabDebugNote": "WARNING: For developer use only, will reduce performance",
+  "SettingsTabDebugEnableGDBStub": "Enable GDB Stub",
+  "SettingsTabDebugGDBStubToggleTooltip": "Enables the GDB stub, which makes it possible to debug the running application. For development use only!",
+  "SettingsTabDebugGDBStubPort": "GDB Stub Port:",
+  "SettingsTabDebugSuspendOnStart": "Suspend Application on Start",
+  "SettingsTabDebugSuspendOnStartTooltip": "Suspends the application before executing the first instruction, allowing for debugging from the earliest point."
 }

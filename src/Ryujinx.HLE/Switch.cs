@@ -11,6 +11,7 @@ using Ryujinx.HLE.UI;
 using Ryujinx.Memory;
 using System;
 using System.IO;
+using System.Threading;
 
 namespace Ryujinx.HLE
 {
@@ -27,6 +28,7 @@ namespace Ryujinx.HLE
         public Hid Hid { get; }
         public TamperMachine TamperMachine { get; }
         public IHostUIHandler UIHandler { get; }
+        public Debugger.Debugger Debugger { get; }
 
         public int CpuCoresCount = 4; //Switch 1 has 4 cores
 
@@ -56,6 +58,7 @@ namespace Ryujinx.HLE
             AudioDeviceDriver = new CompatLayerHardwareDeviceDriver(Configuration.AudioDeviceDriver);
             Memory            = new MemoryBlock(Configuration.MemoryConfiguration.ToDramSize(), memoryAllocationFlags);
             Gpu               = new GpuContext(Configuration.GpuRenderer);
+            Debugger          = Configuration.EnableGdbStub ? new Debugger.Debugger(this, Configuration.GdbStubPort) : null;
             System            = new HOS.Horizon(this);
             Statistics        = new PerformanceStatistics();
             Hid               = new Hid(this, System.HidStorage);
@@ -211,6 +214,7 @@ namespace Ryujinx.HLE
                 AudioDeviceDriver.Dispose();
                 FileSystem.Dispose();
                 Memory.Dispose();
+                Debugger?.Dispose();
             }
         }
     }

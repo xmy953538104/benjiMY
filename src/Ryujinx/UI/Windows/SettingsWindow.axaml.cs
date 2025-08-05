@@ -86,6 +86,9 @@ namespace Ryujinx.Ava.UI.Windows
                     case "LoggingPage":
                         NavPanel.Content = LoggingPage;
                         break;
+                    case "DebugPage":
+                        NavPanel.Content = DebugPage;
+                        break;
                     default:
                         throw new NotImplementedException();
                 }
