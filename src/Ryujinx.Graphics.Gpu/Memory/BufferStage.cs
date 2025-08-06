@@ -1,4 +1,5 @@
 using Ryujinx.Graphics.Shader;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Ryujinx.Graphics.Gpu.Memory
@@ -7,6 +8,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
     /// Pipeline stages that can modify buffer data, as well as flags indicating storage usage.
     /// Must match ShaderStage for the shader stages, though anything after that can be in any order.
     /// </summary>
+    [Flags]
     internal enum BufferStage : byte
     {
         Compute,

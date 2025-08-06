@@ -14,12 +14,13 @@ namespace Ryujinx.Common.Collections
         /// Adds a new node into the tree.
         /// </summary>
         /// <param name="node">Node to be added</param>
+        /// <param name="parent">Node to be added under</param>
         /// <exception cref="ArgumentNullException"><paramref name="node"/> is null</exception>
-        public void Add(T node)
+        public void Add(T node, T parent = null)
         {
             ArgumentNullException.ThrowIfNull(node);
 
-            Insert(node);
+            Insert(node, parent);
         }
 
         /// <summary>
@@ -75,9 +76,11 @@ namespace Ryujinx.Common.Collections
         /// Inserts a new node into the tree.
         /// </summary>
         /// <param name="node">Node to be inserted</param>
-        private void Insert(T node)
+        /// <param name="parent">Node to be inserted under</param>
+        private void Insert(T node, T parent = null)
         {
-            T newNode = BSTInsert(node);
+            T newNode = parent != null ? InsertWithParent(node, parent) : BSTInsert(node);
+            
             RestoreBalanceAfterInsertion(newNode);
         }
 
@@ -120,10 +123,78 @@ namespace Ryujinx.Common.Collections
             else if (newNode.CompareTo(parent) < 0)
             {
                 parent.Left = newNode;
+                
+                newNode.Successor = parent;
+                
+                if (parent.Predecessor != null)
+                {
+                    newNode.Predecessor = parent.Predecessor;
+                    parent.Predecessor = newNode;
+                    newNode.Predecessor.Successor = newNode;
+                }
+                
+                parent.Predecessor = newNode;
             }
             else
             {
                 parent.Right = newNode;
+                
+                newNode.Predecessor = parent;
+                
+                if (parent.Successor != null)
+                {
+                    newNode.Successor = parent.Successor;
+                    newNode.Successor.Predecessor = newNode;
+                }
+                
+                parent.Successor = newNode;
+            }
+            Count++;
+            return newNode;
+        }
+        
+        /// <summary>
+        /// Insertion Mechanism for a Binary Search Tree (BST).
+        /// <br></br>
+        /// Inserts a new node directly under a parent node
+        /// where all children in the left subtree are less than <paramref name="newNode"/>,
+        /// and all children in the right subtree are greater than <paramref name="newNode"/>.
+        /// </summary>
+        /// <param name="newNode">Node to be inserted</param>
+        /// <param name="parent">Node to be inserted under</param>
+        /// <returns>The inserted Node</returns>
+        private T InsertWithParent(T newNode, T parent)
+        {
+            newNode.Parent = parent;
+
+            if (newNode.CompareTo(parent) < 0)
+            {
+                parent.Left = newNode;
+                
+                newNode.Successor = parent;
+                
+                if (parent.Predecessor != null)
+                {
+                    newNode.Predecessor = parent.Predecessor;
+                    parent.Predecessor = newNode;
+                    newNode.Predecessor.Successor = newNode;
+                }
+                
+                parent.Predecessor = newNode;
+            }
+            else
+            {
+                parent.Right = newNode;
+                
+                newNode.Predecessor = parent;
+                
+                if (parent.Successor != null)
+                {
+                    newNode.Successor = parent.Successor;
+                    newNode.Successor.Predecessor = newNode;
+                }
+                
+                parent.Successor = newNode;
             }
             Count++;
             return newNode;
@@ -156,7 +227,7 @@ namespace Ryujinx.Common.Collections
             }
             else
             {
-                T element = Minimum(RightOf(nodeToDelete));
+                T element = nodeToDelete.Successor;
 
                 child = RightOf(element);
                 parent = ParentOf(element);
@@ -184,6 +255,9 @@ namespace Ryujinx.Common.Collections
                 element.Left = old.Left;
                 element.Right = old.Right;
                 element.Parent = old.Parent;
+                element.Predecessor = old.Predecessor;
+                if (element.Predecessor != null)
+                    element.Predecessor.Successor = element;
 
                 if (ParentOf(old) == null)
                 {
@@ -238,6 +312,11 @@ namespace Ryujinx.Common.Collections
             {
                 RestoreBalanceAfterRemoval(child);
             }
+            
+            if (old.Successor != null)
+                old.Successor.Predecessor = old.Predecessor;
+            if (old.Predecessor != null)
+                old.Predecessor.Successor = old.Successor;
 
             return old;
         }

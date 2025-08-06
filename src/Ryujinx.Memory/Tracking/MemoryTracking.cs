@@ -1,4 +1,3 @@
-using Ryujinx.Common.Pools;
 using Ryujinx.Memory.Range;
 using System.Collections.Generic;
 
@@ -76,17 +75,16 @@ namespace Ryujinx.Memory.Tracking
 
             lock (TrackingLock)
             {
-                ref var overlaps = ref ThreadStaticArray<VirtualRegion>.Get();
-
                 for (int type = 0; type < 2; type++)
                 {
                     NonOverlappingRangeList<VirtualRegion> regions = type == 0 ? _virtualRegions : _guestVirtualRegions;
-
-                    int count = regions.FindOverlapsNonOverlapping(va, size, ref overlaps);
-
-                    for (int i = 0; i < count; i++)
+                    regions.Lock.EnterReadLock();
+                    (RangeItem<VirtualRegion> first, RangeItem<VirtualRegion> last) = regions.FindOverlaps(va, size);
+                    
+                    RangeItem<VirtualRegion> current = first;
+                    while (last != null && current != last.Next)
                     {
-                        VirtualRegion region = overlaps[i];
+                        VirtualRegion region = current.Value;
 
                         // If the region has been fully remapped, signal that it has been mapped again.
                         bool remapped = _memoryManager.IsRangeMapped(region.Address, region.Size);
@@ -96,7 +94,9 @@ namespace Ryujinx.Memory.Tracking
                         }
 
                         region.UpdateProtection();
+                        current = current.Next;
                     }
+                    regions.Lock.ExitReadLock();
                 }
             }
         }
@@ -114,20 +114,21 @@ namespace Ryujinx.Memory.Tracking
 
             lock (TrackingLock)
             {
-                ref var overlaps = ref ThreadStaticArray<VirtualRegion>.Get();
-
                 for (int type = 0; type < 2; type++)
                 {
                     NonOverlappingRangeList<VirtualRegion> regions = type == 0 ? _virtualRegions : _guestVirtualRegions;
-
-                    int count = regions.FindOverlapsNonOverlapping(va, size, ref overlaps);
-
-                    for (int i = 0; i < count; i++)
+                    regions.Lock.EnterReadLock();
+                    (RangeItem<VirtualRegion> first, RangeItem<VirtualRegion> last) = regions.FindOverlaps(va, size);
+                    
+                    RangeItem<VirtualRegion> current = first;
+                    while (last != null && current != last.Next)
                     {
-                        VirtualRegion region = overlaps[i];
+                        VirtualRegion region = current.Value;
 
                         region.SignalMappingChanged(false);
+                        current = current.Next;
                     }
+                    regions.Lock.ExitReadLock();
                 }
             }
         }
@@ -165,10 +166,11 @@ namespace Ryujinx.Memory.Tracking
         /// <returns>A list of virtual regions within the given range</returns>
         internal List<VirtualRegion> GetVirtualRegionsForHandle(ulong va, ulong size, bool guest)
         {
-            List<VirtualRegion> result = [];
             NonOverlappingRangeList<VirtualRegion> regions = guest ? _guestVirtualRegions : _virtualRegions;
-            regions.GetOrAddRegions(result, va, size, (va, size) => new VirtualRegion(this, va, size, guest));
-
+            regions.Lock.EnterUpgradeableReadLock();
+            regions.GetOrAddRegions(out List<VirtualRegion> result, va, size, (va, size) => new VirtualRegion(this, va, size, guest));
+            regions.Lock.ExitUpgradeableReadLock();
+            
             return result;
         }
 
@@ -296,25 +298,33 @@ namespace Ryujinx.Memory.Tracking
 
             lock (TrackingLock)
             {
-                ref var overlaps = ref ThreadStaticArray<VirtualRegion>.Get();
-
                 NonOverlappingRangeList<VirtualRegion> regions = guest ? _guestVirtualRegions : _virtualRegions;
+                List<RangeItem<VirtualRegion>> overlaps = [];
+                
+                // We use the non-span method here because keeping the lock will cause a deadlock.
+                regions.Lock.EnterReadLock();
+                (RangeItem<VirtualRegion> first, RangeItem<VirtualRegion> last) = regions.FindOverlaps(address, size);
+            
+                RangeItem<VirtualRegion> current = first;
+                while (last != null && current != last.Next)
+                {
+                    overlaps.Add(current);
+                    current = current.Next;
+                }
+                regions.Lock.ExitReadLock();
 
-                int count = regions.FindOverlapsNonOverlapping(address, size, ref overlaps);
-
-                if (count == 0 && !precise)
+                if (first is null && !precise)
                 {
                     if (_memoryManager.IsRangeMapped(address, size))
                     {
                         // TODO: There is currently the possibility that a page can be protected after its virtual region is removed.
                         // This code handles that case when it happens, but it would be better to find out how this happens.
                         _memoryManager.TrackingReprotect(address & ~(ulong)(_pageSize - 1), (ulong)_pageSize, MemoryPermission.ReadAndWrite, guest);
+                        
                         return true; // This memory _should_ be mapped, so we need to try again.
                     }
-                    else
-                    {
-                        shouldThrow = true;
-                    }
+                    
+                    shouldThrow = true;
                 }
                 else
                 {
@@ -324,9 +334,9 @@ namespace Ryujinx.Memory.Tracking
                         size += (ulong)_pageSize;
                     }
 
-                    for (int i = 0; i < count; i++)
+                    for (int i = 0; i < overlaps.Count; i++)
                     {
-                        VirtualRegion region = overlaps[i];
+                        VirtualRegion region = overlaps[i].Value;
 
                         if (precise)
                         {
