@@ -15,7 +15,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <summary>
         /// Represents a GPU virtual memory range.
         /// </summary>
-        private class VirtualRange : INonOverlappingRange
+        private readonly struct VirtualRange : IRange
         {
             /// <summary>
             /// GPU virtual address where the range starts.
@@ -25,7 +25,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
             /// <summary>
             /// Size of the range in bytes.
             /// </summary>
-            public ulong Size { get; private set; }
+            public ulong Size { get; }
 
             /// <summary>
             /// GPU virtual address where the range ends.
@@ -35,7 +35,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
             /// <summary>
             /// Physical regions where the GPU virtual region is mapped.
             /// </summary>
-            public MultiRange Range { get; private set; }
+            public MultiRange Range { get; }
 
             /// <summary>
             /// Creates a new virtual memory range.
@@ -60,14 +60,10 @@ namespace Ryujinx.Graphics.Gpu.Memory
             {
                 return Address < address + size && address < EndAddress;
             }
-
-            public INonOverlappingRange Split(ulong splitAddress)
-            {
-                throw new NotImplementedException();
-            }
         }
 
-        private readonly NonOverlappingRangeList<VirtualRange> _virtualRanges;
+        private readonly RangeList<VirtualRange> _virtualRanges;
+        private VirtualRange[] _virtualRangeOverlaps;
         private readonly ConcurrentQueue<VirtualRange> _deferredUnmaps;
         private int _hasDeferredUnmaps;
 
@@ -79,6 +75,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
         {
             _memoryManager = memoryManager;
             _virtualRanges = [];
+            _virtualRangeOverlaps = new VirtualRange[BufferCache.OverlapsBufferInitialCapacity];
             _deferredUnmaps = new ConcurrentQueue<VirtualRange>();
         }
 
@@ -109,11 +106,19 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <returns>True if the range already existed, false if a new one was created and added</returns>
         public bool TryGetOrAddRange(ulong gpuVa, ulong size, out MultiRange range)
         {
+            VirtualRange[] overlaps = _virtualRangeOverlaps;
+            int overlapsCount;
+
             if (Interlocked.Exchange(ref _hasDeferredUnmaps, 0) != 0)
             {
                 while (_deferredUnmaps.TryDequeue(out VirtualRange unmappedRange))
                 {
-                    _virtualRanges.RemoveRange(unmappedRange.Address, unmappedRange.Size);
+                    overlapsCount = _virtualRanges.FindOverlapsNonOverlapping(unmappedRange.Address, unmappedRange.Size, ref overlaps);
+
+                    for (int index = 0; index < overlapsCount; index++)
+                    {
+                        _virtualRanges.Remove(overlaps[index]);
+                    }
                 }
             }
 
@@ -121,22 +126,27 @@ namespace Ryujinx.Graphics.Gpu.Memory
 
             ulong originalVa = gpuVa;
 
-            _virtualRanges.Lock.EnterWriteLock();
-            (RangeItem<VirtualRange> first, RangeItem<VirtualRange> last) = _virtualRanges.FindOverlaps(gpuVa, size);
+            overlapsCount = _virtualRanges.FindOverlapsNonOverlapping(gpuVa, size, ref overlaps);
 
-            if (first is not null)
+            if (overlapsCount != 0)
             {
                 // The virtual range already exists. We just need to check if our range fits inside
                 // the existing one, and if not, we must extend the existing one.
 
                 ulong endAddress = gpuVa + size;
+                VirtualRange overlap0 = overlaps[0];
 
-                if (first.Address > gpuVa || first.EndAddress < endAddress)
+                if (overlap0.Address > gpuVa || overlap0.EndAddress < endAddress)
                 {
-                    gpuVa = Math.Min(gpuVa, first.Address);
-                    endAddress = Math.Max(endAddress, last.EndAddress);
+                    for (int index = 0; index < overlapsCount; index++)
+                    {
+                        VirtualRange virtualRange = overlaps[index];
 
-                    _virtualRanges.RemoveRange(first, last);
+                        gpuVa = Math.Min(gpuVa, virtualRange.Address);
+                        endAddress = Math.Max(endAddress, virtualRange.EndAddress);
+
+                        _virtualRanges.Remove(virtualRange);
+                    }
 
                     ulong newSize = endAddress - gpuVa;
                     MultiRange newRange = _memoryManager.GetPhysicalRegions(gpuVa, newSize);
@@ -147,8 +157,8 @@ namespace Ryujinx.Graphics.Gpu.Memory
                 }
                 else
                 {
-                    found = first.Value.Range.Count == 1 || IsSparseAligned(first.Value.Range);
-                    range = first.Value.Range.Slice(gpuVa - first.Address, size);
+                    found = overlap0.Range.Count == 1 || IsSparseAligned(overlap0.Range);
+                    range = overlap0.Range.Slice(gpuVa - overlap0.Address, size);
                 }
             }
             else
@@ -160,7 +170,8 @@ namespace Ryujinx.Graphics.Gpu.Memory
 
                 _virtualRanges.Add(virtualRange);
             }
-            _virtualRanges.Lock.ExitWriteLock();
+
+            ShrinkOverlapsBufferIfNeeded();
 
             // If the range is not properly aligned for sparse mapping,
             // let's just force it to a single range.
@@ -209,6 +220,17 @@ namespace Ryujinx.Graphics.Gpu.Memory
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Resizes the temporary buffer used for range list intersection results, if it has grown too much.
+        /// </summary>
+        private void ShrinkOverlapsBufferIfNeeded()
+        {
+            if (_virtualRangeOverlaps.Length > BufferCache.OverlapsBufferMaxCapacity)
+            {
+                Array.Resize(ref _virtualRangeOverlaps, BufferCache.OverlapsBufferMaxCapacity);
+            }
         }
     }
 }

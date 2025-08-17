@@ -107,7 +107,7 @@ namespace Ryujinx.Common.Collections
             Node<TKey, TValue> node = GetNode(key);
             if (node != null)
             {
-                Node<TKey, TValue> successor = node.Successor;
+                Node<TKey, TValue> successor = SuccessorOf(node);
 
                 return successor != null ? successor.Key : default;
             }
@@ -124,7 +124,7 @@ namespace Ryujinx.Common.Collections
             Node<TKey, TValue> node = GetNode(key);
             if (node != null)
             {
-                Node<TKey, TValue> predecessor = node.Predecessor;
+                Node<TKey, TValue> predecessor = PredecessorOf(node);
 
                 return predecessor != null ? predecessor.Key : default;
             }
@@ -132,10 +132,11 @@ namespace Ryujinx.Common.Collections
         }
 
         /// <summary>
-        /// Adds all the nodes in the dictionary as key/value pairs into a list.
+        /// Adds all the nodes in the dictionary as key/value pairs into <paramref name="list"/>.
         /// <br></br>
         /// The key/value pairs will be added in Level Order.
         /// </summary>
+        /// <param name="list">List to add the tree pairs into</param>
         public List<KeyValuePair<TKey, TValue>> AsLevelOrderList()
         {
             List<KeyValuePair<TKey, TValue>> list = [];
@@ -162,7 +163,7 @@ namespace Ryujinx.Common.Collections
         }
 
         /// <summary>
-        /// Adds all the nodes in the dictionary into a list.
+        /// Adds all the nodes in the dictionary into <paramref name="list"/>.
         /// </summary>
         /// <returns>A list of all KeyValuePairs sorted by Key Order</returns>
         public List<KeyValuePair<TKey, TValue>> AsList()
@@ -274,7 +275,7 @@ namespace Ryujinx.Common.Collections
                 }
             }
             Node<TKey, TValue> newNode = new(key, value, parent);
-            if (parent == null)
+            if (newNode.Parent == null)
             {
                 Root = newNode;
             }

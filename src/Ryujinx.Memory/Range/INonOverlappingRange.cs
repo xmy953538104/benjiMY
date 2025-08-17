@@ -3,7 +3,7 @@ namespace Ryujinx.Memory.Range
     /// <summary>
     /// Range of memory that can be split in two.
     /// </summary>
-    public interface INonOverlappingRange : IRange
+    interface INonOverlappingRange : IRange
     {
         /// <summary>
         /// Split this region into two, around the specified address. 

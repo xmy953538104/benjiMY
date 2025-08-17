@@ -89,19 +89,13 @@ namespace Ryujinx.HLE.HOS.Kernel.Memory
                     if (baseAddress > currBaseAddr)
                     {
                         KMemoryBlock newBlock = currBlock.SplitRightAtAddress(baseAddress);
-                        if (currBlock.Left == null)
-                            _blockTree.Add(newBlock, currBlock);
-                        else
-                            _blockTree.Add(newBlock, currBlock.Predecessor);
+                        _blockTree.Add(newBlock);
                     }
 
                     if (endAddr < currEndAddr)
                     {
                         KMemoryBlock newBlock = currBlock.SplitRightAtAddress(endAddr);
-                        if (currBlock.Left == null)
-                            _blockTree.Add(newBlock, currBlock);
-                        else
-                            _blockTree.Add(newBlock, currBlock.Predecessor);
+                        _blockTree.Add(newBlock);
                         currBlock = newBlock;
                     }
 
@@ -149,19 +143,13 @@ namespace Ryujinx.HLE.HOS.Kernel.Memory
                     if (baseAddress > currBaseAddr)
                     {
                         KMemoryBlock newBlock = currBlock.SplitRightAtAddress(baseAddress);
-                        if (currBlock.Left == null)
-                            _blockTree.Add(newBlock, currBlock);
-                        else
-                            _blockTree.Add(newBlock, currBlock.Predecessor);
+                        _blockTree.Add(newBlock);
                     }
 
                     if (endAddr < currEndAddr)
                     {
                         KMemoryBlock newBlock = currBlock.SplitRightAtAddress(endAddr);
-                        if (currBlock.Left == null)
-                            _blockTree.Add(newBlock, currBlock);
-                        else
-                            _blockTree.Add(newBlock, currBlock.Predecessor);
+                        _blockTree.Add(newBlock);
                         currBlock = newBlock;
                     }
 
@@ -211,19 +199,13 @@ namespace Ryujinx.HLE.HOS.Kernel.Memory
                     if (baseAddress > currBaseAddr)
                     {
                         KMemoryBlock newBlock = currBlock.SplitRightAtAddress(baseAddress);
-                        if (currBlock.Left == null)
-                            _blockTree.Add(newBlock, currBlock);
-                        else
-                            _blockTree.Add(newBlock, currBlock.Predecessor);
+                        _blockTree.Add(newBlock);
                     }
 
                     if (endAddr < currEndAddr)
                     {
                         KMemoryBlock newBlock = currBlock.SplitRightAtAddress(endAddr);
-                        if (currBlock.Left == null)
-                            _blockTree.Add(newBlock, currBlock);
-                        else
-                            _blockTree.Add(newBlock, currBlock.Predecessor);
+                        _blockTree.Add(newBlock);
                         currBlock = newBlock;
                     }
 
