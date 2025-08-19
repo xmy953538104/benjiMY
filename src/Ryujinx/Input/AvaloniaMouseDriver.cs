@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Ryujinx.Input;
 using System;
 using System.Numerics;
@@ -11,10 +12,13 @@ namespace Ryujinx.Ava.Input
 {
     internal class AvaloniaMouseDriver : IGamepadDriver
     {
+        private const int ScrollTimerIntervalMilliseconds = 50;
+
         private Control _widget;
         private bool _isDisposed;
         private Size _size;
         private readonly TopLevel _window;
+        private DispatcherTimer _scrollStopTimer;
 
         public bool[] PressedButtons { get; }
         public Vector2 CurrentPosition { get; private set; }
@@ -37,6 +41,11 @@ namespace Ryujinx.Ava.Input
             _window.PointerPressed += Parent_PointerPressedEvent;
             _window.PointerReleased += Parent_PointerReleasedEvent;
             _window.PointerWheelChanged += Parent_PointerWheelChanged;
+
+            _scrollStopTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(ScrollTimerIntervalMilliseconds)
+            };
 
             PressedButtons = new bool[(int)MouseButton.Count];
 
@@ -61,10 +70,26 @@ namespace Ryujinx.Ava.Input
         {
             _size = new Size((int)rect.Width, (int)rect.Height);
         }
+        
+        private void HandleScrollStopped() 
+        {
+            Scroll = new Vector2(0, 0);
+        }
 
         private void Parent_PointerWheelChanged(object o, PointerWheelEventArgs args)
         {
             Scroll = new Vector2((float)args.Delta.X, (float)args.Delta.Y);
+
+            _scrollStopTimer.Stop();
+
+            _scrollStopTimer.Tick += (_, _) =>
+            {
+                _scrollStopTimer.Stop();
+
+                HandleScrollStopped();
+
+            };
+            _scrollStopTimer.Start();
         }
 
         private void Parent_PointerReleasedEvent(object o, PointerReleasedEventArgs args)
