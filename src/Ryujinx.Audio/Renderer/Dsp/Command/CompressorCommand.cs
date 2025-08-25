@@ -42,11 +42,14 @@ namespace Ryujinx.Audio.Renderer.Dsp.Command
 
             InputBufferIndices = new ushort[Constants.VoiceChannelCountMax];
             OutputBufferIndices = new ushort[Constants.VoiceChannelCountMax];
+            
+            Span<byte> inputSpan = _parameter.Input.AsSpan();
+            Span<byte> outputSpan = _parameter.Output.AsSpan();
 
             for (int i = 0; i < _parameter.ChannelCount; i++)
             {
-                InputBufferIndices[i] = (ushort)(bufferOffset + _parameter.Input[i]);
-                OutputBufferIndices[i] = (ushort)(bufferOffset + _parameter.Output[i]);
+                InputBufferIndices[i] = (ushort)(bufferOffset + inputSpan[i]);
+                OutputBufferIndices[i] = (ushort)(bufferOffset + outputSpan[i]);
             }
         }
 
@@ -171,10 +174,12 @@ namespace Ryujinx.Audio.Renderer.Dsp.Command
 
                         statistics.MinimumGain = MathF.Min(statistics.MinimumGain, compressionGain * state.OutputGain);
                         statistics.MaximumMean = MathF.Max(statistics.MaximumMean, mean);
+                        
+                        Span<float> lastSamplesSpan = statistics.LastSamples.AsSpan();
 
                         for (int channelIndex = 0; channelIndex < _parameter.ChannelCount; channelIndex++)
                         {
-                            statistics.LastSamples[channelIndex] = MathF.Abs(channelInput[channelIndex] * (1f / 32768f));
+                            lastSamplesSpan[channelIndex] = MathF.Abs(channelInput[channelIndex] * (1f / 32768f));
                         }
                     }
                 }

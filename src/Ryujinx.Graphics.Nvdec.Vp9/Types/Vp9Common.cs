@@ -155,9 +155,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
         public bool CompoundReferenceAllowed()
         {
+            Span<sbyte> refFrameSignBiasSpan = RefFrameSignBias.AsSpan();
+            
             for (int i = 1; i < Constants.RefsPerFrame; ++i)
             {
-                if (RefFrameSignBias[i + 1] != RefFrameSignBias[1])
+                if (refFrameSignBiasSpan[i + 1] != refFrameSignBiasSpan[1])
                 {
                     return true;
                 }
@@ -173,13 +175,13 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
         public int GetFreeFb()
         {
-            ref Array12<RefCntBuffer> frameBufs = ref BufferPool.Value.FrameBufs;
+            Span<RefCntBuffer> frameBuffs = BufferPool.Value.FrameBufs.AsSpan();
 
             int i;
 
             for (i = 0; i < Constants.FrameBuffers; ++i)
             {
-                if (frameBufs[i].RefCount == 0)
+                if (frameBuffs[i].RefCount == 0)
                 {
                     break;
                 }
@@ -187,7 +189,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
             if (i != Constants.FrameBuffers)
             {
-                frameBufs[i].RefCount = 1;
+                frameBuffs[i].RefCount = 1;
             }
             else
             {
@@ -240,25 +242,29 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
         private void AllocSegMap(MemoryAllocator allocator, int segMapSize)
         {
+            Span<ArrayPtr<byte>> segMapArraySpan = SegMapArray.AsSpan();
+            
             for (int i = 0; i < Constants.NumPingPongBuffers; ++i)
             {
-                SegMapArray[i] = allocator.Allocate<byte>(segMapSize);
+                segMapArraySpan[i] = allocator.Allocate<byte>(segMapSize);
             }
 
             // Init the index.
             SegMapIdx = 0;
             PrevSegMapIdx = 1;
 
-            CurrentFrameSegMap = SegMapArray[SegMapIdx];
-            LastFrameSegMap = SegMapArray[PrevSegMapIdx];
+            CurrentFrameSegMap = segMapArraySpan[SegMapIdx];
+            LastFrameSegMap = segMapArraySpan[PrevSegMapIdx];
         }
 
         private void FreeSegMap(MemoryAllocator allocator)
         {
+            Span<ArrayPtr<byte>> segMapArraySpan = SegMapArray.AsSpan();
+            
             for (int i = 0; i < Constants.NumPingPongBuffers; ++i)
             {
-                allocator.Free(SegMapArray[i]);
-                SegMapArray[i] = ArrayPtr<byte>.Null;
+                allocator.Free(segMapArraySpan[i]);
+                segMapArraySpan[i] = ArrayPtr<byte>.Null;
             }
 
             CurrentFrameSegMap = ArrayPtr<byte>.Null;
@@ -366,18 +372,21 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
         internal void InitMacroBlockD(ref MacroBlockD xd, ArrayPtr<int> dqcoeff)
         {
+            Span<MacroBlockDPlane> planeSpan = xd.Plane.AsSpan();
+            Span<ArrayPtr<sbyte>> aboveContextSpan = xd.AboveContext.AsSpan();
+            
             for (int i = 0; i < Constants.MaxMbPlane; ++i)
             {
-                xd.Plane[i].DqCoeff = dqcoeff;
-                xd.AboveContext[i] = AboveContext.Slice(i * 2 * TileInfo.MiColsAlignedToSb(MiCols));
+                planeSpan[i].DqCoeff = dqcoeff;
+                aboveContextSpan[i] = AboveContext.Slice(i * 2 * TileInfo.MiColsAlignedToSb(MiCols));
 
                 if (i == 0)
                 {
-                    MemoryUtil.Copy(ref xd.Plane[i].SegDequant, ref YDequant);
+                    MemoryUtil.Copy(ref planeSpan[i].SegDequant, ref YDequant);
                 }
                 else
                 {
-                    MemoryUtil.Copy(ref xd.Plane[i].SegDequant, ref UvDequant);
+                    MemoryUtil.Copy(ref planeSpan[i].SegDequant, ref UvDequant);
                 }
 
                 xd.Fc = new Ptr<Vp9EntropyProbs>(ref Fc.Value);
@@ -395,32 +404,43 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             // Build y/uv dequant values based on segmentation.
             if (Seg.Enabled)
             {
+                Span<Array2<short>> yDequantSpan1 = YDequant.AsSpan();
+                Span<Array2<short>> uvDequantSpan1 = UvDequant.AsSpan();
+                
                 for (int i = 0; i < Constants.MaxSegments; ++i)
                 {
+                    Span<short> yDequantSpan2 = yDequantSpan1[i].AsSpan();
+                    Span<short> uvDequantSpan2 = uvDequantSpan1[i].AsSpan();
+                    
                     int qindex = Seg.GetQIndex(i, BaseQindex);
-                    YDequant[i][0] = QuantCommon.DcQuant(qindex, YDcDeltaQ, BitDepth);
-                    YDequant[i][1] = QuantCommon.AcQuant(qindex, 0, BitDepth);
-                    UvDequant[i][0] = QuantCommon.DcQuant(qindex, UvDcDeltaQ, BitDepth);
-                    UvDequant[i][1] = QuantCommon.AcQuant(qindex, UvAcDeltaQ, BitDepth);
+                    yDequantSpan2[0] = QuantCommon.DcQuant(qindex, YDcDeltaQ, BitDepth);
+                    yDequantSpan2[1] = QuantCommon.AcQuant(qindex, 0, BitDepth);
+                    uvDequantSpan2[0] = QuantCommon.DcQuant(qindex, UvDcDeltaQ, BitDepth);
+                    uvDequantSpan2[1] = QuantCommon.AcQuant(qindex, UvAcDeltaQ, BitDepth);
                 }
             }
             else
             {
+                Span<short> yDequantSpan = YDequant[0].AsSpan();
+                Span<short> uvDequantSpan = UvDequant[0].AsSpan();
+                
                 int qindex = BaseQindex;
                 // When segmentation is disabled, only the first value is used.  The
                 // remaining are don't cares.
-                YDequant[0][0] = QuantCommon.DcQuant(qindex, YDcDeltaQ, BitDepth);
-                YDequant[0][1] = QuantCommon.AcQuant(qindex, 0, BitDepth);
-                UvDequant[0][0] = QuantCommon.DcQuant(qindex, UvDcDeltaQ, BitDepth);
-                UvDequant[0][1] = QuantCommon.AcQuant(qindex, UvAcDeltaQ, BitDepth);
+                yDequantSpan[0] = QuantCommon.DcQuant(qindex, YDcDeltaQ, BitDepth);
+                yDequantSpan[1] = QuantCommon.AcQuant(qindex, 0, BitDepth);
+                uvDequantSpan[0] = QuantCommon.DcQuant(qindex, UvDcDeltaQ, BitDepth);
+                uvDequantSpan[1] = QuantCommon.AcQuant(qindex, UvAcDeltaQ, BitDepth);
             }
         }
 
         public void SetupScaleFactors()
         {
+            Span<RefBuffer> frameRefsSpan = FrameRefs.AsSpan();
+            
             for (int i = 0; i < Constants.RefsPerFrame; ++i)
             {
-                ref RefBuffer refBuf = ref FrameRefs[i];
+                ref RefBuffer refBuf = ref frameRefsSpan[i];
                 refBuf.Sf.SetupScaleFactorsForFrame(refBuf.Buf.Width, refBuf.Buf.Height, Width, Height);
             }
         }
@@ -432,26 +452,34 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
             if (ReferenceMode == ReferenceMode.Select)
             {
+                Span<byte> compInterProbSpan = fc.CompInterProb.AsSpan();
+                
                 for (int i = 0; i < Constants.CompInterContexts; ++i)
                 {
-                    r.DiffUpdateProb(ref fc.CompInterProb[i]);
+                    r.DiffUpdateProb(ref compInterProbSpan[i]);
                 }
             }
 
             if (ReferenceMode != ReferenceMode.Compound)
             {
+                Span<Array2<byte>> singleRefProbSpan1 = fc.SingleRefProb.AsSpan();
+                
                 for (int i = 0; i < Constants.RefContexts; ++i)
                 {
-                    r.DiffUpdateProb(ref fc.SingleRefProb[i][0]);
-                    r.DiffUpdateProb(ref fc.SingleRefProb[i][1]);
+                    Span<byte> singleRefProbSpan2 = singleRefProbSpan1[i].AsSpan();
+                    
+                    r.DiffUpdateProb(ref singleRefProbSpan2[0]);
+                    r.DiffUpdateProb(ref singleRefProbSpan2[1]);
                 }
             }
 
             if (ReferenceMode != ReferenceMode.Single)
             {
+                Span<byte> compRefProbSpan = fc.CompRefProb.AsSpan();
+                
                 for (int i = 0; i < Constants.RefContexts; ++i)
                 {
-                    r.DiffUpdateProb(ref fc.CompRefProb[i]);
+                    r.DiffUpdateProb(ref compRefProbSpan[i]);
                 }
             }
         }
@@ -470,99 +498,124 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
         public void SetupCompoundReferenceMode()
         {
-            if (RefFrameSignBias[Constants.LastFrame] == RefFrameSignBias[Constants.GoldenFrame])
+            Span<sbyte> refFrameSignBiasSpan = RefFrameSignBias.AsSpan();
+            Span<sbyte> compVarRefSpan = CompVarRef.AsSpan();
+            
+            if (refFrameSignBiasSpan[Constants.LastFrame] == refFrameSignBiasSpan[Constants.GoldenFrame])
             {
                 CompFixedRef = Constants.AltRefFrame;
-                CompVarRef[0] = Constants.LastFrame;
-                CompVarRef[1] = Constants.GoldenFrame;
+                compVarRefSpan[0] = Constants.LastFrame;
+                compVarRefSpan[1] = Constants.GoldenFrame;
             }
-            else if (RefFrameSignBias[Constants.LastFrame] == RefFrameSignBias[Constants.AltRefFrame])
+            else if (refFrameSignBiasSpan[Constants.LastFrame] == refFrameSignBiasSpan[Constants.AltRefFrame])
             {
                 CompFixedRef = Constants.GoldenFrame;
-                CompVarRef[0] = Constants.LastFrame;
-                CompVarRef[1] = Constants.AltRefFrame;
+                compVarRefSpan[0] = Constants.LastFrame;
+                compVarRefSpan[1] = Constants.AltRefFrame;
             }
             else
             {
                 CompFixedRef = Constants.LastFrame;
-                CompVarRef[0] = Constants.GoldenFrame;
-                CompVarRef[1] = Constants.AltRefFrame;
+                compVarRefSpan[0] = Constants.GoldenFrame;
+                compVarRefSpan[1] = Constants.AltRefFrame;
             }
         }
 
         public void InitMvProbs()
         {
-            Fc.Value.Joints[0] = 32;
-            Fc.Value.Joints[1] = 64;
-            Fc.Value.Joints[2] = 96;
+            Span<byte> jointsSpan = Fc.Value.Joints.AsSpan();
+            Span<byte> signSpan = Fc.Value.Sign.AsSpan();
+            Span<Array10<byte>> classesSpan = Fc.Value.Classes.AsSpan();
+            Span<byte> classes0Span = classesSpan[0].AsSpan();
+            Span<byte> classes1Span = classesSpan[1].AsSpan();
+            Span<Array1<byte>> class0Span = Fc.Value.Class0.AsSpan();
+            Span<Array10<byte>> bitsSpan = Fc.Value.Bits.AsSpan();
+            Span<byte> bits0Span = bitsSpan[0].AsSpan();
+            Span<byte> bits1Span = bitsSpan[1].AsSpan();
+            Span<Array2<Array3<byte>>> class0FpSpan = Fc.Value.Class0Fp.AsSpan();
+            Span<Array3<byte>> class0Fp0Span = class0FpSpan[0].AsSpan();
+            Span<Array3<byte>> class0Fp1Span = class0FpSpan[1].AsSpan();
+            Span<byte> class0Fp00Span = class0Fp0Span[0].AsSpan();
+            Span<byte> class0Fp01Span = class0Fp0Span[1].AsSpan();
+            Span<byte> class0Fp10Span = class0Fp1Span[0].AsSpan();
+            Span<byte> class0Fp11Span = class0Fp1Span[1].AsSpan();
+            Span<Array3<byte>> fpSpan = Fc.Value.Fp.AsSpan();
+            Span<byte> fp0Span = fpSpan[0].AsSpan();
+            Span<byte> fp1Span = fpSpan[1].AsSpan();
+            Span<byte> class0HpSpan = Fc.Value.Class0Hp.AsSpan();
+            Span<byte> hpSpan = Fc.Value.Hp.AsSpan();
+            
+            jointsSpan[0] = 32;
+            jointsSpan[1] = 64;
+            jointsSpan[2] = 96;
 
-            Fc.Value.Sign[0] = 128;
-            Fc.Value.Classes[0][0] = 224;
-            Fc.Value.Classes[0][1] = 144;
-            Fc.Value.Classes[0][2] = 192;
-            Fc.Value.Classes[0][3] = 168;
-            Fc.Value.Classes[0][4] = 192;
-            Fc.Value.Classes[0][5] = 176;
-            Fc.Value.Classes[0][6] = 192;
-            Fc.Value.Classes[0][7] = 198;
-            Fc.Value.Classes[0][8] = 198;
-            Fc.Value.Classes[0][9] = 245;
-            Fc.Value.Class0[0][0] = 216;
-            Fc.Value.Bits[0][0] = 136;
-            Fc.Value.Bits[0][1] = 140;
-            Fc.Value.Bits[0][2] = 148;
-            Fc.Value.Bits[0][3] = 160;
-            Fc.Value.Bits[0][4] = 176;
-            Fc.Value.Bits[0][5] = 192;
-            Fc.Value.Bits[0][6] = 224;
-            Fc.Value.Bits[0][7] = 234;
-            Fc.Value.Bits[0][8] = 234;
-            Fc.Value.Bits[0][9] = 240;
-            Fc.Value.Class0Fp[0][0][0] = 128;
-            Fc.Value.Class0Fp[0][0][1] = 128;
-            Fc.Value.Class0Fp[0][0][2] = 64;
-            Fc.Value.Class0Fp[0][1][0] = 96;
-            Fc.Value.Class0Fp[0][1][1] = 112;
-            Fc.Value.Class0Fp[0][1][2] = 64;
-            Fc.Value.Fp[0][0] = 64;
-            Fc.Value.Fp[0][1] = 96;
-            Fc.Value.Fp[0][2] = 64;
-            Fc.Value.Class0Hp[0] = 160;
-            Fc.Value.Hp[0] = 128;
+            signSpan[0] = 128;
+            classes0Span[0] = 224;
+            classes0Span[1] = 144;
+            classes0Span[2] = 192;
+            classes0Span[3] = 168;
+            classes0Span[4] = 192;
+            classes0Span[5] = 176;
+            classes0Span[6] = 192;
+            classes0Span[7] = 198;
+            classes0Span[8] = 198;
+            classes0Span[9] = 245;
+            class0Span[0][0] = 216;
+            bits0Span[0] = 136;
+            bits0Span[1] = 140;
+            bits0Span[2] = 148;
+            bits0Span[3] = 160;
+            bits0Span[4] = 176;
+            bits0Span[5] = 192;
+            bits0Span[6] = 224;
+            bits0Span[7] = 234;
+            bits0Span[8] = 234;
+            bits0Span[9] = 240;
+            class0Fp00Span[0] = 128;
+            class0Fp00Span[1] = 128;
+            class0Fp00Span[2] = 64;
+            class0Fp01Span[0] = 96;
+            class0Fp01Span[1] = 112;
+            class0Fp01Span[2] = 64;
+            fp0Span[0] = 64;
+            fp0Span[1] = 96;
+            fp0Span[2] = 64;
+            class0HpSpan[0] = 160;
+            hpSpan[0] = 128;
 
-            Fc.Value.Sign[1] = 128;
-            Fc.Value.Classes[1][0] = 216;
-            Fc.Value.Classes[1][1] = 128;
-            Fc.Value.Classes[1][2] = 176;
-            Fc.Value.Classes[1][3] = 160;
-            Fc.Value.Classes[1][4] = 176;
-            Fc.Value.Classes[1][5] = 176;
-            Fc.Value.Classes[1][6] = 192;
-            Fc.Value.Classes[1][7] = 198;
-            Fc.Value.Classes[1][8] = 198;
-            Fc.Value.Classes[1][9] = 208;
-            Fc.Value.Class0[1][0] = 208;
-            Fc.Value.Bits[1][0] = 136;
-            Fc.Value.Bits[1][1] = 140;
-            Fc.Value.Bits[1][2] = 148;
-            Fc.Value.Bits[1][3] = 160;
-            Fc.Value.Bits[1][4] = 176;
-            Fc.Value.Bits[1][5] = 192;
-            Fc.Value.Bits[1][6] = 224;
-            Fc.Value.Bits[1][7] = 234;
-            Fc.Value.Bits[1][8] = 234;
-            Fc.Value.Bits[1][9] = 240;
-            Fc.Value.Class0Fp[1][0][0] = 128;
-            Fc.Value.Class0Fp[1][0][1] = 128;
-            Fc.Value.Class0Fp[1][0][2] = 64;
-            Fc.Value.Class0Fp[1][1][0] = 96;
-            Fc.Value.Class0Fp[1][1][1] = 112;
-            Fc.Value.Class0Fp[1][1][2] = 64;
-            Fc.Value.Fp[1][0] = 64;
-            Fc.Value.Fp[1][1] = 96;
-            Fc.Value.Fp[1][2] = 64;
-            Fc.Value.Class0Hp[1] = 160;
-            Fc.Value.Hp[1] = 128;
+            signSpan[1] = 128;
+            classes1Span[0] = 216;
+            classes1Span[1] = 128;
+            classes1Span[2] = 176;
+            classes1Span[3] = 160;
+            classes1Span[4] = 176;
+            classes1Span[5] = 176;
+            classes1Span[6] = 192;
+            classes1Span[7] = 198;
+            classes1Span[8] = 198;
+            classes1Span[9] = 208;
+            class0Span[1][0] = 208;
+            bits1Span[0] = 136;
+            bits1Span[1] = 140;
+            bits1Span[2] = 148;
+            bits1Span[3] = 160;
+            bits1Span[4] = 176;
+            bits1Span[5] = 192;
+            bits1Span[6] = 224;
+            bits1Span[7] = 234;
+            bits1Span[8] = 234;
+            bits1Span[9] = 240;
+            class0Fp10Span[0] = 128;
+            class0Fp10Span[1] = 128;
+            class0Fp10Span[2] = 64;
+            class0Fp11Span[0] = 96;
+            class0Fp11Span[1] = 112;
+            class0Fp11Span[2] = 64;
+            fp1Span[0] = 64;
+            fp1Span[1] = 96;
+            fp1Span[2] = 64;
+            class0HpSpan[1] = 160;
+            hpSpan[1] = 128;
         }
 
         public void AdaptMvProbs(bool allowHp)
@@ -577,41 +630,74 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
                 counts.Joints.AsSpan(),
                 fc.Joints.AsSpan());
 
+            Span<byte> fSignSpan = fc.Sign.AsSpan();
+            Span<byte> pSignSpan = preFc.Sign.AsSpan();
+            Span<Array2<uint>> cSignSpan = counts.Sign.AsSpan();
+            Span<Array10<byte>> fClassesSpan = fc.Classes.AsSpan();
+            Span<Array10<byte>> pClassesSpan = preFc.Classes.AsSpan();
+            Span<Array11<uint>> cClassesSpan = counts.Classes.AsSpan();
+            Span<Array1<byte>> fClass0Span = fc.Class0.AsSpan();
+            Span<Array1<byte>> pClass0Span = preFc.Class0.AsSpan();
+            Span<Array2<uint>> cClass0Span = counts.Class0.AsSpan();
+            Span<Array10<byte>> fBitsSpan1 = fc.Bits.AsSpan();
+            Span<Array10<byte>> pBitsSpan1 = preFc.Bits.AsSpan();
+            Span<Array10<Array2<uint>>> cBitsSpan1 = counts.Bits.AsSpan();
+            Span<Array2<Array3<byte>>> fClass0FpSpan1 = fc.Class0Fp.AsSpan();
+            Span<Array2<Array3<byte>>> pClass0FpSpan1 = preFc.Class0Fp.AsSpan();
+            Span<Array2<Array4<uint>>> cClass0FpSpan1 = counts.Class0Fp.AsSpan();
+            Span<Array3<byte>> fFpSpan = fc.Fp.AsSpan();
+            Span<Array3<byte>> pFpSpan = preFc.Fp.AsSpan();
+            Span<Array4<uint>> cFpSpan = counts.Fp.AsSpan();
+            Span<byte> fClass0HpSpan = fc.Class0Hp.AsSpan();
+            Span<byte> pClass0HpSpan = preFc.Class0Hp.AsSpan();
+            Span<Array2<uint>> cClass0HpSpan = counts.Class0Hp.AsSpan();
+            Span<byte> fHpSpan = fc.Hp.AsSpan();
+            Span<byte> pHpSpan = preFc.Hp.AsSpan();
+            Span<Array2<uint>> cHpSpan = counts.Hp.AsSpan();
+
             for (int i = 0; i < 2; ++i)
             {
-                fc.Sign[i] = Prob.ModeMvMergeProbs(preFc.Sign[i], ref counts.Sign[i]);
+                fSignSpan[i] = Prob.ModeMvMergeProbs(pSignSpan[i], cSignSpan[i].AsSpan());
                 Prob.VpxTreeMergeProbs(
                     EntropyMv.ClassTree,
-                    preFc.Classes[i].AsSpan(),
-                    counts.Classes[i].AsSpan(),
-                    fc.Classes[i].AsSpan());
+                    pClassesSpan[i].AsSpan(),
+                    cClassesSpan[i].AsSpan(),
+                    fClassesSpan[i].AsSpan());
                 Prob.VpxTreeMergeProbs(
                     EntropyMv.Class0Tree,
-                    preFc.Class0[i].AsSpan(),
-                    counts.Class0[i].AsSpan(),
-                    fc.Class0[i].AsSpan());
+                    pClass0Span[i].AsSpan(),
+                    cClass0Span[i].AsSpan(),
+                    fClass0Span[i].AsSpan());
+                
+                Span<byte> fBitsSpan2 = fBitsSpan1[i].AsSpan();
+                Span<byte> pBitsSpan2 = pBitsSpan1[i].AsSpan();
+                Span<Array2<uint>> cBitsSpan2 = cBitsSpan1[i].AsSpan();
 
                 for (int j = 0; j < EntropyMv.OffsetBits; ++j)
                 {
-                    fc.Bits[i][j] = Prob.ModeMvMergeProbs(preFc.Bits[i][j], ref counts.Bits[i][j]);
+                    fBitsSpan2[j] = Prob.ModeMvMergeProbs(pBitsSpan2[j], cBitsSpan2[j].AsSpan());
                 }
+
+                Span<Array3<byte>> fClass0FpSpan2 = fClass0FpSpan1[i].AsSpan();
+                Span<Array3<byte>> pClass0FpSpan2 = pClass0FpSpan1[i].AsSpan();
+                Span<Array4<uint>> cClass0FpSpan2 = cClass0FpSpan1[i].AsSpan();
 
                 for (int j = 0; j < EntropyMv.Class0Size; ++j)
                 {
                     Prob.VpxTreeMergeProbs(
                         EntropyMv.FpTree,
-                        preFc.Class0Fp[i][j].AsSpan(),
-                        counts.Class0Fp[i][j].AsSpan(),
-                        fc.Class0Fp[i][j].AsSpan());
+                        pClass0FpSpan2[j].AsSpan(),
+                        cClass0FpSpan2[j].AsSpan(),
+                        fClass0FpSpan2[j].AsSpan());
                 }
 
-                Prob.VpxTreeMergeProbs(EntropyMv.FpTree, preFc.Fp[i].AsSpan(), counts.Fp[i].AsSpan(),
-                    fc.Fp[i].AsSpan());
+                Prob.VpxTreeMergeProbs(EntropyMv.FpTree, pFpSpan[i].AsSpan(), cFpSpan[i].AsSpan(),
+                    fFpSpan[i].AsSpan());
 
                 if (allowHp)
                 {
-                    fc.Class0Hp[i] = Prob.ModeMvMergeProbs(preFc.Class0Hp[i], ref counts.Class0Hp[i]);
-                    fc.Hp[i] = Prob.ModeMvMergeProbs(preFc.Hp[i], ref counts.Hp[i]);
+                    fClass0HpSpan[i] = Prob.ModeMvMergeProbs(pClass0HpSpan[i], cClass0HpSpan[i].AsSpan());
+                    fHpSpan[i] = Prob.ModeMvMergeProbs(pHpSpan[i], cHpSpan[i].AsSpan());
                 }
             }
         }
@@ -771,75 +857,115 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             ref Vp9EntropyProbs preFc = ref FrameContexts[(int)FrameContextIdx];
             ref Vp9BackwardUpdates counts = ref Counts.Value;
 
+            Span<byte> fIntraInterProbSpan = fc.IntraInterProb.AsSpan();
+            Span<byte> pIntraInterProbSpan = preFc.IntraInterProb.AsSpan();
+            Span<Array2<uint>> cIntraInterSpan = counts.IntraInter.AsSpan();
+
             for (int i = 0; i < Constants.IntraInterContexts; i++)
             {
-                fc.IntraInterProb[i] = Prob.ModeMvMergeProbs(preFc.IntraInterProb[i], ref counts.IntraInter[i]);
+                fIntraInterProbSpan[i] = Prob.ModeMvMergeProbs(pIntraInterProbSpan[i], cIntraInterSpan[i].AsSpan());
             }
+            
+            Span<byte> fCompInterProbSpan = fc.CompInterProb.AsSpan();
+            Span<byte> pCompInterProbSpan = preFc.CompInterProb.AsSpan();
+            Span<Array2<uint>> cCompInterSpan = counts.CompInter.AsSpan();
 
             for (int i = 0; i < Constants.CompInterContexts; i++)
             {
-                fc.CompInterProb[i] = Prob.ModeMvMergeProbs(preFc.CompInterProb[i], ref counts.CompInter[i]);
+                fCompInterProbSpan[i] = Prob.ModeMvMergeProbs(pCompInterProbSpan[i], cCompInterSpan[i].AsSpan());
             }
+            
+            Span<byte> fCompRefProbSpan = fc.CompRefProb.AsSpan();
+            Span<byte> pCompRefProbSpan = preFc.CompRefProb.AsSpan();
+            Span<Array2<uint>> cCompRefSpan = counts.CompRef.AsSpan();
 
             for (int i = 0; i < Constants.RefContexts; i++)
             {
-                fc.CompRefProb[i] = Prob.ModeMvMergeProbs(preFc.CompRefProb[i], ref counts.CompRef[i]);
+                fCompRefProbSpan[i] = Prob.ModeMvMergeProbs(pCompRefProbSpan[i], cCompRefSpan[i].AsSpan());
             }
+            
+            Span<Array2<byte>> fSingleRefProbSpan1 = fc.SingleRefProb.AsSpan();
+            Span<Array2<byte>> pSingleRefProbSpan1 = preFc.SingleRefProb.AsSpan();
+            Span<Array2<Array2<uint>>> cSingleRefSpan1 = counts.SingleRef.AsSpan();
 
             for (int i = 0; i < Constants.RefContexts; i++)
             {
+                Span<byte> fSingleRefProbSpan2 = fSingleRefProbSpan1[i].AsSpan();
+                Span<byte> pSingleRefProbSpan2 = pSingleRefProbSpan1[i].AsSpan();
+                Span<Array2<uint>> cSingleRefSpan2 = cSingleRefSpan1[i].AsSpan();
+                
                 for (int j = 0; j < 2; j++)
                 {
-                    fc.SingleRefProb[i][j] =
-                        Prob.ModeMvMergeProbs(preFc.SingleRefProb[i][j], ref counts.SingleRef[i][j]);
+                    fSingleRefProbSpan2[j] =
+                        Prob.ModeMvMergeProbs(pSingleRefProbSpan2[j], cSingleRefSpan2[j].AsSpan());
                 }
             }
+            
+            Span<Array3<byte>> fInterModeProbSpan = fc.InterModeProb.AsSpan();
+            Span<Array3<byte>> pInterModeProbSpan = preFc.InterModeProb.AsSpan();
+            Span<Array4<uint>> cInterModeSpan = counts.InterMode.AsSpan();
 
             for (int i = 0; i < Constants.InterModeContexts; i++)
             {
                 Prob.VpxTreeMergeProbs(
                     EntropyMode.InterModeTree,
-                    preFc.InterModeProb[i].AsSpan(),
-                    counts.InterMode[i].AsSpan(),
-                    fc.InterModeProb[i].AsSpan());
+                    pInterModeProbSpan[i].AsSpan(),
+                    cInterModeSpan[i].AsSpan(),
+                    fInterModeProbSpan[i].AsSpan());
             }
+            
+            Span<Array9<byte>> fYModeProbSpan = fc.YModeProb.AsSpan();
+            Span<Array9<byte>> pYModeProbSpan = preFc.YModeProb.AsSpan();
+            Span<Array10<uint>> cYModeSpan = counts.YMode.AsSpan();
 
             for (int i = 0; i < EntropyMode.BlockSizeGroups; i++)
             {
                 Prob.VpxTreeMergeProbs(
                     EntropyMode.IntraModeTree,
-                    preFc.YModeProb[i].AsSpan(),
-                    counts.YMode[i].AsSpan(),
-                    fc.YModeProb[i].AsSpan());
+                    pYModeProbSpan[i].AsSpan(),
+                    cYModeSpan[i].AsSpan(),
+                    fYModeProbSpan[i].AsSpan());
             }
+            
+            Span<Array9<byte>> fUvModeProbSpan = fc.UvModeProb.AsSpan();
+            Span<Array9<byte>> pUvModeProbSpan = preFc.UvModeProb.AsSpan();
+            Span<Array10<uint>> cUvModeSpan = counts.UvMode.AsSpan();
 
             for (int i = 0; i < Constants.IntraModes; ++i)
             {
                 Prob.VpxTreeMergeProbs(
                     EntropyMode.IntraModeTree,
-                    preFc.UvModeProb[i].AsSpan(),
-                    counts.UvMode[i].AsSpan(),
-                    fc.UvModeProb[i].AsSpan());
+                    pUvModeProbSpan[i].AsSpan(),
+                    cUvModeSpan[i].AsSpan(),
+                    fUvModeProbSpan[i].AsSpan());
             }
+            
+            Span<Array3<byte>> fPartitionProbSpan = fc.PartitionProb.AsSpan();
+            Span<Array3<byte>> pPartitionProbSpan = preFc.PartitionProb.AsSpan();
+            Span<Array4<uint>> cPartitionSpan = counts.Partition.AsSpan();
 
             for (int i = 0; i < Constants.PartitionContexts; i++)
             {
                 Prob.VpxTreeMergeProbs(
                     EntropyMode.PartitionTree,
-                    preFc.PartitionProb[i].AsSpan(),
-                    counts.Partition[i].AsSpan(),
-                    fc.PartitionProb[i].AsSpan());
+                    pPartitionProbSpan[i].AsSpan(),
+                    cPartitionSpan[i].AsSpan(),
+                    fPartitionProbSpan[i].AsSpan());
             }
 
             if (InterpFilter == Constants.Switchable)
             {
+                Span<Array2<byte>> fSwitchableInterpProbSpan = fc.SwitchableInterpProb.AsSpan();
+                Span<Array2<byte>> pSwitchableInterpProbSpan = preFc.SwitchableInterpProb.AsSpan();
+                Span<Array3<uint>> cSwitchableInterpSpan = counts.SwitchableInterp.AsSpan();
+                
                 for (int i = 0; i < Constants.SwitchableFilterContexts; i++)
                 {
                     Prob.VpxTreeMergeProbs(
                         EntropyMode.SwitchableInterpTree,
-                        preFc.SwitchableInterpProb[i].AsSpan(),
-                        counts.SwitchableInterp[i].AsSpan(),
-                        fc.SwitchableInterpProb[i].AsSpan());
+                        pSwitchableInterpProbSpan[i].AsSpan(),
+                        cSwitchableInterpSpan[i].AsSpan(),
+                        fSwitchableInterpProbSpan[i].AsSpan());
                 }
             }
 
@@ -848,34 +974,62 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
                 Array1<Array2<uint>> branchCt8x8P = new();
                 Array2<Array2<uint>> branchCt16x16P = new();
                 Array3<Array2<uint>> branchCt32x32P = new();
+                
+                Span<Array2<uint>> branchCt8x8PSpan = branchCt8x8P.AsSpan();
+                Span<Array2<uint>> branchCt16x16PSpan = branchCt16x16P.AsSpan();
+                Span<Array2<uint>> branchCt32x32PSpan = branchCt32x32P.AsSpan();
+                
+                Span<Array2<uint>> tx8x8Span = counts.Tx8x8.AsSpan();
+                Span<Array2<uint>> tx16x16Span = counts.Tx8x8.AsSpan();
+                Span<Array2<uint>> tx32x32Span = counts.Tx8x8.AsSpan();
+
+                //There is no need for a Span2, as there is only ever 1 iteration
+                Span<Array1<byte>> fTx8x8ProbSpan = fc.Tx8x8Prob.AsSpan();
+                Span<Array1<byte>> pTx8x8ProbSpan = preFc.Tx8x8Prob.AsSpan();
+                
+                Span<Array2<byte>> fTx16x16ProbSpan1 = fc.Tx16x16Prob.AsSpan();
+                Span<Array2<byte>> pTx16x16ProbSpan1 = preFc.Tx16x16Prob.AsSpan();
+                
+                Span<Array3<byte>> fTx32x32ProbSpan1 = fc.Tx32x32Prob.AsSpan();
+                Span<Array3<byte>> pTx32x32ProbSpan1 = preFc.Tx32x32Prob.AsSpan();
 
                 for (int i = 0; i < EntropyMode.TxSizeContexts; ++i)
                 {
-                    EntropyMode.TxCountsToBranchCounts8x8(counts.Tx8x8[i].AsSpan(), ref branchCt8x8P);
+                    EntropyMode.TxCountsToBranchCounts8x8(tx8x8Span[i].AsSpan(), branchCt8x8P.AsSpan());
                     for (int j = 0; j < (int)TxSize.TxSizes - 3; ++j)
                     {
-                        fc.Tx8x8Prob[i][j] = Prob.ModeMvMergeProbs(preFc.Tx8x8Prob[i][j], ref branchCt8x8P[j]);
+                        fTx8x8ProbSpan[i][j] = Prob.ModeMvMergeProbs(pTx8x8ProbSpan[i][j], branchCt8x8PSpan[j].AsSpan());
                     }
+                    
+                    Span<byte> fTx16x16ProbSpan2 = fTx16x16ProbSpan1[i].AsSpan();
+                    Span<byte> pTx16x16ProbSpan2 = pTx16x16ProbSpan1[i].AsSpan();
 
-                    EntropyMode.TxCountsToBranchCounts16x16(counts.Tx16x16[i].AsSpan(), ref branchCt16x16P);
+                    EntropyMode.TxCountsToBranchCounts16x16(tx16x16Span[i].AsSpan(), branchCt16x16P.AsSpan());
                     for (int j = 0; j < (int)TxSize.TxSizes - 2; ++j)
                     {
-                        fc.Tx16x16Prob[i][j] =
-                            Prob.ModeMvMergeProbs(preFc.Tx16x16Prob[i][j], ref branchCt16x16P[j]);
+                        fTx16x16ProbSpan2[j] =
+                            Prob.ModeMvMergeProbs(pTx16x16ProbSpan2[j], branchCt16x16PSpan[j].AsSpan());
                     }
+                    
+                    Span<byte> fTx32x32ProbSpan2 = fTx32x32ProbSpan1[i].AsSpan();
+                    Span<byte> pTx32x32ProbSpan2 = pTx32x32ProbSpan1[i].AsSpan();
 
-                    EntropyMode.TxCountsToBranchCounts32x32(counts.Tx32x32[i].AsSpan(), ref branchCt32x32P);
+                    EntropyMode.TxCountsToBranchCounts32x32(tx32x32Span[i].AsSpan(), branchCt32x32P.AsSpan());
                     for (int j = 0; j < (int)TxSize.TxSizes - 1; ++j)
                     {
-                        fc.Tx32x32Prob[i][j] =
-                            Prob.ModeMvMergeProbs(preFc.Tx32x32Prob[i][j], ref branchCt32x32P[j]);
+                        fTx32x32ProbSpan2[j] =
+                            Prob.ModeMvMergeProbs(pTx32x32ProbSpan2[j], branchCt32x32PSpan[j].AsSpan());
                     }
                 }
             }
+            
+            Span<byte> fSkipProbSpan = fc.SkipProb.AsSpan();
+            Span<byte> pSkipProbSpan = preFc.SkipProb.AsSpan();
+            Span<Array2<uint>> cSkipSpan = counts.Skip.AsSpan();
 
             for (int i = 0; i < Constants.SkipContexts; ++i)
             {
-                fc.SkipProb[i] = Prob.ModeMvMergeProbs(preFc.SkipProb[i], ref counts.Skip[i]);
+                fSkipProbSpan[i] = Prob.ModeMvMergeProbs(pSkipProbSpan[i], cSkipSpan[i].AsSpan());
             }
         }
 
@@ -918,13 +1072,19 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             {
                 ref MvRef mv = ref PrevFrameMvs[i];
 
-                mv.Mv[0].Row = mvs[i].Mvs[0].Row;
-                mv.Mv[0].Col = mvs[i].Mvs[0].Col;
-                mv.Mv[1].Row = mvs[i].Mvs[1].Row;
-                mv.Mv[1].Col = mvs[i].Mvs[1].Col;
+                Span<Mv> mvSpan = mv.Mv.AsSpan();
+                Span<Vp9Mv> mvsSpan = mvs[i].Mvs.AsSpan();
 
-                mv.RefFrame[0] = (sbyte)mvs[i].RefFrames[0];
-                mv.RefFrame[1] = (sbyte)mvs[i].RefFrames[1];
+                mvSpan[0].Row = mvsSpan[0].Row;
+                mvSpan[0].Col = mvsSpan[0].Col;
+                mvSpan[1].Row = mvsSpan[1].Row;
+                mvSpan[1].Col = mvsSpan[1].Col;
+
+                Span<sbyte> refFrameSpan = mv.RefFrame.AsSpan();
+                Span<int> refFramesSpan = mvs[i].RefFrames.AsSpan();
+                
+                refFrameSpan[0] = (sbyte)refFramesSpan[0];
+                refFrameSpan[1] = (sbyte)refFramesSpan[1];
             }
         }
 
@@ -939,47 +1099,76 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             for (int i = 0; i < mvs.Length; i++)
             {
                 ref MvRef mv = ref CurFrameMvs[i];
+                
+                Span<Mv> mvSpan = mv.Mv.AsSpan();
+                Span<Vp9Mv> mvsSpan = mvs[i].Mvs.AsSpan();
 
-                mvs[i].Mvs[0].Row = mv.Mv[0].Row;
-                mvs[i].Mvs[0].Col = mv.Mv[0].Col;
-                mvs[i].Mvs[1].Row = mv.Mv[1].Row;
-                mvs[i].Mvs[1].Col = mv.Mv[1].Col;
+                mvsSpan[0].Row = mvSpan[0].Row;
+                mvsSpan[0].Col = mvSpan[0].Col;
+                mvsSpan[1].Row = mvSpan[1].Row;
+                mvsSpan[1].Col = mvSpan[1].Col;
+                
+                Span<sbyte> refFrameSpan = mv.RefFrame.AsSpan();
+                Span<int> refFramesSpan = mvs[i].RefFrames.AsSpan();
 
-                mvs[i].RefFrames[0] = mv.RefFrame[0];
-                mvs[i].RefFrames[1] = mv.RefFrame[1];
+                refFramesSpan[0] = refFrameSpan[0];
+                refFramesSpan[1] = refFrameSpan[1];
             }
         }
 
         private void AdaptCoefProbs(byte txSize, uint countSat, uint updateFactor)
         {
             ref Vp9EntropyProbs preFc = ref FrameContexts[(int)FrameContextIdx];
-            ref Array2<Array2<Array6<Array6<Array3<byte>>>>> probs = ref Fc.Value.CoefProbs[txSize];
-            ref Array2<Array2<Array6<Array6<Array3<byte>>>>> preProbs = ref preFc.CoefProbs[txSize];
-            ref Array2<Array2<Array6<Array6<Array4<uint>>>>> counts = ref Counts.Value.Coef[txSize];
-            ref Array2<Array2<Array6<Array6<uint>>>> eobCounts = ref Counts.Value.EobBranch[txSize];
+            Span<Array2<Array6<Array6<Array3<byte>>>>> probsSpan1 = Fc.Value.CoefProbs[txSize].AsSpan();
+            Span<Array2<Array6<Array6<Array3<byte>>>>> preProbsSpan1 = preFc.CoefProbs[txSize].AsSpan();
+            Span<Array2<Array6<Array6<Array4<uint>>>>> countsSpan1 = Counts.Value.Coef[txSize].AsSpan();
+            Span<Array2<Array6<Array6<uint>>>> eobCountsSpan1 = Counts.Value.EobBranch[txSize].AsSpan();
 
             for (int i = 0; i < Constants.PlaneTypes; ++i)
             {
+                Span<Array6<Array6<Array3<byte>>>> probsSpan2 = probsSpan1[i].AsSpan();
+                Span<Array6<Array6<Array3<byte>>>> preProbsSpan2 = preProbsSpan1[i].AsSpan();
+                Span<Array6<Array6<Array4<uint>>>> countsSpan2 = countsSpan1[i].AsSpan();
+                Span<Array6<Array6<uint>>> eobCountsSpan2 = eobCountsSpan1[i].AsSpan();
+                
                 for (int j = 0; j < Entropy.RefTypes; ++j)
                 {
+                    Span<Array6<Array3<byte>>> probsSpan3 = probsSpan2[j].AsSpan();
+                    Span<Array6<Array3<byte>>> preProbsSpan3 = preProbsSpan2[j].AsSpan();
+                    Span<Array6<Array4<uint>>> countsSpan3 = countsSpan2[j].AsSpan();
+                    Span<Array6<uint>> eobCountsSpan3 = eobCountsSpan2[j].AsSpan();
+                    
                     for (int k = 0; k < Entropy.CoefBands; ++k)
                     {
+                        Span<Array3<byte>> probsSpan4 = probsSpan3[k].AsSpan();
+                        Span<Array3<byte>> preProbsSpan4 = preProbsSpan3[k].AsSpan();
+                        Span<Array4<uint>> countsSpan4 = countsSpan3[k].AsSpan();
+                        Span<uint> eobCountsSpan4 = eobCountsSpan3[k].AsSpan();
+                        
                         for (int l = 0; l < Entropy.BAND_COEFF_CONTEXTS(k); ++l)
                         {
-                            int n0 = (int)counts[i][j][k][l][Entropy.ZeroToken];
-                            int n1 = (int)counts[i][j][k][l][Entropy.OneToken];
-                            int n2 = (int)counts[i][j][k][l][Entropy.TwoToken];
-                            int neob = (int)counts[i][j][k][l][Entropy.EobModelToken];
+                            Span<byte> probsSpan5 = probsSpan4[l].AsSpan();
+                            Span<byte> preProbsSpan5 = preProbsSpan4[l].AsSpan();
+                            Span<uint> countsSpan5 = countsSpan4[l].AsSpan();
+                            
+                            int n0 = (int)countsSpan5[Entropy.ZeroToken];
+                            int n1 = (int)countsSpan5[Entropy.OneToken];
+                            int n2 = (int)countsSpan5[Entropy.TwoToken];
+                            int neob = (int)countsSpan5[Entropy.EobModelToken];
                             Array3<Array2<uint>> branchCt = new();
-                            branchCt[0][0] = (uint)neob;
-                            branchCt[0][1] = (uint)(eobCounts[i][j][k][l] - neob);
-                            branchCt[1][0] = (uint)n0;
-                            branchCt[1][1] = (uint)(n1 + n2);
-                            branchCt[2][0] = (uint)n1;
-                            branchCt[2][1] = (uint)n2;
+                            Span<Array2<uint>> branchCtSpan = branchCt.AsSpan();
+                            Span<uint> branchCt0Span = branchCtSpan[0].AsSpan();
+                            Span<uint> branchCt1Span = branchCtSpan[1].AsSpan();
+                            Span<uint> branchCt2Span = branchCtSpan[2].AsSpan();
+                            branchCt0Span[0] = (uint)neob;
+                            branchCt0Span[1] = (uint)(eobCountsSpan4[l] - neob);
+                            branchCt1Span[0] = (uint)n0;
+                            branchCt1Span[1] = (uint)(n1 + n2);
+                            branchCt2Span[0] = (uint)n1;
+                            branchCt2Span[1] = (uint)n2;
                             for (int m = 0; m < Entropy.UnconstrainedNodes; ++m)
                             {
-                                probs[i][j][k][l][m] = Prob.MergeProbs(preProbs[i][j][k][l][m], ref branchCt[m],
+                                probsSpan5[m] = Prob.MergeProbs(preProbsSpan5[m], branchCt[m].AsSpan(),
                                     countSat, updateFactor);
                             }
                         }

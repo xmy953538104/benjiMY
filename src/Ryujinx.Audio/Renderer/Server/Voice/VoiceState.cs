@@ -219,15 +219,17 @@ namespace Ryujinx.Audio.Renderer.Server.Voice
         /// </summary>
         private void InitializeWaveBuffers()
         {
-            for (int i = 0; i < WaveBuffers.Length; i++)
+            Span<WaveBuffer> waveBuffersSpan = WaveBuffers.AsSpan();
+            
+            for (int i = 0; i < waveBuffersSpan.Length; i++)
             {
-                WaveBuffers[i].StartSampleOffset = 0;
-                WaveBuffers[i].EndSampleOffset = 0;
-                WaveBuffers[i].ShouldLoop = false;
-                WaveBuffers[i].IsEndOfStream = false;
-                WaveBuffers[i].BufferAddressInfo.Setup(0, 0);
-                WaveBuffers[i].ContextAddressInfo.Setup(0, 0);
-                WaveBuffers[i].IsSendToAudioProcessor = true;
+                waveBuffersSpan[i].StartSampleOffset = 0;
+                waveBuffersSpan[i].EndSampleOffset = 0;
+                waveBuffersSpan[i].ShouldLoop = false;
+                waveBuffersSpan[i].IsEndOfStream = false;
+                waveBuffersSpan[i].BufferAddressInfo.Setup(0, 0);
+                waveBuffersSpan[i].ContextAddressInfo.Setup(0, 0);
+                waveBuffersSpan[i].IsSendToAudioProcessor = true;
             }
         }
 
@@ -446,10 +448,13 @@ namespace Ryujinx.Audio.Renderer.Server.Voice
             }
 
             ref VoiceUpdateState voiceUpdateState = ref voiceUpdateStates[0].Span[0];
+            
+            Span<WaveBuffer> waveBuffersSpan = WaveBuffers.AsSpan();
+            Span<WaveBufferInternal> pWaveBuffersSpan = parameter.WaveBuffers.AsSpan();
 
             for (int i = 0; i < Constants.VoiceWaveBufferCount; i++)
             {
-                UpdateWaveBuffer(errorInfos.AsSpan(i * 2, 2), ref WaveBuffers[i], ref parameter.WaveBuffers[i], parameter.SampleFormat, voiceUpdateState.IsWaveBufferValid[i], mapper, ref behaviourContext);
+                UpdateWaveBuffer(errorInfos.AsSpan(i * 2, 2), ref waveBuffersSpan[i], ref pWaveBuffersSpan[i], parameter.SampleFormat, voiceUpdateState.IsWaveBufferValid[i], mapper, ref behaviourContext);
             }
         }
 
@@ -534,9 +539,11 @@ namespace Ryujinx.Audio.Renderer.Server.Voice
         /// <param name="context">The voice context.</param>
         private void ResetResources(VoiceContext context)
         {
+            Span<int> channelResourceIdsSpan = ChannelResourceIds.AsSpan();
+            
             for (int i = 0; i < ChannelsCount; i++)
             {
-                int channelResourceId = ChannelResourceIds[i];
+                int channelResourceId = channelResourceIdsSpan[i];
 
                 ref VoiceChannelResource voiceChannelResource = ref context.GetChannelResource(channelResourceId);
 
@@ -559,10 +566,12 @@ namespace Ryujinx.Audio.Renderer.Server.Voice
         private void FlushWaveBuffers(uint waveBufferCount, Memory<VoiceUpdateState>[] voiceUpdateStates, uint channelCount)
         {
             uint waveBufferIndex = WaveBuffersIndex;
+            
+            Span<WaveBuffer> waveBuffersSpan = WaveBuffers.AsSpan();
 
             for (int i = 0; i < waveBufferCount; i++)
             {
-                WaveBuffers[(int)waveBufferIndex].IsSendToAudioProcessor = true;
+                waveBuffersSpan[(int)waveBufferIndex].IsSendToAudioProcessor = true;
 
                 for (int j = 0; j < channelCount; j++)
                 {
@@ -591,14 +600,18 @@ namespace Ryujinx.Audio.Renderer.Server.Voice
                 FlushWaveBufferCount = 0;
             }
 
+            Span<WaveBuffer> waveBuffersSpan;
+
             switch (PlayState)
             {
                 case PlayState.Started:
-                    for (int i = 0; i < WaveBuffers.Length; i++)
+                    waveBuffersSpan = WaveBuffers.AsSpan();
+                    
+                    for (int i = 0; i < waveBuffersSpan.Length; i++)
                     {
-                        ref WaveBuffer wavebuffer = ref WaveBuffers[i];
+                        ref WaveBuffer waveBuffer = ref waveBuffersSpan[i];
 
-                        if (!wavebuffer.IsSendToAudioProcessor)
+                        if (!waveBuffer.IsSendToAudioProcessor)
                         {
                             for (int y = 0; y < ChannelsCount; y++)
                             {
@@ -607,7 +620,7 @@ namespace Ryujinx.Audio.Renderer.Server.Voice
                                 voiceUpdateStates[y].Span[0].IsWaveBufferValid[i] = true;
                             }
 
-                            wavebuffer.IsSendToAudioProcessor = true;
+                            waveBuffer.IsSendToAudioProcessor = true;
                         }
                     }
 
@@ -626,11 +639,13 @@ namespace Ryujinx.Audio.Renderer.Server.Voice
                     return false;
 
                 case PlayState.Stopping:
-                    for (int i = 0; i < WaveBuffers.Length; i++)
+                    waveBuffersSpan = WaveBuffers.AsSpan();
+                    
+                    for (int i = 0; i < waveBuffersSpan.Length; i++)
                     {
-                        ref WaveBuffer wavebuffer = ref WaveBuffers[i];
+                        ref WaveBuffer waveBuffer = ref waveBuffersSpan[i];
 
-                        wavebuffer.IsSendToAudioProcessor = true;
+                        waveBuffer.IsSendToAudioProcessor = true;
 
                         for (int j = 0; j < ChannelsCount; j++)
                         {
@@ -702,9 +717,11 @@ namespace Ryujinx.Audio.Renderer.Server.Voice
 
             Memory<VoiceUpdateState>[] voiceUpdateStates = new Memory<VoiceUpdateState>[Constants.VoiceChannelCountMax];
 
+            Span<int> channelResourceIdsSpan = ChannelResourceIds.AsSpan();
+            
             for (int i = 0; i < ChannelsCount; i++)
             {
-                voiceUpdateStates[i] = context.GetUpdateStateForDsp(ChannelResourceIds[i]);
+                voiceUpdateStates[i] = context.GetUpdateStateForDsp(channelResourceIdsSpan[i]);
             }
 
             return UpdateParametersForCommandGeneration(voiceUpdateStates);

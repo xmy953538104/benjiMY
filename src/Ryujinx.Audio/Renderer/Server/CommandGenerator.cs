@@ -141,18 +141,20 @@ namespace Ryujinx.Audio.Renderer.Server
         {
             bool supportsOptimizedPath = _rendererContext.BehaviourContext.UseMultiTapBiquadFilterProcessing();
 
-            if (supportsOptimizedPath && voiceState.BiquadFilters[0].Enable && voiceState.BiquadFilters[1].Enable)
+            Span<BiquadFilterParameter> biquadFiltersSpan = voiceState.BiquadFilters.AsSpan();
+
+            if (supportsOptimizedPath && biquadFiltersSpan[0].Enable && biquadFiltersSpan[1].Enable)
             {
                 Memory<byte> biquadStateRawMemory = SpanMemoryManager<byte>.Cast(state)[..(Unsafe.SizeOf<BiquadFilterState>() * Constants.VoiceBiquadFilterCount)];
                 Memory<BiquadFilterState> stateMemory = SpanMemoryManager<BiquadFilterState>.Cast(biquadStateRawMemory);
 
-                _commandBuffer.GenerateMultiTapBiquadFilter(baseIndex, voiceState.BiquadFilters.AsSpan(), stateMemory, bufferOffset, bufferOffset, voiceState.BiquadFilterNeedInitialization, nodeId);
+                _commandBuffer.GenerateMultiTapBiquadFilter(baseIndex, biquadFiltersSpan, stateMemory, bufferOffset, bufferOffset, voiceState.BiquadFilterNeedInitialization, nodeId);
             }
             else
             {
-                for (int i = 0; i < voiceState.BiquadFilters.Length; i++)
+                for (int i = 0; i < biquadFiltersSpan.Length; i++)
                 {
-                    ref BiquadFilterParameter filter = ref voiceState.BiquadFilters[i];
+                    ref BiquadFilterParameter filter = ref biquadFiltersSpan[i];
 
                     if (filter.Enable)
                     {
@@ -311,12 +313,15 @@ namespace Ryujinx.Audio.Renderer.Server
         {
             int nodeId = voiceState.NodeId;
             uint channelsCount = voiceState.ChannelsCount;
+            
+            Span<int> channelResourceIdsSpan = voiceState.ChannelResourceIds.AsSpan();
+            Span<BiquadFilterParameter> biquadFiltersSpan = voiceState.BiquadFilters.AsSpan();
 
             for (int channelIndex = 0; channelIndex < channelsCount; channelIndex++)
             {
-                Memory<VoiceUpdateState> dspStateMemory = _voiceContext.GetUpdateStateForDsp(voiceState.ChannelResourceIds[channelIndex]);
+                Memory<VoiceUpdateState> dspStateMemory = _voiceContext.GetUpdateStateForDsp(channelResourceIdsSpan[channelIndex]);
 
-                ref VoiceChannelResource channelResource = ref _voiceContext.GetChannelResource(voiceState.ChannelResourceIds[channelIndex]);
+                ref VoiceChannelResource channelResource = ref _voiceContext.GetChannelResource(channelResourceIdsSpan[channelIndex]);
 
                 PerformanceDetailType dataSourceDetailType = PerformanceDetailType.Adpcm;
 
@@ -476,7 +481,7 @@ namespace Ryujinx.Audio.Renderer.Server
 
                     for (int i = 0; i < voiceState.BiquadFilterNeedInitialization.Length; i++)
                     {
-                        voiceState.BiquadFilterNeedInitialization[i] = voiceState.BiquadFilters[i].Enable;
+                        voiceState.BiquadFilterNeedInitialization[i] = biquadFiltersSpan[i].Enable;
                     }
                 }
             }
@@ -526,15 +531,19 @@ namespace Ryujinx.Audio.Renderer.Server
 
             if (effect.IsEnabled)
             {
+                Span<float> volumesSpan = effect.Parameter.Volumes.AsSpan();
+                Span<byte> inputSpan = effect.Parameter.Input.AsSpan();
+                Span<byte> outputSpan = effect.Parameter.Output.AsSpan();
+                
                 for (int i = 0; i < effect.Parameter.MixesCount; i++)
                 {
-                    if (effect.Parameter.Volumes[i] != 0.0f)
+                    if (volumesSpan[i] != 0.0f)
                     {
                         _commandBuffer.GenerateMix(
-                            (uint)bufferOffset + effect.Parameter.Input[i],
-                            (uint)bufferOffset + effect.Parameter.Output[i],
+                            (uint)bufferOffset + inputSpan[i],
+                            (uint)bufferOffset + outputSpan[i],
                             nodeId,
-                            effect.Parameter.Volumes[i]);
+                            volumesSpan[i]);
                     }
                 }
             }
@@ -554,6 +563,10 @@ namespace Ryujinx.Audio.Renderer.Server
             {
                 int i = 0;
                 uint writeOffset = 0;
+                
+                Span<byte> inputSpan = effect.Parameter.Input.AsSpan();
+                Span<byte> outputSpan = effect.Parameter.Output.AsSpan();
+                
                 for (uint channelIndex = effect.Parameter.ChannelCount; channelIndex != 0; channelIndex--)
                 {
                     uint newUpdateCount = writeOffset + _commandBuffer.CommandList.SampleCount;
@@ -571,8 +584,8 @@ namespace Ryujinx.Audio.Renderer.Server
 
                     _commandBuffer.GenerateAuxEffect(
                         bufferOffset,
-                        effect.Parameter.Input[i],
-                        effect.Parameter.Output[i],
+                        inputSpan[i],
+                        outputSpan[i],
                         ref effect.State,
                         effect.IsEnabled,
                         effect.Parameter.BufferStorageSize,
@@ -619,6 +632,9 @@ namespace Ryujinx.Audio.Renderer.Server
         private void GenerateBiquadFilterEffect(uint bufferOffset, BiquadFilterEffect effect, int nodeId)
         {
             Debug.Assert(effect.Type == EffectType.BiquadFilter);
+            
+            Span<byte> inputSpan = effect.Parameter.Input.AsSpan();
+            Span<byte> outputSpan = effect.Parameter.Output.AsSpan();
 
             if (effect.IsEnabled)
             {
@@ -639,8 +655,8 @@ namespace Ryujinx.Audio.Renderer.Server
                         (int)bufferOffset,
                         ref parameter,
                         effect.State.Slice(i, 1),
-                        effect.Parameter.Input[i],
-                        effect.Parameter.Output[i],
+                        inputSpan[i],
+                        outputSpan[i],
                         needInitialization,
                         nodeId);
                 }
@@ -649,8 +665,8 @@ namespace Ryujinx.Audio.Renderer.Server
             {
                 for (int i = 0; i < effect.Parameter.ChannelCount; i++)
                 {
-                    uint inputBufferIndex = bufferOffset + effect.Parameter.Input[i];
-                    uint outputBufferIndex = bufferOffset + effect.Parameter.Output[i];
+                    uint inputBufferIndex = bufferOffset + inputSpan[i];
+                    uint outputBufferIndex = bufferOffset + outputSpan[i];
 
                     // If the input and output isn't the same, generate a command.
                     if (inputBufferIndex != outputBufferIndex)
@@ -701,6 +717,8 @@ namespace Ryujinx.Audio.Renderer.Server
             {
                 int i = 0;
                 uint writeOffset = 0;
+                
+                Span<byte> inputSpan = effect.Parameter.Input.AsSpan();
 
                 for (uint channelIndex = effect.Parameter.ChannelCount; channelIndex != 0; channelIndex--)
                 {
@@ -719,7 +737,7 @@ namespace Ryujinx.Audio.Renderer.Server
 
                     _commandBuffer.GenerateCaptureEffect(
                         bufferOffset,
-                        effect.Parameter.Input[i],
+                        inputSpan[i],
                         effect.State.SendBufferInfo,
                         effect.IsEnabled,
                         effect.Parameter.BufferStorageSize,

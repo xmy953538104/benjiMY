@@ -26,12 +26,15 @@ namespace Ryujinx.Audio.Renderer.Dsp
             ReadOnlySpan<float> inputBuffer,
             uint sampleCount)
         {
-            float a0 = FixedPointHelper.ToFloat(parameter.Numerator[0], FixedPointPrecisionForParameter);
-            float a1 = FixedPointHelper.ToFloat(parameter.Numerator[1], FixedPointPrecisionForParameter);
-            float a2 = FixedPointHelper.ToFloat(parameter.Numerator[2], FixedPointPrecisionForParameter);
+            Span<short> numeratorSpan = parameter.Numerator.AsSpan();
+            Span<short> denominatorSpan = parameter.Denominator.AsSpan();
+            
+            float a0 = FixedPointHelper.ToFloat(numeratorSpan[0], FixedPointPrecisionForParameter);
+            float a1 = FixedPointHelper.ToFloat(numeratorSpan[1], FixedPointPrecisionForParameter);
+            float a2 = FixedPointHelper.ToFloat(numeratorSpan[2], FixedPointPrecisionForParameter);
 
-            float b1 = FixedPointHelper.ToFloat(parameter.Denominator[0], FixedPointPrecisionForParameter);
-            float b2 = FixedPointHelper.ToFloat(parameter.Denominator[1], FixedPointPrecisionForParameter);
+            float b1 = FixedPointHelper.ToFloat(denominatorSpan[0], FixedPointPrecisionForParameter);
+            float b2 = FixedPointHelper.ToFloat(denominatorSpan[1], FixedPointPrecisionForParameter);
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -64,12 +67,15 @@ namespace Ryujinx.Audio.Renderer.Dsp
             uint sampleCount,
             float volume)
         {
-            float a0 = FixedPointHelper.ToFloat(parameter.Numerator[0], FixedPointPrecisionForParameter);
-            float a1 = FixedPointHelper.ToFloat(parameter.Numerator[1], FixedPointPrecisionForParameter);
-            float a2 = FixedPointHelper.ToFloat(parameter.Numerator[2], FixedPointPrecisionForParameter);
+            Span<short> numeratorSpan = parameter.Numerator.AsSpan();
+            Span<short> denominatorSpan = parameter.Denominator.AsSpan();
+            
+            float a0 = FixedPointHelper.ToFloat(numeratorSpan[0], FixedPointPrecisionForParameter);
+            float a1 = FixedPointHelper.ToFloat(numeratorSpan[1], FixedPointPrecisionForParameter);
+            float a2 = FixedPointHelper.ToFloat(numeratorSpan[2], FixedPointPrecisionForParameter);
 
-            float b1 = FixedPointHelper.ToFloat(parameter.Denominator[0], FixedPointPrecisionForParameter);
-            float b2 = FixedPointHelper.ToFloat(parameter.Denominator[1], FixedPointPrecisionForParameter);
+            float b1 = FixedPointHelper.ToFloat(denominatorSpan[0], FixedPointPrecisionForParameter);
+            float b2 = FixedPointHelper.ToFloat(denominatorSpan[1], FixedPointPrecisionForParameter);
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -107,12 +113,15 @@ namespace Ryujinx.Audio.Renderer.Dsp
             float volume,
             float ramp)
         {
-            float a0 = FixedPointHelper.ToFloat(parameter.Numerator[0], FixedPointPrecisionForParameter);
-            float a1 = FixedPointHelper.ToFloat(parameter.Numerator[1], FixedPointPrecisionForParameter);
-            float a2 = FixedPointHelper.ToFloat(parameter.Numerator[2], FixedPointPrecisionForParameter);
+            Span<short> numeratorSpan = parameter.Numerator.AsSpan();
+            Span<short> denominatorSpan = parameter.Denominator.AsSpan();
+            
+            float a0 = FixedPointHelper.ToFloat(numeratorSpan[0], FixedPointPrecisionForParameter);
+            float a1 = FixedPointHelper.ToFloat(numeratorSpan[1], FixedPointPrecisionForParameter);
+            float a2 = FixedPointHelper.ToFloat(numeratorSpan[2], FixedPointPrecisionForParameter);
 
-            float b1 = FixedPointHelper.ToFloat(parameter.Denominator[0], FixedPointPrecisionForParameter);
-            float b2 = FixedPointHelper.ToFloat(parameter.Denominator[1], FixedPointPrecisionForParameter);
+            float b1 = FixedPointHelper.ToFloat(denominatorSpan[0], FixedPointPrecisionForParameter);
+            float b2 = FixedPointHelper.ToFloat(denominatorSpan[1], FixedPointPrecisionForParameter);
 
             float mixState = 0f;
 
@@ -157,13 +166,16 @@ namespace Ryujinx.Audio.Renderer.Dsp
                 BiquadFilterParameter parameter = parameters[stageIndex];
 
                 ref BiquadFilterState state = ref states[stageIndex];
+                
+                Span<short> numeratorSpan = parameter.Numerator.AsSpan();
+                Span<short> denominatorSpan = parameter.Denominator.AsSpan();
 
-                float a0 = FixedPointHelper.ToFloat(parameter.Numerator[0], FixedPointPrecisionForParameter);
-                float a1 = FixedPointHelper.ToFloat(parameter.Numerator[1], FixedPointPrecisionForParameter);
-                float a2 = FixedPointHelper.ToFloat(parameter.Numerator[2], FixedPointPrecisionForParameter);
+                float a0 = FixedPointHelper.ToFloat(numeratorSpan[0], FixedPointPrecisionForParameter);
+                float a1 = FixedPointHelper.ToFloat(numeratorSpan[1], FixedPointPrecisionForParameter);
+                float a2 = FixedPointHelper.ToFloat(numeratorSpan[2], FixedPointPrecisionForParameter);
 
-                float b1 = FixedPointHelper.ToFloat(parameter.Denominator[0], FixedPointPrecisionForParameter);
-                float b2 = FixedPointHelper.ToFloat(parameter.Denominator[1], FixedPointPrecisionForParameter);
+                float b1 = FixedPointHelper.ToFloat(denominatorSpan[0], FixedPointPrecisionForParameter);
+                float b2 = FixedPointHelper.ToFloat(denominatorSpan[1], FixedPointPrecisionForParameter);
 
                 for (int i = 0; i < sampleCount; i++)
                 {
@@ -201,19 +213,25 @@ namespace Ryujinx.Audio.Renderer.Dsp
             uint sampleCount,
             float volume)
         {
-            float a00 = FixedPointHelper.ToFloat(parameter0.Numerator[0], FixedPointPrecisionForParameter);
-            float a10 = FixedPointHelper.ToFloat(parameter0.Numerator[1], FixedPointPrecisionForParameter);
-            float a20 = FixedPointHelper.ToFloat(parameter0.Numerator[2], FixedPointPrecisionForParameter);
+            Span<short> numerator0Span = parameter0.Numerator.AsSpan();
+            Span<short> numerator1Span = parameter1.Numerator.AsSpan();
+            Span<short> denominator0Span = parameter0.Denominator.AsSpan();
+            Span<short> denominator1Span = parameter1.Denominator.AsSpan();
+            
+            
+            float a00 = FixedPointHelper.ToFloat(numerator0Span[0], FixedPointPrecisionForParameter);
+            float a10 = FixedPointHelper.ToFloat(numerator0Span[1], FixedPointPrecisionForParameter);
+            float a20 = FixedPointHelper.ToFloat(numerator0Span[2], FixedPointPrecisionForParameter);
 
-            float b10 = FixedPointHelper.ToFloat(parameter0.Denominator[0], FixedPointPrecisionForParameter);
-            float b20 = FixedPointHelper.ToFloat(parameter0.Denominator[1], FixedPointPrecisionForParameter);
+            float b10 = FixedPointHelper.ToFloat(denominator0Span[0], FixedPointPrecisionForParameter);
+            float b20 = FixedPointHelper.ToFloat(denominator0Span[1], FixedPointPrecisionForParameter);
 
-            float a01 = FixedPointHelper.ToFloat(parameter1.Numerator[0], FixedPointPrecisionForParameter);
-            float a11 = FixedPointHelper.ToFloat(parameter1.Numerator[1], FixedPointPrecisionForParameter);
-            float a21 = FixedPointHelper.ToFloat(parameter1.Numerator[2], FixedPointPrecisionForParameter);
+            float a01 = FixedPointHelper.ToFloat(numerator1Span[0], FixedPointPrecisionForParameter);
+            float a11 = FixedPointHelper.ToFloat(numerator1Span[1], FixedPointPrecisionForParameter);
+            float a21 = FixedPointHelper.ToFloat(numerator1Span[2], FixedPointPrecisionForParameter);
 
-            float b11 = FixedPointHelper.ToFloat(parameter1.Denominator[0], FixedPointPrecisionForParameter);
-            float b21 = FixedPointHelper.ToFloat(parameter1.Denominator[1], FixedPointPrecisionForParameter);
+            float b11 = FixedPointHelper.ToFloat(denominator1Span[0], FixedPointPrecisionForParameter);
+            float b21 = FixedPointHelper.ToFloat(denominator1Span[1], FixedPointPrecisionForParameter);
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -261,19 +279,24 @@ namespace Ryujinx.Audio.Renderer.Dsp
             float volume,
             float ramp)
         {
-            float a00 = FixedPointHelper.ToFloat(parameter0.Numerator[0], FixedPointPrecisionForParameter);
-            float a10 = FixedPointHelper.ToFloat(parameter0.Numerator[1], FixedPointPrecisionForParameter);
-            float a20 = FixedPointHelper.ToFloat(parameter0.Numerator[2], FixedPointPrecisionForParameter);
+            Span<short> numerator0Span = parameter0.Numerator.AsSpan();
+            Span<short> numerator1Span = parameter1.Numerator.AsSpan();
+            Span<short> denominator0Span = parameter0.Denominator.AsSpan();
+            Span<short> denominator1Span = parameter1.Denominator.AsSpan();
+            
+            float a00 = FixedPointHelper.ToFloat(numerator0Span[0], FixedPointPrecisionForParameter);
+            float a10 = FixedPointHelper.ToFloat(numerator0Span[1], FixedPointPrecisionForParameter);
+            float a20 = FixedPointHelper.ToFloat(numerator0Span[2], FixedPointPrecisionForParameter);
 
-            float b10 = FixedPointHelper.ToFloat(parameter0.Denominator[0], FixedPointPrecisionForParameter);
-            float b20 = FixedPointHelper.ToFloat(parameter0.Denominator[1], FixedPointPrecisionForParameter);
+            float b10 = FixedPointHelper.ToFloat(denominator0Span[0], FixedPointPrecisionForParameter);
+            float b20 = FixedPointHelper.ToFloat(denominator0Span[1], FixedPointPrecisionForParameter);
 
-            float a01 = FixedPointHelper.ToFloat(parameter1.Numerator[0], FixedPointPrecisionForParameter);
-            float a11 = FixedPointHelper.ToFloat(parameter1.Numerator[1], FixedPointPrecisionForParameter);
-            float a21 = FixedPointHelper.ToFloat(parameter1.Numerator[2], FixedPointPrecisionForParameter);
+            float a01 = FixedPointHelper.ToFloat(numerator1Span[0], FixedPointPrecisionForParameter);
+            float a11 = FixedPointHelper.ToFloat(numerator1Span[1], FixedPointPrecisionForParameter);
+            float a21 = FixedPointHelper.ToFloat(numerator1Span[2], FixedPointPrecisionForParameter);
 
-            float b11 = FixedPointHelper.ToFloat(parameter1.Denominator[0], FixedPointPrecisionForParameter);
-            float b21 = FixedPointHelper.ToFloat(parameter1.Denominator[1], FixedPointPrecisionForParameter);
+            float b11 = FixedPointHelper.ToFloat(denominator1Span[0], FixedPointPrecisionForParameter);
+            float b21 = FixedPointHelper.ToFloat(denominator1Span[1], FixedPointPrecisionForParameter);
 
             float mixState = 0f;
 

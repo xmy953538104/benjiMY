@@ -552,13 +552,11 @@ namespace Ryujinx.Graphics.Vulkan
                     PAttachments = pColorBlendAttachmentState,
                 };
 
-                PipelineColorBlendAdvancedStateCreateInfoEXT colorBlendAdvancedState;
-
                 if (!AdvancedBlendSrcPreMultiplied ||
                     !AdvancedBlendDstPreMultiplied ||
                     AdvancedBlendOverlap != BlendOverlapEXT.UncorrelatedExt)
                 {
-                    colorBlendAdvancedState = new PipelineColorBlendAdvancedStateCreateInfoEXT
+                    PipelineColorBlendAdvancedStateCreateInfoEXT colorBlendAdvancedState = new()
                     {
                         SType = StructureType.PipelineColorBlendAdvancedStateCreateInfoExt,
                         SrcPremultiplied = AdvancedBlendSrcPreMultiplied,
@@ -674,14 +672,21 @@ namespace Ryujinx.Graphics.Vulkan
             // To work around this, we reduce the format to something that doesn't exceed the stride if possible.
             // The assumption is that the exceeding components are not actually accessed on the shader.
 
+            Span<VertexInputAttributeDescription> vertexAttributeDescriptionsSpan =
+                Internal.VertexAttributeDescriptions.AsSpan();
+            Span<VertexInputBindingDescription> vertexBindingDescriptionsSpan =
+                Internal.VertexBindingDescriptions.AsSpan();
+            Span<VertexInputAttributeDescription> vertexAttributeDescriptions2Span =
+                _vertexAttributeDescriptions2.AsSpan();
+
             for (int index = 0; index < VertexAttributeDescriptionsCount; index++)
             {
-                var attribute = Internal.VertexAttributeDescriptions[index];
+                var attribute = vertexAttributeDescriptionsSpan[index];
                 int vbIndex = GetVertexBufferIndex(attribute.Binding);
 
                 if (vbIndex >= 0)
                 {
-                    ref var vb = ref Internal.VertexBindingDescriptions[vbIndex];
+                    ref var vb = ref vertexBindingDescriptionsSpan[vbIndex];
 
                     Format format = attribute.Format;
 
@@ -706,15 +711,18 @@ namespace Ryujinx.Graphics.Vulkan
                     }
                 }
 
-                _vertexAttributeDescriptions2[index] = attribute;
+                vertexAttributeDescriptions2Span[index] = attribute;
             }
         }
 
         private int GetVertexBufferIndex(uint binding)
         {
+            Span<VertexInputBindingDescription> vertexBindingDescriptionsSpan =
+                Internal.VertexBindingDescriptions.AsSpan();
+            
             for (int index = 0; index < VertexBindingDescriptionsCount; index++)
             {
-                if (Internal.VertexBindingDescriptions[index].Binding == binding)
+                if (vertexBindingDescriptionsSpan[index].Binding == binding)
                 {
                     return index;
                 }

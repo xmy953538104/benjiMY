@@ -1,4 +1,5 @@
 using Ryujinx.Common.Memory;
+using System;
 using System.Diagnostics;
 
 namespace Ryujinx.Graphics.Nvdec.Vp9.Types
@@ -65,36 +66,41 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
         public Mv MvPredQ4(int idx)
         {
+            Span<BModeInfo> bmiSpan = Bmi.AsSpan();
+            
             Mv res = new()
             {
                 Row = (short)ReconInter.RoundMvCompQ4(
-                    Bmi[0].Mv[idx].Row + Bmi[1].Mv[idx].Row +
-                    Bmi[2].Mv[idx].Row + Bmi[3].Mv[idx].Row),
+                    bmiSpan[0].Mv[idx].Row + bmiSpan[1].Mv[idx].Row +
+                    bmiSpan[2].Mv[idx].Row + bmiSpan[3].Mv[idx].Row),
                 Col = (short)ReconInter.RoundMvCompQ4(
-                    Bmi[0].Mv[idx].Col + Bmi[1].Mv[idx].Col +
-                    Bmi[2].Mv[idx].Col + Bmi[3].Mv[idx].Col)
+                    bmiSpan[0].Mv[idx].Col + bmiSpan[1].Mv[idx].Col +
+                    bmiSpan[2].Mv[idx].Col + bmiSpan[3].Mv[idx].Col)
             };
             return res;
         }
 
         public Mv MvPredQ2(int idx, int block0, int block1)
         {
+            Span<BModeInfo> bmiSpan = Bmi.AsSpan();
+            
             Mv res = new()
             {
                 Row = (short)ReconInter.RoundMvCompQ2(
-                    Bmi[block0].Mv[idx].Row +
-                    Bmi[block1].Mv[idx].Row),
+                    bmiSpan[block0].Mv[idx].Row +
+                    bmiSpan[block1].Mv[idx].Row),
                 Col = (short)ReconInter.RoundMvCompQ2(
-                    Bmi[block0].Mv[idx].Col +
-                    Bmi[block1].Mv[idx].Col)
+                    bmiSpan[block0].Mv[idx].Col +
+                    bmiSpan[block1].Mv[idx].Col)
             };
             return res;
         }
 
         // Performs mv sign inversion if indicated by the reference frame combination.
-        public Mv ScaleMv(int refr, sbyte thisRefFrame, ref Array4<sbyte> refSignBias)
+        public Mv ScaleMv(int refr, sbyte thisRefFrame, Span<sbyte> refSignBias)
         {
             Mv mv = Mv[refr];
+            
             if (refSignBias[RefFrame[refr]] != refSignBias[thisRefFrame])
             {
                 mv.Row *= -1;

@@ -92,20 +92,24 @@ namespace Ryujinx.Graphics.Nvdec.FFmpeg.H264
 
             if (pictureInfo.ScalingMatrixPresent)
             {
+                Span<Array16<byte>> scalingLists4x4Span = pictureInfo.ScalingLists4x4.AsSpan();
+                
                 for (int index = 0; index < 6; index++)
                 {
                     writer.WriteBit(true);
 
-                    WriteScalingList(ref writer, pictureInfo.ScalingLists4x4[index]);
+                    WriteScalingList(ref writer, scalingLists4x4Span[index]);
                 }
 
                 if (pictureInfo.Transform8x8ModeFlag)
                 {
+                    Span<Array64<byte>> scalingLists8x8Span = pictureInfo.ScalingLists8x8.AsSpan();
+                    
                     for (int index = 0; index < 2; index++)
                     {
                         writer.WriteBit(true);
 
-                        WriteScalingList(ref writer, pictureInfo.ScalingLists8x8[index]);
+                        WriteScalingList(ref writer, scalingLists8x8Span[index]);
                     }
                 }
             }
@@ -144,9 +148,11 @@ namespace Ryujinx.Graphics.Nvdec.FFmpeg.H264
 
             int lastScale = 8;
 
-            for (int index = 0; index < list.Length; index++)
+            Span<byte> listSpan = list.AsSpan();
+
+            for (int index = 0; index < listSpan.Length; index++)
             {
-                byte value = list[scan[index]];
+                byte value = listSpan[scan[index]];
 
                 int deltaScale = value - lastScale;
 

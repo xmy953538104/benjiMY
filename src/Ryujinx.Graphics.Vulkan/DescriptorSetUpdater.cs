@@ -679,7 +679,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             var program = _program;
 
-            if (_dirty.HasFlag(DirtyFlags.Uniform))
+            if ((_dirty & DirtyFlags.Uniform) == DirtyFlags.Uniform)
             {
                 if (program.UsePushDescriptors)
                 {
@@ -691,12 +691,12 @@ namespace Ryujinx.Graphics.Vulkan
                 }
             }
 
-            if (_dirty.HasFlag(DirtyFlags.Storage))
+            if ((_dirty & DirtyFlags.Storage) == DirtyFlags.Storage)
             {
                 UpdateAndBind(cbs, program, PipelineBase.StorageSetIndex, pbp);
             }
 
-            if (_dirty.HasFlag(DirtyFlags.Texture))
+            if ((_dirty & DirtyFlags.Texture) == DirtyFlags.Texture)
             {
                 if (program.UpdateTexturesWithoutTemplate)
                 {
@@ -708,7 +708,7 @@ namespace Ryujinx.Graphics.Vulkan
                 }
             }
 
-            if (_dirty.HasFlag(DirtyFlags.Image))
+            if ((_dirty & DirtyFlags.Image) == DirtyFlags.Image)
             {
                 UpdateAndBind(cbs, program, PipelineBase.ImageSetIndex, pbp);
             }

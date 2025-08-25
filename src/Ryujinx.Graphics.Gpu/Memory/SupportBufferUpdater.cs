@@ -1,5 +1,6 @@
 using Ryujinx.Graphics.GAL;
 using Ryujinx.Graphics.Shader;
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -104,9 +105,11 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <param name="scale">Scale value</param>
         public void UpdateRenderScale(int index, float scale)
         {
-            if (_data.RenderScale[1 + index].X != scale)
+            Span<Vector4<float>> renderScaleSpan = _data.RenderScale.AsSpan();
+            
+            if (renderScaleSpan[1 + index].X != scale)
             {
-                _data.RenderScale[1 + index].X = scale;
+                renderScaleSpan[1 + index].X = scale;
                 DirtyRenderScale(1 + index, 1);
             }
         }
@@ -133,11 +136,13 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <param name="isBgra">True if the format is BGRA, false otherwise</param>
         public void SetRenderTargetIsBgra(int index, bool isBgra)
         {
-            bool isBgraChanged = _data.FragmentIsBgra[index].X != 0 != isBgra;
+            Span<Vector4<int>> fragmentIsBgraSpan = _data.FragmentIsBgra.AsSpan();
+            
+            bool isBgraChanged = fragmentIsBgraSpan[index].X != 0 != isBgra;
 
             if (isBgraChanged)
             {
-                _data.FragmentIsBgra[index].X = isBgra ? 1 : 0;
+                fragmentIsBgraSpan[index].X = isBgra ? 1 : 0;
                 DirtyFragmentIsBgra(index, 1);
             }
         }

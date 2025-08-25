@@ -40,11 +40,12 @@ namespace Ryujinx.Audio.Renderer.Dsp
             }
 
             Array20<float> result = new();
+            Span<float> resultSpan = result.AsSpan();
 
             for (int i = 0; i < FilterBankLength; i++)
             {
                 float x = (Bank0CenterIndex - i) + offset;
-                result[i] = Sinc(x) * BlackmanWindow(x / FilterBankLength + 0.5f);
+                resultSpan[i] = Sinc(x) * BlackmanWindow(x / FilterBankLength + 0.5f);
             }
 
             return result;
@@ -77,6 +78,9 @@ namespace Ryujinx.Audio.Renderer.Dsp
 
                 Debug.Assert(state.History.Length == HistoryLength);
                 Debug.Assert(bank.Length == FilterBankLength);
+                
+                Span<float> bankSpan = bank.AsSpan();
+                Span<float> historySpan = state.History.AsSpan();
 
                 int curIdx = 0;
                 if (Vector.IsHardwareAccelerated)
@@ -87,15 +91,15 @@ namespace Ryujinx.Audio.Renderer.Dsp
                     while (curIdx < stopIdx)
                     {
                         result += Vector.Dot(
-                            new Vector<float>(bank.AsSpan().Slice(curIdx, Vector<float>.Count)),
-                            new Vector<float>(state.History.AsSpan().Slice(curIdx, Vector<float>.Count)));
+                            new Vector<float>(bankSpan[curIdx..(curIdx + Vector<float>.Count)]),
+                            new Vector<float>(historySpan[curIdx..(curIdx + Vector<float>.Count)]));
                         curIdx += Vector<float>.Count;
                     }
                 }
 
                 while (curIdx < FilterBankLength)
                 {
-                    result += bank[curIdx] * state.History[curIdx];
+                    result += bankSpan[curIdx] * historySpan[curIdx];
                     curIdx++;
                 }
 

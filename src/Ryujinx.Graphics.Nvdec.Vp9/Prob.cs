@@ -37,7 +37,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             return (byte)BitUtils.RoundPowerOfTwo((prob1 * (256 - factor)) + (prob2 * factor), 8);
         }
 
-        public static byte MergeProbs(byte preProb, ref Array2<uint> ct, uint countSat, uint maxUpdateFactor)
+        public static byte MergeProbs(byte preProb, ReadOnlySpan<uint> ct, uint countSat, uint maxUpdateFactor)
         {
             byte prob = GetBinaryProb(ct[0], ct[1]);
             uint count = Math.Min(ct[0] + ct[1], countSat);
@@ -53,7 +53,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
         private const int ModeMvCountSat = 20;
 
-        public static byte ModeMvMergeProbs(byte preProb, ref Array2<uint> ct)
+        public static byte ModeMvMergeProbs(byte preProb, ReadOnlySpan<uint> ct)
         {
             uint den = ct[0] + ct[1];
             if (den == 0)
@@ -81,7 +81,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             Array2<uint> ct = new();
             ct[0] = leftCount;
             ct[1] = rightCount;
-            probs[(int)(i >> 1)] = ModeMvMergeProbs(preProbs[(int)(i >> 1)], ref ct);
+            probs[(int)(i >> 1)] = ModeMvMergeProbs(preProbs[(int)(i >> 1)], ct.AsSpan());
             return leftCount + rightCount;
         }
 

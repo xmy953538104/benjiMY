@@ -378,9 +378,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             int index = shiftY;
 
+            Span<byte> lflYSpan = lfm.LflY.AsSpan();
+            
             for (int i = 0; i < bh; i++)
             {
-                MemoryMarshal.CreateSpan(ref lfm.LflY[index], 64 - index).Slice(0, bw).Fill((byte)filterLevel);
+                MemoryMarshal.CreateSpan(ref lflYSpan[index], 64 - index).Slice(0, bw).Fill((byte)filterLevel);
                 index += 8;
             }
 
@@ -445,25 +447,29 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             const ushort leftBorderUv = 0x1111;
             const ushort aboveBorderUv = 0x000f;
 
+            Span<ulong> leftYSpan = lfm.LeftY.AsSpan();
+            Span<ulong> aboveYSpan = lfm.AboveY.AsSpan();
+            Span<ushort> leftUvSpan = lfm.LeftUv.AsSpan();
+            Span<ushort> aboveUvSpan = lfm.AboveUv.AsSpan();
 
             // The largest loopfilter we have is 16x16 so we use the 16x16 mask
             // for 32x32 transforms also.
-            lfm.LeftY[(int)TxSize.Tx16x16] |= lfm.LeftY[(int)TxSize.Tx32x32];
-            lfm.AboveY[(int)TxSize.Tx16x16] |= lfm.AboveY[(int)TxSize.Tx32x32];
-            lfm.LeftUv[(int)TxSize.Tx16x16] |= lfm.LeftUv[(int)TxSize.Tx32x32];
-            lfm.AboveUv[(int)TxSize.Tx16x16] |= lfm.AboveUv[(int)TxSize.Tx32x32];
+            leftYSpan[(int)TxSize.Tx16x16] |= leftYSpan[(int)TxSize.Tx32x32];
+            aboveYSpan[(int)TxSize.Tx16x16] |= aboveYSpan[(int)TxSize.Tx32x32];
+            leftUvSpan[(int)TxSize.Tx16x16] |= leftUvSpan[(int)TxSize.Tx32x32];
+            aboveUvSpan[(int)TxSize.Tx16x16] |= aboveUvSpan[(int)TxSize.Tx32x32];
 
             // We do at least 8 tap filter on every 32x32 even if the transform size
             // is 4x4. So if the 4x4 is set on a border pixel add it to the 8x8 and
             // remove it from the 4x4.
-            lfm.LeftY[(int)TxSize.Tx8x8] |= lfm.LeftY[(int)TxSize.Tx4x4] & leftBorder;
-            lfm.LeftY[(int)TxSize.Tx4x4] &= ~leftBorder;
-            lfm.AboveY[(int)TxSize.Tx8x8] |= lfm.AboveY[(int)TxSize.Tx4x4] & aboveBorder;
-            lfm.AboveY[(int)TxSize.Tx4x4] &= ~aboveBorder;
-            lfm.LeftUv[(int)TxSize.Tx8x8] |= (ushort)(lfm.LeftUv[(int)TxSize.Tx4x4] & leftBorderUv);
-            lfm.LeftUv[(int)TxSize.Tx4x4] &= unchecked((ushort)~leftBorderUv);
-            lfm.AboveUv[(int)TxSize.Tx8x8] |= (ushort)(lfm.AboveUv[(int)TxSize.Tx4x4] & aboveBorderUv);
-            lfm.AboveUv[(int)TxSize.Tx4x4] &= unchecked((ushort)~aboveBorderUv);
+            leftYSpan[(int)TxSize.Tx8x8] |= leftYSpan[(int)TxSize.Tx4x4] & leftBorder;
+            leftYSpan[(int)TxSize.Tx4x4] &= ~leftBorder;
+            aboveYSpan[(int)TxSize.Tx8x8] |= aboveYSpan[(int)TxSize.Tx4x4] & aboveBorder;
+            aboveYSpan[(int)TxSize.Tx4x4] &= ~aboveBorder;
+            leftUvSpan[(int)TxSize.Tx8x8] |= (ushort)(leftUvSpan[(int)TxSize.Tx4x4] & leftBorderUv);
+            leftUvSpan[(int)TxSize.Tx4x4] &= unchecked((ushort)~leftBorderUv);
+            aboveUvSpan[(int)TxSize.Tx8x8] |= (ushort)(aboveUvSpan[(int)TxSize.Tx4x4] & aboveBorderUv);
+            aboveUvSpan[(int)TxSize.Tx4x4] &= unchecked((ushort)~aboveBorderUv);
 
             // We do some special edge handling.
             if (miRow + Constants.MiBlockSize > cm.MiRows)
@@ -477,10 +483,10 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 // Remove values completely outside our border.
                 for (int i = 0; i < (int)TxSize.Tx32x32; i++)
                 {
-                    lfm.LeftY[i] &= maskY;
-                    lfm.AboveY[i] &= maskY;
-                    lfm.LeftUv[i] &= maskUv;
-                    lfm.AboveUv[i] &= maskUv;
+                    leftYSpan[i] &= maskY;
+                    aboveYSpan[i] &= maskY;
+                    leftUvSpan[i] &= maskUv;
+                    aboveUvSpan[i] &= maskUv;
                 }
 
                 lfm.Int4x4Y &= maskY;
@@ -490,14 +496,14 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 // apply the shorter one instead.
                 if (rows == 1)
                 {
-                    lfm.AboveUv[(int)TxSize.Tx8x8] |= lfm.AboveUv[(int)TxSize.Tx16x16];
-                    lfm.AboveUv[(int)TxSize.Tx16x16] = 0;
+                    aboveUvSpan[(int)TxSize.Tx8x8] |= aboveUvSpan[(int)TxSize.Tx16x16];
+                    aboveUvSpan[(int)TxSize.Tx16x16] = 0;
                 }
 
                 if (rows == 5)
                 {
-                    lfm.AboveUv[(int)TxSize.Tx8x8] |= (ushort)(lfm.AboveUv[(int)TxSize.Tx16x16] & 0xff00);
-                    lfm.AboveUv[(int)TxSize.Tx16x16] &= (ushort)~(lfm.AboveUv[(int)TxSize.Tx16x16] & 0xff00);
+                    aboveUvSpan[(int)TxSize.Tx8x8] |= (ushort)(aboveUvSpan[(int)TxSize.Tx16x16] & 0xff00);
+                    aboveUvSpan[(int)TxSize.Tx16x16] &= (ushort)~(aboveUvSpan[(int)TxSize.Tx16x16] & 0xff00);
                 }
             }
 
@@ -517,10 +523,10 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 // Remove the bits outside the image edge.
                 for (int i = 0; i < (int)TxSize.Tx32x32; i++)
                 {
-                    lfm.LeftY[i] &= maskY;
-                    lfm.AboveY[i] &= maskY;
-                    lfm.LeftUv[i] &= maskUv;
-                    lfm.AboveUv[i] &= maskUv;
+                    leftYSpan[i] &= maskY;
+                    aboveYSpan[i] &= maskY;
+                    leftUvSpan[i] &= maskUv;
+                    aboveUvSpan[i] &= maskUv;
                 }
 
                 lfm.Int4x4Y &= maskY;
@@ -530,14 +536,14 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 // apply the shorter one instead.
                 if (columns == 1)
                 {
-                    lfm.LeftUv[(int)TxSize.Tx8x8] |= lfm.LeftUv[(int)TxSize.Tx16x16];
-                    lfm.LeftUv[(int)TxSize.Tx16x16] = 0;
+                    leftUvSpan[(int)TxSize.Tx8x8] |= leftUvSpan[(int)TxSize.Tx16x16];
+                    leftUvSpan[(int)TxSize.Tx16x16] = 0;
                 }
 
                 if (columns == 5)
                 {
-                    lfm.LeftUv[(int)TxSize.Tx8x8] |= (ushort)(lfm.LeftUv[(int)TxSize.Tx16x16] & 0xcccc);
-                    lfm.LeftUv[(int)TxSize.Tx16x16] &= (ushort)~(lfm.LeftUv[(int)TxSize.Tx16x16] & 0xcccc);
+                    leftUvSpan[(int)TxSize.Tx8x8] |= (ushort)(leftUvSpan[(int)TxSize.Tx16x16] & 0xcccc);
+                    leftUvSpan[(int)TxSize.Tx16x16] &= (ushort)~(leftUvSpan[(int)TxSize.Tx16x16] & 0xcccc);
                 }
             }
 
@@ -547,28 +553,28 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             {
                 for (int i = 0; i < (int)TxSize.Tx32x32; i++)
                 {
-                    lfm.LeftY[i] &= 0xfefefefefefefefeUL;
-                    lfm.LeftUv[i] &= 0xeeee;
+                    leftYSpan[i] &= 0xfefefefefefefefeUL;
+                    leftUvSpan[i] &= 0xeeee;
                 }
             }
 
             // Assert if we try to apply 2 different loop filters at the same position.
-            Debug.Assert((lfm.LeftY[(int)TxSize.Tx16x16] & lfm.LeftY[(int)TxSize.Tx8x8]) == 0);
-            Debug.Assert((lfm.LeftY[(int)TxSize.Tx16x16] & lfm.LeftY[(int)TxSize.Tx4x4]) == 0);
-            Debug.Assert((lfm.LeftY[(int)TxSize.Tx8x8] & lfm.LeftY[(int)TxSize.Tx4x4]) == 0);
-            Debug.Assert((lfm.Int4x4Y & lfm.LeftY[(int)TxSize.Tx16x16]) == 0);
-            Debug.Assert((lfm.LeftUv[(int)TxSize.Tx16x16] & lfm.LeftUv[(int)TxSize.Tx8x8]) == 0);
-            Debug.Assert((lfm.LeftUv[(int)TxSize.Tx16x16] & lfm.LeftUv[(int)TxSize.Tx4x4]) == 0);
-            Debug.Assert((lfm.LeftUv[(int)TxSize.Tx8x8] & lfm.LeftUv[(int)TxSize.Tx4x4]) == 0);
-            Debug.Assert((lfm.Int4x4Uv & lfm.LeftUv[(int)TxSize.Tx16x16]) == 0);
-            Debug.Assert((lfm.AboveY[(int)TxSize.Tx16x16] & lfm.AboveY[(int)TxSize.Tx8x8]) == 0);
-            Debug.Assert((lfm.AboveY[(int)TxSize.Tx16x16] & lfm.AboveY[(int)TxSize.Tx4x4]) == 0);
-            Debug.Assert((lfm.AboveY[(int)TxSize.Tx8x8] & lfm.AboveY[(int)TxSize.Tx4x4]) == 0);
-            Debug.Assert((lfm.Int4x4Y & lfm.AboveY[(int)TxSize.Tx16x16]) == 0);
-            Debug.Assert((lfm.AboveUv[(int)TxSize.Tx16x16] & lfm.AboveUv[(int)TxSize.Tx8x8]) == 0);
-            Debug.Assert((lfm.AboveUv[(int)TxSize.Tx16x16] & lfm.AboveUv[(int)TxSize.Tx4x4]) == 0);
-            Debug.Assert((lfm.AboveUv[(int)TxSize.Tx8x8] & lfm.AboveUv[(int)TxSize.Tx4x4]) == 0);
-            Debug.Assert((lfm.Int4x4Uv & lfm.AboveUv[(int)TxSize.Tx16x16]) == 0);
+            Debug.Assert((leftYSpan[(int)TxSize.Tx16x16] & leftYSpan[(int)TxSize.Tx8x8]) == 0);
+            Debug.Assert((leftYSpan[(int)TxSize.Tx16x16] & leftYSpan[(int)TxSize.Tx4x4]) == 0);
+            Debug.Assert((leftYSpan[(int)TxSize.Tx8x8] & leftYSpan[(int)TxSize.Tx4x4]) == 0);
+            Debug.Assert((lfm.Int4x4Y & leftYSpan[(int)TxSize.Tx16x16]) == 0);
+            Debug.Assert((leftUvSpan[(int)TxSize.Tx16x16] & leftUvSpan[(int)TxSize.Tx8x8]) == 0);
+            Debug.Assert((leftUvSpan[(int)TxSize.Tx16x16] & leftUvSpan[(int)TxSize.Tx4x4]) == 0);
+            Debug.Assert((leftUvSpan[(int)TxSize.Tx8x8] & leftUvSpan[(int)TxSize.Tx4x4]) == 0);
+            Debug.Assert((lfm.Int4x4Uv & leftUvSpan[(int)TxSize.Tx16x16]) == 0);
+            Debug.Assert((aboveYSpan[(int)TxSize.Tx16x16] & aboveYSpan[(int)TxSize.Tx8x8]) == 0);
+            Debug.Assert((aboveYSpan[(int)TxSize.Tx16x16] & aboveYSpan[(int)TxSize.Tx4x4]) == 0);
+            Debug.Assert((aboveYSpan[(int)TxSize.Tx8x8] & aboveYSpan[(int)TxSize.Tx4x4]) == 0);
+            Debug.Assert((lfm.Int4x4Y & aboveYSpan[(int)TxSize.Tx16x16]) == 0);
+            Debug.Assert((aboveUvSpan[(int)TxSize.Tx16x16] & aboveUvSpan[(int)TxSize.Tx8x8]) == 0);
+            Debug.Assert((aboveUvSpan[(int)TxSize.Tx16x16] & aboveUvSpan[(int)TxSize.Tx4x4]) == 0);
+            Debug.Assert((aboveUvSpan[(int)TxSize.Tx8x8] & aboveUvSpan[(int)TxSize.Tx4x4]) == 0);
+            Debug.Assert((lfm.Int4x4Uv & aboveUvSpan[(int)TxSize.Tx16x16]) == 0);
         }
 
         public static unsafe void ResetLfm(ref Vp9Common cm)
@@ -583,6 +589,8 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
         private static void UpdateSharpness(ref LoopFilterInfoN lfi, int sharpnessLvl)
         {
             int lvl;
+
+            Span<LoopFilterThresh> lFThrSpan = lfi.Lfthr.AsSpan();
 
             // For each possible value for the loop filter fill out limits
             for (lvl = 0; lvl <= MaxLoopFilter; lvl++)
@@ -603,8 +611,8 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     blockInsideLimit = 1;
                 }
 
-                lfi.Lfthr[lvl].Lim.AsSpan().Fill((byte)blockInsideLimit);
-                lfi.Lfthr[lvl].Mblim.AsSpan().Fill((byte)((2 * (lvl + 2)) + blockInsideLimit));
+                lFThrSpan[lvl].Lim.AsSpan().Fill((byte)blockInsideLimit);
+                lFThrSpan[lvl].Mblim.AsSpan().Fill((byte)((2 * (lvl + 2)) + blockInsideLimit));
             }
         }
 
@@ -626,6 +634,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 lf.LastSharpnessLevel = lf.SharpnessLevel;
             }
 
+            Span<Array4<Array2<byte>>> lvlSpan = lfi.Lvl.AsSpan();
+            Span<sbyte> refDeltasSpan = lf.RefDeltas.AsSpan();
+            Span<sbyte> modeDeltasSpan = lf.ModeDeltas.AsSpan();
+            sbyte intraFrameRefDelta = refDeltasSpan[Constants.IntraFrame];
+
             for (segId = 0; segId < Constants.MaxSegments; segId++)
             {
                 int lvlSeg = defaultFiltLvl;
@@ -640,20 +653,24 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 {
                     // We could get rid of this if we assume that deltas are set to
                     // zero when not in use; encoder always uses deltas
-                    MemoryMarshal.Cast<Array2<byte>, byte>(lfi.Lvl[segId].AsSpan()).Fill((byte)lvlSeg);
+                    MemoryMarshal.Cast<Array2<byte>, byte>(lvlSpan[segId].AsSpan()).Fill((byte)lvlSeg);
                 }
                 else
                 {
                     int refr, mode;
-                    int intraLvl = lvlSeg + (lf.RefDeltas[Constants.IntraFrame] * scale);
-                    lfi.Lvl[segId][Constants.IntraFrame][0] = (byte)Math.Clamp(intraLvl, 0, MaxLoopFilter);
+                    int intraLvl = lvlSeg + (intraFrameRefDelta * scale);
+                    lvlSpan[segId][Constants.IntraFrame][0] = (byte)Math.Clamp(intraLvl, 0, MaxLoopFilter);
+                    
+                    Span<Array2<byte>> lvlSpan2 = lvlSpan[segId].AsSpan();
 
                     for (refr = Constants.LastFrame; refr < Constants.MaxRefFrames; ++refr)
                     {
+                        Span<byte> lvlSpan3 = lvlSpan2[refr].AsSpan();
+                        
                         for (mode = 0; mode < MaxModeLfDeltas; ++mode)
                         {
-                            int interLvl = lvlSeg + (lf.RefDeltas[refr] * scale) + (lf.ModeDeltas[mode] * scale);
-                            lfi.Lvl[segId][refr][mode] = (byte)Math.Clamp(interLvl, 0, MaxLoopFilter);
+                            int interLvl = lvlSeg + (refDeltasSpan[refr] * scale) + (modeDeltasSpan[mode] * scale);
+                            lvlSpan3[mode] = (byte)Math.Clamp(interLvl, 0, MaxLoopFilter);
                         }
                     }
                 }
@@ -812,18 +829,32 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     lfis[1] = lfthr[lfl[lflForward]];
                     ss[1] = ss[0].Slice(8 * pitch);
 
+                    Span<byte> mblim0Span = lfis[0].Mblim.AsSpan();
+                    Span<byte> lim0Span = lfis[0].Lim.AsSpan();
+                    Span<byte> hevThr0Span = lfis[0].HevThr.AsSpan();
+                    Span<byte> mblim1Span = lfis[1].Mblim.AsSpan();
+                    Span<byte> lim1Span = lfis[1].Lim.AsSpan();
+                    Span<byte> hevThr1Span = lfis[1].HevThr.AsSpan();
+
                     if ((mask16x16 & dualOne) != 0)
                     {
                         if ((mask16x16 & dualOne) == dualOne)
                         {
-                            LoopFilterScalar.HighBdLpfVertical16Dual(ss[0], pitch, lfis[0].Mblim[0], lfis[0].Lim[0],
-                                lfis[0].HevThr[0], bd);
+                            LoopFilterScalar.HighBdLpfVertical16Dual(ss[0], pitch, mblim0Span[0], lim0Span[0],
+                                hevThr0Span[0], bd);
                         }
                         else
                         {
-                            ref LoopFilterThresh lfi = ref lfis[(mask16x16 & 1) == 0 ? 1 : 0];
-                            LoopFilterScalar.HighBdLpfVertical16(ss[(mask16x16 & 1) == 0 ? 1 : 0], pitch, lfi.Mblim[0],
-                                lfi.Lim[0], lfi.HevThr[0], bd);
+                            if ((mask16x16 & 1) == 0)
+                            {
+                                LoopFilterScalar.HighBdLpfVertical16(ss[1], pitch, mblim1Span[0],
+                                    lim1Span[0], hevThr1Span[0], bd);
+                            }
+                            else
+                            {
+                                LoopFilterScalar.HighBdLpfVertical16(ss[0], pitch, mblim0Span[0],
+                                    lim0Span[0], hevThr0Span[0], bd);
+                            }
                         }
                     }
 
@@ -834,24 +865,26 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                             LoopFilterScalar.HighBdLpfVertical8Dual(
                                 ss[0],
                                 pitch,
-                                lfis[0].Mblim[0],
-                                lfis[0].Lim[0],
-                                lfis[0].HevThr[0],
-                                lfis[1].Mblim[0],
-                                lfis[1].Lim[0],
-                                lfis[1].HevThr[0],
+                                mblim0Span[0],
+                                lim0Span[0],
+                                hevThr0Span[0],
+                                mblim1Span[0],
+                                lim1Span[0],
+                                hevThr1Span[0],
                                 bd);
                         }
                         else
                         {
-                            ref LoopFilterThresh lfi = ref lfis[(mask8x8 & 1) == 0 ? 1 : 0];
-                            LoopFilterScalar.HighBdLpfVertical8(
-                                ss[(mask8x8 & 1) == 0 ? 1 : 0],
-                                pitch,
-                                lfi.Mblim[0],
-                                lfi.Lim[0],
-                                lfi.HevThr[0],
-                                bd);
+                            if ((mask8x8 & 1) == 0)
+                            {
+                                LoopFilterScalar.HighBdLpfVertical8(ss[1], pitch, mblim1Span[0],
+                                    lim1Span[0], hevThr1Span[0], bd);
+                            }
+                            else
+                            {
+                                LoopFilterScalar.HighBdLpfVertical8(ss[0], pitch, mblim0Span[0],
+                                    lim0Span[0], hevThr0Span[0], bd);
+                            }
                         }
                     }
 
@@ -862,19 +895,26 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                             LoopFilterScalar.HighBdLpfVertical4Dual(
                                 ss[0],
                                 pitch,
-                                lfis[0].Mblim[0],
-                                lfis[0].Lim[0],
-                                lfis[0].HevThr[0],
-                                lfis[1].Mblim[0],
-                                lfis[1].Lim[0],
-                                lfis[1].HevThr[0],
+                                mblim0Span[0],
+                                lim0Span[0],
+                                hevThr0Span[0],
+                                mblim1Span[0],
+                                lim1Span[0],
+                                hevThr1Span[0],
                                 bd);
                         }
                         else
                         {
-                            ref LoopFilterThresh lfi = ref lfis[(mask4x4 & 1) == 0 ? 1 : 0];
-                            LoopFilterScalar.HighBdLpfVertical4(ss[(mask4x4 & 1) == 0 ? 1 : 0], pitch, lfi.Mblim[0],
-                                lfi.Lim[0], lfi.HevThr[0], bd);
+                            if ((mask4x4 & 1) == 0)
+                            {
+                                LoopFilterScalar.HighBdLpfVertical4(ss[1], pitch, mblim1Span[0],
+                                    lim1Span[0], hevThr1Span[0], bd);
+                            }
+                            else
+                            {
+                                LoopFilterScalar.HighBdLpfVertical4(ss[0], pitch, mblim0Span[0],
+                                    lim0Span[0], hevThr0Span[0], bd);
+                            }
                         }
                     }
 
@@ -885,19 +925,26 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                             LoopFilterScalar.HighBdLpfVertical4Dual(
                                 ss[0].Slice(4),
                                 pitch,
-                                lfis[0].Mblim[0],
-                                lfis[0].Lim[0],
-                                lfis[0].HevThr[0],
-                                lfis[1].Mblim[0],
-                                lfis[1].Lim[0],
-                                lfis[1].HevThr[0],
+                                mblim0Span[0],
+                                lim0Span[0],
+                                hevThr0Span[0],
+                                mblim1Span[0],
+                                lim1Span[0],
+                                hevThr1Span[0],
                                 bd);
                         }
                         else
                         {
-                            ref LoopFilterThresh lfi = ref lfis[(mask4x4Int & 1) == 0 ? 1 : 0];
-                            LoopFilterScalar.HighBdLpfVertical4(ss[(mask4x4Int & 1) == 0 ? 1 : 0].Slice(4), pitch,
-                                lfi.Mblim[0], lfi.Lim[0], lfi.HevThr[0], bd);
+                            if ((mask4x4Int & 1) == 0)
+                            {
+                                LoopFilterScalar.HighBdLpfVertical4(ss[1].Slice(4), pitch, mblim1Span[0],
+                                    lim1Span[0], hevThr1Span[0], bd);
+                            }
+                            else
+                            {
+                                LoopFilterScalar.HighBdLpfVertical4(ss[0].Slice(4), pitch, mblim0Span[0],
+                                    lim0Span[0], hevThr0Span[0], bd);
+                            }
                         }
                     }
                 }
@@ -1087,18 +1134,22 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 if ((mask & 1) != 0)
                 {
                     LoopFilterThresh lfi = lfthr[lfl[0]];
+                    
+                    Span<byte> mblimSpan = lfi.Mblim.AsSpan();
+                    Span<byte> limSpan = lfi.Lim.AsSpan();
+                    Span<byte> hevThrSpan = lfi.HevThr.AsSpan();
 
                     if ((mask16x16 & 1) != 0)
                     {
                         if ((mask16x16 & 3) == 3)
                         {
-                            LoopFilterScalar.HighBdLpfHorizontal16Dual(s, pitch, lfi.Mblim[0], lfi.Lim[0],
-                                lfi.HevThr[0], bd);
+                            LoopFilterScalar.HighBdLpfHorizontal16Dual(s, pitch, mblimSpan[0], limSpan[0],
+                                hevThrSpan[0], bd);
                             count = 2;
                         }
                         else
                         {
-                            LoopFilterScalar.HighBdLpfHorizontal16(s, pitch, lfi.Mblim[0], lfi.Lim[0], lfi.HevThr[0],
+                            LoopFilterScalar.HighBdLpfHorizontal16(s, pitch, mblimSpan[0], limSpan[0], hevThrSpan[0],
                                 bd);
                         }
                     }
@@ -1108,16 +1159,20 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                         {
                             // Next block's thresholds.
                             LoopFilterThresh lfin = lfthr[lfl[1]];
+                            
+                            Span<byte> nMblimSpan = lfin.Mblim.AsSpan();
+                            Span<byte> nLimSpan = lfin.Lim.AsSpan();
+                            Span<byte> nHevThrSpan = lfin.HevThr.AsSpan();
 
                             LoopFilterScalar.HighBdLpfHorizontal8Dual(
                                 s,
                                 pitch,
-                                lfi.Mblim[0],
-                                lfi.Lim[0],
-                                lfi.HevThr[0],
-                                lfin.Mblim[0],
-                                lfin.Lim[0],
-                                lfin.HevThr[0],
+                                mblimSpan[0],
+                                limSpan[0],
+                                hevThrSpan[0],
+                                nMblimSpan[0],
+                                nLimSpan[0],
+                                nHevThrSpan[0],
                                 bd);
 
                             if ((mask4x4Int & 3) == 3)
@@ -1125,36 +1180,36 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                                 LoopFilterScalar.HighBdLpfHorizontal4Dual(
                                     s.Slice(4 * pitch),
                                     pitch,
-                                    lfi.Mblim[0],
-                                    lfi.Lim[0],
-                                    lfi.HevThr[0],
-                                    lfin.Mblim[0],
-                                    lfin.Lim[0],
-                                    lfin.HevThr[0],
+                                    mblimSpan[0],
+                                    limSpan[0],
+                                    hevThrSpan[0],
+                                    nMblimSpan[0],
+                                    nLimSpan[0],
+                                    nHevThrSpan[0],
                                     bd);
                             }
                             else if ((mask4x4Int & 1) != 0)
                             {
-                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, lfi.Mblim[0],
-                                    lfi.Lim[0], lfi.HevThr[0], bd);
+                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, mblimSpan[0],
+                                    limSpan[0], hevThrSpan[0], bd);
                             }
                             else if ((mask4x4Int & 2) != 0)
                             {
-                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(8 + (4 * pitch)), pitch, lfin.Mblim[0],
-                                    lfin.Lim[0], lfin.HevThr[0], bd);
+                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(8 + (4 * pitch)), pitch, nMblimSpan[0],
+                                    nLimSpan[0], nHevThrSpan[0], bd);
                             }
 
                             count = 2;
                         }
                         else
                         {
-                            LoopFilterScalar.HighBdLpfHorizontal8(s, pitch, lfi.Mblim[0], lfi.Lim[0], lfi.HevThr[0],
+                            LoopFilterScalar.HighBdLpfHorizontal8(s, pitch, mblimSpan[0], limSpan[0], hevThrSpan[0],
                                 bd);
 
                             if ((mask4x4Int & 1) != 0)
                             {
-                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, lfi.Mblim[0],
-                                    lfi.Lim[0], lfi.HevThr[0], bd);
+                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, mblimSpan[0],
+                                    limSpan[0], hevThrSpan[0], bd);
                             }
                         }
                     }
@@ -1164,16 +1219,20 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                         {
                             // Next block's thresholds.
                             LoopFilterThresh lfin = lfthr[lfl[1]];
+                            
+                            Span<byte> nMblimSpan = lfin.Mblim.AsSpan();
+                            Span<byte> nLimSpan = lfin.Lim.AsSpan();
+                            Span<byte> nHevThrSpan = lfin.HevThr.AsSpan();
 
                             LoopFilterScalar.HighBdLpfHorizontal4Dual(
                                 s,
                                 pitch,
-                                lfi.Mblim[0],
-                                lfi.Lim[0],
-                                lfi.HevThr[0],
-                                lfin.Mblim[0],
-                                lfin.Lim[0],
-                                lfin.HevThr[0],
+                                mblimSpan[0],
+                                limSpan[0],
+                                hevThrSpan[0],
+                                nMblimSpan[0],
+                                nLimSpan[0],
+                                nHevThrSpan[0],
                                 bd);
 
                             if ((mask4x4Int & 3) == 3)
@@ -1181,43 +1240,43 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                                 LoopFilterScalar.HighBdLpfHorizontal4Dual(
                                     s.Slice(4 * pitch),
                                     pitch,
-                                    lfi.Mblim[0],
-                                    lfi.Lim[0],
-                                    lfi.HevThr[0],
-                                    lfin.Mblim[0],
-                                    lfin.Lim[0],
-                                    lfin.HevThr[0],
+                                    mblimSpan[0],
+                                    limSpan[0],
+                                    hevThrSpan[0],
+                                    nMblimSpan[0],
+                                    nLimSpan[0],
+                                    nHevThrSpan[0],
                                     bd);
                             }
                             else if ((mask4x4Int & 1) != 0)
                             {
-                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, lfi.Mblim[0],
-                                    lfi.Lim[0], lfi.HevThr[0], bd);
+                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, mblimSpan[0],
+                                    limSpan[0], hevThrSpan[0], bd);
                             }
                             else if ((mask4x4Int & 2) != 0)
                             {
-                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(8 + (4 * pitch)), pitch, lfin.Mblim[0],
-                                    lfin.Lim[0], lfin.HevThr[0], bd);
+                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(8 + (4 * pitch)), pitch, nMblimSpan[0],
+                                    nLimSpan[0], nHevThrSpan[0], bd);
                             }
 
                             count = 2;
                         }
                         else
                         {
-                            LoopFilterScalar.HighBdLpfHorizontal4(s, pitch, lfi.Mblim[0], lfi.Lim[0], lfi.HevThr[0],
+                            LoopFilterScalar.HighBdLpfHorizontal4(s, pitch, mblimSpan[0], limSpan[0], hevThrSpan[0],
                                 bd);
 
                             if ((mask4x4Int & 1) != 0)
                             {
-                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, lfi.Mblim[0],
-                                    lfi.Lim[0], lfi.HevThr[0], bd);
+                                LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, mblimSpan[0],
+                                    limSpan[0], hevThrSpan[0], bd);
                             }
                         }
                     }
                     else
                     {
-                        LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, lfi.Mblim[0], lfi.Lim[0],
-                            lfi.HevThr[0], bd);
+                        LoopFilterScalar.HighBdLpfHorizontal4(s.Slice(4 * pitch), pitch, mblimSpan[0], limSpan[0],
+                            hevThrSpan[0], bd);
                     }
                 }
 
@@ -1292,26 +1351,30 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             for (uint mask = mask16x16 | mask8x8 | mask4x4 | mask4x4Int; mask != 0; mask >>= 1)
             {
                 LoopFilterThresh lfi = lfthr[lfl[0]];
+                
+                Span<byte> mblimSpan = lfi.Mblim.AsSpan();
+                Span<byte> limSpan = lfi.Lim.AsSpan();
+                Span<byte> hevThrSpan = lfi.HevThr.AsSpan();
 
                 if ((mask & 1) != 0)
                 {
                     if ((mask16x16 & 1) != 0)
                     {
-                        LoopFilterScalar.HighBdLpfVertical16(s, pitch, lfi.Mblim[0], lfi.Lim[0], lfi.HevThr[0], bd);
+                        LoopFilterScalar.HighBdLpfVertical16(s, pitch, mblimSpan[0], limSpan[0], hevThrSpan[0], bd);
                     }
                     else if ((mask8x8 & 1) != 0)
                     {
-                        LoopFilterScalar.HighBdLpfVertical8(s, pitch, lfi.Mblim[0], lfi.Lim[0], lfi.HevThr[0], bd);
+                        LoopFilterScalar.HighBdLpfVertical8(s, pitch, mblimSpan[0], limSpan[0], hevThrSpan[0], bd);
                     }
                     else if ((mask4x4 & 1) != 0)
                     {
-                        LoopFilterScalar.HighBdLpfVertical4(s, pitch, lfi.Mblim[0], lfi.Lim[0], lfi.HevThr[0], bd);
+                        LoopFilterScalar.HighBdLpfVertical4(s, pitch, mblimSpan[0], limSpan[0], hevThrSpan[0], bd);
                     }
                 }
 
                 if ((mask4x4Int & 1) != 0)
                 {
-                    LoopFilterScalar.HighBdLpfVertical4(s.Slice(4), pitch, lfi.Mblim[0], lfi.Lim[0], lfi.HevThr[0], bd);
+                    LoopFilterScalar.HighBdLpfVertical4(s.Slice(4), pitch, mblimSpan[0], limSpan[0], hevThrSpan[0], bd);
                 }
 
                 s = s.Slice(8);
@@ -1557,9 +1620,10 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
         {
             ref Buf2D dst = ref plane.Dst;
             ArrayPtr<byte> dst0 = dst.Buf;
-            ulong mask16x16 = lfm.LeftY[(int)TxSize.Tx16x16];
-            ulong mask8x8 = lfm.LeftY[(int)TxSize.Tx8x8];
-            ulong mask4x4 = lfm.LeftY[(int)TxSize.Tx4x4];
+            Span<ulong> leftYSpan = lfm.LeftY.AsSpan();
+            ulong mask16x16 = leftYSpan[(int)TxSize.Tx16x16];
+            ulong mask8x8 = leftYSpan[(int)TxSize.Tx8x8];
+            ulong mask4x4 = leftYSpan[(int)TxSize.Tx4x4];
             ulong mask4x4Int = lfm.Int4x4Y;
 
             Debug.Assert(plane.SubsamplingX == 0 && plane.SubsamplingY == 0);
@@ -1606,9 +1670,10 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             // Horizontal pass
             dst.Buf = dst0;
-            mask16x16 = lfm.AboveY[(int)TxSize.Tx16x16];
-            mask8x8 = lfm.AboveY[(int)TxSize.Tx8x8];
-            mask4x4 = lfm.AboveY[(int)TxSize.Tx4x4];
+            Span<ulong> aboveYSpan = lfm.AboveY.AsSpan();
+            mask16x16 = aboveYSpan[(int)TxSize.Tx16x16];
+            mask8x8 = aboveYSpan[(int)TxSize.Tx8x8];
+            mask4x4 = aboveYSpan[(int)TxSize.Tx4x4];
             mask4x4Int = lfm.Int4x4Y;
 
             for (int r = 0; r < Constants.MiBlockSize && miRow + r < cm.MiRows; r++)
@@ -1671,10 +1736,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             ArrayPtr<byte> dst0 = dst.Buf;
 
             Span<byte> lflUv = stackalloc byte[16];
+            Span<byte> lflY = lfm.LflY.AsSpan();
 
-            ushort mask16x16 = lfm.LeftUv[(int)TxSize.Tx16x16];
-            ushort mask8x8 = lfm.LeftUv[(int)TxSize.Tx8x8];
-            ushort mask4x4 = lfm.LeftUv[(int)TxSize.Tx4x4];
+            Span<ushort> leftUvSpan = lfm.LeftUv.AsSpan();
+            ushort mask16x16 = leftUvSpan[(int)TxSize.Tx16x16];
+            ushort mask8x8 = leftUvSpan[(int)TxSize.Tx8x8];
+            ushort mask4x4 = leftUvSpan[(int)TxSize.Tx4x4];
             ushort mask4x4Int = lfm.Int4x4Uv;
 
             Debug.Assert(plane.SubsamplingX == 1 && plane.SubsamplingY == 1);
@@ -1684,8 +1751,8 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             {
                 for (int c = 0; c < Constants.MiBlockSize >> 1; c++)
                 {
-                    lflUv[(r << 1) + c] = lfm.LflY[(r << 3) + (c << 1)];
-                    lflUv[((r + 2) << 1) + c] = lfm.LflY[((r + 2) << 3) + (c << 1)];
+                    lflUv[(r << 1) + c] = lflY[(r << 3) + (c << 1)];
+                    lflUv[((r + 2) << 1) + c] = lflY[((r + 2) << 3) + (c << 1)];
                 }
 
                 if (cm.UseHighBitDepth)
@@ -1727,9 +1794,10 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             // Horizontal pass
             dst.Buf = dst0;
-            mask16x16 = lfm.AboveUv[(int)TxSize.Tx16x16];
-            mask8x8 = lfm.AboveUv[(int)TxSize.Tx8x8];
-            mask4x4 = lfm.AboveUv[(int)TxSize.Tx4x4];
+            Span<ushort> aboveUvSpan = lfm.AboveUv.AsSpan();
+            mask16x16 = aboveUvSpan[(int)TxSize.Tx16x16];
+            mask8x8 = aboveUvSpan[(int)TxSize.Tx8x8];
+            mask4x4 = aboveUvSpan[(int)TxSize.Tx4x4];
             mask4x4Int = lfm.Int4x4Uv;
 
             for (int r = 0; r < Constants.MiBlockSize && miRow + r < cm.MiRows; r += 2)
@@ -1808,16 +1876,17 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             int sbCols = TileInfo.MiColsAlignedToSb(cm.MiCols) >> Constants.MiBlockSizeLog2;
             LfPath path;
             int miRow, miCol;
+            Span<MacroBlockDPlane> planesSpan = planes.AsSpan();
 
             if (yOnly)
             {
                 path = LfPath.LfPath444;
             }
-            else if (planes[1].SubsamplingY == 1 && planes[1].SubsamplingX == 1)
+            else if (planesSpan[1].SubsamplingY == 1 && planesSpan[1].SubsamplingX == 1)
             {
                 path = LfPath.LfPath420;
             }
-            else if (planes[1].SubsamplingY == 0 && planes[1].SubsamplingX == 0)
+            else if (planesSpan[1].SubsamplingY == 0 && planesSpan[1].SubsamplingX == 0)
             {
                 path = LfPath.LfPath444;
             }
@@ -1839,23 +1908,23 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
                     lfSync.SyncRead(r, c);
 
-                    ReconInter.SetupDstPlanes(ref planes, ref frameBuffer, miRow, miCol);
+                    ReconInter.SetupDstPlanes(planesSpan, ref frameBuffer, miRow, miCol);
 
                     AdjustMask(ref cm, miRow, miCol, ref lfm[0]);
 
-                    FilterBlockPlaneSs00(ref cm, ref planes[0], miRow, ref lfm[0]);
+                    FilterBlockPlaneSs00(ref cm, ref planesSpan[0], miRow, ref lfm[0]);
                     for (plane = 1; plane < numPlanes; ++plane)
                     {
                         switch (path)
                         {
                             case LfPath.LfPath420:
-                                FilterBlockPlaneSs11(ref cm, ref planes[plane], miRow, ref lfm[0]);
+                                FilterBlockPlaneSs11(ref cm, ref planesSpan[plane], miRow, ref lfm[0]);
                                 break;
                             case LfPath.LfPath444:
-                                FilterBlockPlaneSs00(ref cm, ref planes[plane], miRow, ref lfm[0]);
+                                FilterBlockPlaneSs00(ref cm, ref planesSpan[plane], miRow, ref lfm[0]);
                                 break;
                             case LfPath.LfPathSlow:
-                                FilterBlockPlaneNon420(ref cm, ref planes[plane], mi.Slice(miCol), miRow,
+                                FilterBlockPlaneNon420(ref cm, ref planesSpan[plane], mi.Slice(miCol), miRow,
                                     miCol);
                                 break;
                         }

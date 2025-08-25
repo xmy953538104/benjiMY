@@ -49,12 +49,14 @@ namespace Ryujinx.HLE.HOS.Services.Hid.Types.SharedMemory.Common
             }
 
             ulong index = ReadCurrentIndex();
+            
+            Span<AtomicStorage<T>> storageSpan = _storage.AsSpan();
 
             while (true)
             {
                 int inputEntryIndex = (int)((index + MaxEntries + 1 - countAvailaible) % MaxEntries);
 
-                ref AtomicStorage<T> result = ref _storage[inputEntryIndex];
+                ref AtomicStorage<T> result = ref storageSpan[inputEntryIndex];
 
                 ulong samplingNumber0 = result.ReadSamplingNumberAtomic();
                 ulong samplingNumber1 = result.ReadSamplingNumberAtomic();
@@ -91,15 +93,17 @@ namespace Ryujinx.HLE.HOS.Services.Hid.Types.SharedMemory.Common
             ulong index = ReadCurrentIndex();
 
             AtomicStorage<T>[] result = new AtomicStorage<T>[countAvailaible];
+            
+            Span<AtomicStorage<T>> storageSpan = _storage.AsSpan();
 
             for (ulong i = 0; i < countAvailaible; i++)
             {
                 int inputEntryIndex = (int)((index + MaxEntries + 1 - countAvailaible + i) % MaxEntries);
                 int outputEntryIndex = (int)(countAvailaible - i - 1);
 
-                ulong samplingNumber0 = _storage[inputEntryIndex].ReadSamplingNumberAtomic();
-                result[outputEntryIndex] = _storage[inputEntryIndex];
-                ulong samplingNumber1 = _storage[inputEntryIndex].ReadSamplingNumberAtomic();
+                ulong samplingNumber0 = storageSpan[inputEntryIndex].ReadSamplingNumberAtomic();
+                result[outputEntryIndex] = storageSpan[inputEntryIndex];
+                ulong samplingNumber1 = storageSpan[inputEntryIndex].ReadSamplingNumberAtomic();
 
                 if (samplingNumber0 != samplingNumber1 && (i > 0 && (result[outputEntryIndex].SamplingNumber - result[outputEntryIndex].SamplingNumber) != 1))
                 {

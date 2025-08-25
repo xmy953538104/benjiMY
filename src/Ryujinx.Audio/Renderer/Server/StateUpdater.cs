@@ -162,9 +162,11 @@ namespace Ryujinx.Audio.Renderer.Server
                 {
                     ref VoiceState currentVoiceState = ref context.GetState(i);
 
+                    Span<int> channelResourceIdsSpan = parameter.ChannelResourceIds.AsSpan();
+
                     for (int channelResourceIndex = 0; channelResourceIndex < parameter.ChannelCount; channelResourceIndex++)
                     {
-                        int channelId = parameter.ChannelResourceIds[channelResourceIndex];
+                        int channelId = channelResourceIdsSpan[channelResourceIndex];
 
                         Debug.Assert(channelId >= 0 && channelId < context.GetCount());
 

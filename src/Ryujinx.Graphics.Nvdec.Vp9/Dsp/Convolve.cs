@@ -1,5 +1,6 @@
 using Ryujinx.Common.Memory;
 using Ryujinx.Graphics.Nvdec.Vp9.Common;
+using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
@@ -129,7 +130,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Dsp
                 for (int x = 0; x < w; ++x)
                 {
                     byte* srcX = &src[xQ4 >> SubpelBits];
-                    ref Array8<short> xFilter = ref xFilters[xQ4 & SubpelMask];
+                    Span<short> xFilter = xFilters[xQ4 & SubpelMask].AsSpan();
                     int sum = 0;
                     for (int k = 0; k < SubpelTaps; ++k)
                     {
@@ -164,7 +165,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Dsp
                 for (int x = 0; x < w; ++x)
                 {
                     byte* srcX = &src[xQ4 >> SubpelBits];
-                    ref Array8<short> xFilter = ref xFilters[xQ4 & SubpelMask];
+                    Span<short> xFilter = xFilters[xQ4 & SubpelMask].AsSpan();
                     int sum = 0;
                     for (int k = 0; k < SubpelTaps; ++k)
                     {
@@ -275,7 +276,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Dsp
                 for (int y = 0; y < h; ++y)
                 {
                     byte* srcY = &src[(yQ4 >> SubpelBits) * srcStride];
-                    ref Array8<short> yFilter = ref yFilters[yQ4 & SubpelMask];
+                    Span<short> yFilter = yFilters[yQ4 & SubpelMask].AsSpan();
                     int sum = 0;
                     for (int k = 0; k < SubpelTaps; ++k)
                     {
@@ -310,7 +311,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Dsp
                 for (int y = 0; y < h; ++y)
                 {
                     byte* srcY = &src[(yQ4 >> SubpelBits) * srcStride];
-                    ref Array8<short> yFilter = ref yFilters[yQ4 & SubpelMask];
+                    Span<short> yFilter = yFilters[yQ4 & SubpelMask].AsSpan();
                     int sum = 0;
                     for (int k = 0; k < SubpelTaps; ++k)
                     {
@@ -619,7 +620,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Dsp
                 for (int x = 0; x < w; ++x)
                 {
                     ushort* srcX = &src[xQ4 >> SubpelBits];
-                    ref Array8<short> xFilter = ref xFilters[xQ4 & SubpelMask];
+                    Span<short> xFilter = xFilters[xQ4 & SubpelMask].AsSpan();
                     int sum = 0;
                     for (int k = 0; k < SubpelTaps; ++k)
                     {
@@ -655,7 +656,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Dsp
                 for (int x = 0; x < w; ++x)
                 {
                     ushort* srcX = &src[xQ4 >> SubpelBits];
-                    ref Array8<short> xFilter = ref xFilters[xQ4 & SubpelMask];
+                    Span<short> xFilter = xFilters[xQ4 & SubpelMask].AsSpan();
                     int sum = 0;
                     for (int k = 0; k < SubpelTaps; ++k)
                     {
@@ -692,7 +693,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Dsp
                 for (int y = 0; y < h; ++y)
                 {
                     ushort* srcY = &src[(yQ4 >> SubpelBits) * srcStride];
-                    ref Array8<short> yFilter = ref yFilters[yQ4 & SubpelMask];
+                    Span<short> yFilter = yFilters[yQ4 & SubpelMask].AsSpan();
                     int sum = 0;
                     for (int k = 0; k < SubpelTaps; ++k)
                     {
@@ -728,7 +729,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Dsp
                 for (int y = 0; y < h; ++y)
                 {
                     ushort* srcY = &src[(yQ4 >> SubpelBits) * srcStride];
-                    ref Array8<short> yFilter = ref yFilters[yQ4 & SubpelMask];
+                    Span<short> yFilter = yFilters[yQ4 & SubpelMask].AsSpan();
                     int sum = 0;
                     for (int k = 0; k < SubpelTaps; ++k)
                     {

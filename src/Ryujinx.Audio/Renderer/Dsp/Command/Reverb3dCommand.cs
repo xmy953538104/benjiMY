@@ -65,11 +65,14 @@ namespace Ryujinx.Audio.Renderer.Dsp.Command
 
             InputBufferIndices = new ushort[Constants.VoiceChannelCountMax];
             OutputBufferIndices = new ushort[Constants.VoiceChannelCountMax];
+            
+            Span<byte> inputSpan = Parameter.Input.AsSpan();
+            Span<byte> outputSpan = Parameter.Output.AsSpan();
 
             for (int i = 0; i < Parameter.ChannelCount; i++)
             {
-                InputBufferIndices[i] = (ushort)(bufferOffset + Parameter.Input[i]);
-                OutputBufferIndices[i] = (ushort)(bufferOffset + Parameter.Output[i]);
+                InputBufferIndices[i] = (ushort)(bufferOffset + inputSpan[i]);
+                OutputBufferIndices[i] = (ushort)(bufferOffset + outputSpan[i]);
             }
 
             // NOTE: We do the opposite as Nintendo here for now to restore previous behaviour

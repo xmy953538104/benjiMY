@@ -28,7 +28,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             PlaneType type,
             Span<int> dqcoeff,
             TxSize txSize,
-            ref Array2<short> dq,
+            ReadOnlySpan<short> dq,
             int ctx,
             ReadOnlySpan<short> scan,
             ReadOnlySpan<short> nb,
@@ -39,7 +39,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             ref Vp9EntropyProbs fc = ref xd.Fc.Value;
             int refr = xd.Mi[0].Value.IsInterBlock() ? 1 : 0;
             int band, c = 0;
-            ref Array6<Array6<Array3<byte>>> coefProbs = ref fc.CoefProbs[(int)txSize][(int)type][refr];
+            ReadOnlySpan<Array6<Array3<byte>>> coefProbs = fc.CoefProbs[(int)txSize][(int)type][refr].AsSpan();
             Span<byte> tokenCache = stackalloc byte[32 * 32];
             ReadOnlySpan<byte> bandTranslate = Luts.GetBandTranslate(txSize);
             int dqShift = txSize == TxSize.Tx32x32 ? 1 : 0;
@@ -56,23 +56,26 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             ulong value = r.Value;
             uint range = r.Range;
             int count = r.Count;
+            
+            ReadOnlySpan<Array6<Array4<uint>>> coefSpan = counts.Coef[(int)txSize][(int)type][refr].AsSpan();
+            ReadOnlySpan<Array6<uint>> eobBranchSpan = counts.EobBranch[(int)txSize][(int)type][refr].AsSpan();
 
             while (c < maxEob)
             {
                 int val = -1;
                 band = bandTranslate[0];
                 bandTranslate = bandTranslate.Slice(1);
-                ref Array3<byte> prob = ref coefProbs[band][ctx];
+                ReadOnlySpan<byte> prob = coefProbs[band][ctx].AsSpan();
                 if (!xd.Counts.IsNull)
                 {
-                    ++counts.EobBranch[(int)txSize][(int)type][refr][band][ctx];
+                    ++eobBranchSpan[band][ctx];
                 }
 
                 if (r.ReadBool(prob[EobContextNode], ref value, ref count, ref range) == 0)
                 {
                     if (!xd.Counts.IsNull)
                     {
-                        ++counts.Coef[(int)txSize][(int)type][refr][band][ctx][Constants.EobModelToken];
+                        ++coefSpan[band][ctx][Constants.EobModelToken];
                     }
 
                     break;
@@ -82,7 +85,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 {
                     if (!xd.Counts.IsNull)
                     {
-                        ++counts.Coef[(int)txSize][(int)type][refr][band][ctx][Constants.ZeroToken];
+                        ++coefSpan[band][ctx][Constants.ZeroToken];
                     }
 
                     dqv = dq[1];
@@ -99,7 +102,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     ctx = GetCoefContext(nb, tokenCache, c);
                     band = bandTranslate[0];
                     bandTranslate = bandTranslate.Slice(1);
-                    prob = ref coefProbs[band][ctx];
+                    prob = coefProbs[band][ctx].AsSpan();
                 }
 
                 if (r.ReadBool(prob[OneContextNode], ref value, ref count, ref range) != 0)
@@ -107,7 +110,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     ReadOnlySpan<byte> p = Luts.Pareto8Full[prob[Constants.PivotNode] - 1];
                     if (!xd.Counts.IsNull)
                     {
-                        ++counts.Coef[(int)txSize][(int)type][refr][band][ctx][Constants.TwoToken];
+                        ++coefSpan[band][ctx][Constants.TwoToken];
                     }
 
                     if (r.ReadBool(p[0], ref value, ref count, ref range) != 0)
@@ -175,7 +178,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 {
                     if (!xd.Counts.IsNull)
                     {
-                        ++counts.Coef[(int)txSize][(int)type][refr][band][ctx][Constants.OneToken];
+                        ++coefSpan[band][ctx][Constants.OneToken];
                     }
 
                     tokenCache[scan[c]] = 1;
@@ -232,7 +235,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             ref Reader r = ref twd.BitReader;
             ref MacroBlockD xd = ref twd.Xd;
             ref MacroBlockDPlane pd = ref xd.Plane[plane];
-            ref Array2<short> dequant = ref pd.SegDequant[segId];
+            Span<short> dequant = pd.SegDequant[segId].AsSpan();
             int eob;
             Span<sbyte> a = pd.AboveContext.AsSpan().Slice(x);
             Span<sbyte> l = pd.LeftContext.AsSpan().Slice(y);
@@ -250,7 +253,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                         GetPlaneType(plane),
                         pd.DqCoeff.AsSpan(),
                         txSize,
-                        ref dequant,
+                        dequant,
                         ctx,
                         sc.Scan,
                         sc.Neighbors,
@@ -266,7 +269,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                         GetPlaneType(plane),
                         pd.DqCoeff.AsSpan(),
                         txSize,
-                        ref dequant,
+                        dequant,
                         ctx,
                         sc.Scan,
                         sc.Neighbors,
@@ -283,7 +286,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                         GetPlaneType(plane),
                         pd.DqCoeff.AsSpan(),
                         txSize,
-                        ref dequant,
+                        dequant,
                         ctx,
                         sc.Scan,
                         sc.Neighbors,
@@ -303,7 +306,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                         GetPlaneType(plane),
                         pd.DqCoeff.AsSpan(),
                         txSize,
-                        ref dequant,
+                        dequant,
                         ctx,
                         sc.Scan,
                         sc.Neighbors,

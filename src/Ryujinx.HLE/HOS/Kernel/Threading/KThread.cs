@@ -1,3 +1,4 @@
+using ARMeilleure.State;
 using Ryujinx.Common.Logging;
 using Ryujinx.Cpu;
 using Ryujinx.HLE.Debugger;
@@ -684,17 +685,20 @@ namespace Ryujinx.HLE.HOS.Kernel.Threading
             const int MaxFpuRegistersAArch32 = 16;
 
             ThreadContext context = new();
+            
+            Span<ulong> registersSpan = context.Registers.AsSpan();
+            Span<V128> fpuRegistersSpan = context.FpuRegisters.AsSpan();
 
             if (Owner.Flags.HasFlag(ProcessCreationFlags.Is64Bit))
             {
-                for (int i = 0; i < context.Registers.Length; i++)
+                for (int i = 0; i < registersSpan.Length; i++)
                 {
-                    context.Registers[i] = Context.GetX(i);
+                    registersSpan[i] = Context.GetX(i);
                 }
 
-                for (int i = 0; i < context.FpuRegisters.Length; i++)
+                for (int i = 0; i < fpuRegistersSpan.Length; i++)
                 {
-                    context.FpuRegisters[i] = Context.GetV(i);
+                    fpuRegistersSpan[i] = Context.GetV(i);
                 }
 
                 context.Fp = Context.GetX(29);
@@ -708,12 +712,12 @@ namespace Ryujinx.HLE.HOS.Kernel.Threading
             {
                 for (int i = 0; i < MaxRegistersAArch32; i++)
                 {
-                    context.Registers[i] = (uint)Context.GetX(i);
+                    registersSpan[i] = (uint)Context.GetX(i);
                 }
 
                 for (int i = 0; i < MaxFpuRegistersAArch32; i++)
                 {
-                    context.FpuRegisters[i] = Context.GetV(i);
+                    fpuRegistersSpan[i] = Context.GetV(i);
                 }
 
                 context.Pc = (uint)Context.Pc;

@@ -57,7 +57,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static BufferStage FromUsage(BufferUsageFlags flags)
         {
-            if (flags.HasFlag(BufferUsageFlags.Write))
+            if ((flags & BufferUsageFlags.Write) == BufferUsageFlags.Write)
             {
                 return BufferStage.StorageWrite;
             }
@@ -70,7 +70,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static BufferStage FromUsage(TextureUsageFlags flags)
         {
-            if (flags.HasFlag(TextureUsageFlags.ImageStore))
+            if ((flags & TextureUsageFlags.ImageStore) == TextureUsageFlags.ImageStore)
             {
                 return BufferStage.StorageWrite;
             }

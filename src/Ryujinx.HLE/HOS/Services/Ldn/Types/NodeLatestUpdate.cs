@@ -1,4 +1,5 @@
 using Ryujinx.Common.Memory;
+using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -19,20 +20,24 @@ namespace Ryujinx.HLE.HOS.Services.Ldn.Types
         {
             lock (_lock)
             {
+                Span<NodeLatestUpdate> arraySpan = array.AsSpan();
+                Span<NodeInfo> beforeNodesSpan = beforeNodes.AsSpan();
+                Span<NodeInfo> afterNodesSpan = afterNodes.AsSpan();
+                
                 for (int i = 0; i < 8; i++)
                 {
-                    if (beforeNodes[i].IsConnected == 0)
+                    if (beforeNodesSpan[i].IsConnected == 0)
                     {
-                        if (afterNodes[i].IsConnected != 0)
+                        if (afterNodesSpan[i].IsConnected != 0)
                         {
-                            array[i].State |= NodeLatestUpdateFlags.Connect;
+                            arraySpan[i].State |= NodeLatestUpdateFlags.Connect;
                         }
                     }
                     else
                     {
-                        if (afterNodes[i].IsConnected == 0)
+                        if (afterNodesSpan[i].IsConnected == 0)
                         {
-                            array[i].State |= NodeLatestUpdateFlags.Disconnect;
+                            arraySpan[i].State |= NodeLatestUpdateFlags.Disconnect;
                         }
                     }
                 }
@@ -45,14 +50,16 @@ namespace Ryujinx.HLE.HOS.Services.Ldn.Types
 
             lock (_lock)
             {
+                Span<NodeLatestUpdate> arraySpan = array.AsSpan();
+                
                 for (int i = 0; i < number; i++)
                 {
                     result[i].Reserved = new Array7<byte>();
 
                     if (i < LdnConst.NodeCountMax)
                     {
-                        result[i].State = array[i].State;
-                        array[i].State = NodeLatestUpdateFlags.None;
+                        result[i].State = arraySpan[i].State;
+                        arraySpan[i].State = NodeLatestUpdateFlags.None;
                     }
                 }
             }

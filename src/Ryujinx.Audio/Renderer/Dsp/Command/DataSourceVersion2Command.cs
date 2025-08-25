@@ -52,12 +52,14 @@ namespace Ryujinx.Audio.Renderer.Dsp.Command
             OutputBufferIndex = (ushort)(channelIndex + outputBufferIndex);
             SampleRate = serverState.SampleRate;
             Pitch = serverState.Pitch;
+            
+            Span<Server.Voice.WaveBuffer> waveBufferSpan = serverState.WaveBuffers.AsSpan();
 
             WaveBuffers = new WaveBuffer[Constants.VoiceWaveBufferCount];
 
             for (int i = 0; i < WaveBuffers.Length; i++)
             {
-                ref Server.Voice.WaveBuffer voiceWaveBuffer = ref serverState.WaveBuffers[i];
+                ref Server.Voice.WaveBuffer voiceWaveBuffer = ref waveBufferSpan[i];
 
                 WaveBuffers[i] = voiceWaveBuffer.ToCommon(2);
             }

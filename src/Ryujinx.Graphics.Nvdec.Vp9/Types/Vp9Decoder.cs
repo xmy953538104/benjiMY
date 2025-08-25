@@ -1,6 +1,7 @@
 ﻿using Ryujinx.Common.Memory;
 using Ryujinx.Graphics.Nvdec.Vp9.Common;
 using Ryujinx.Graphics.Video;
+using System;
 using System.Diagnostics;
 
 namespace Ryujinx.Graphics.Nvdec.Vp9.Types
@@ -16,20 +17,20 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
         public int NeedResync; // Wait for key/intra-only frame.
         public int HoldRefBuf; // Hold the reference buffer.
 
-        private static void DecreaseRefCount(int idx, ref Array12<RefCntBuffer> frameBufs, ref BufferPool pool)
+        private static void DecreaseRefCount(int idx, Span<RefCntBuffer> frameBuffs, ref BufferPool pool)
         {
-            if (idx >= 0 && frameBufs[idx].RefCount > 0)
+            if (idx >= 0 && frameBuffs[idx].RefCount > 0)
             {
-                --frameBufs[idx].RefCount;
+                --frameBuffs[idx].RefCount;
                 // A worker may only get a free framebuffer index when calling GetFreeFb.
                 // But the private buffer is not set up until finish decoding header.
                 // So any error happens during decoding header, the frame_bufs will not
                 // have valid priv buffer.
-                if (frameBufs[idx].Released == 0 && frameBufs[idx].RefCount == 0 &&
-                    !frameBufs[idx].RawFrameBuffer.Priv.IsNull)
+                if (frameBuffs[idx].Released == 0 && frameBuffs[idx].RefCount == 0 &&
+                    !frameBuffs[idx].RawFrameBuffer.Priv.IsNull)
                 {
-                    FrameBuffers.ReleaseFrameBuffer(pool.CbPriv, ref frameBufs[idx].RawFrameBuffer);
-                    frameBufs[idx].Released = 1;
+                    FrameBuffers.ReleaseFrameBuffer(pool.CbPriv, ref frameBuffs[idx].RawFrameBuffer);
+                    frameBuffs[idx].Released = 1;
                 }
             }
         }
@@ -43,22 +44,32 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             cm.CheckMemError(ref cm.FrameContexts,
                 allocator.Allocate<Vp9EntropyProbs>(Constants.FrameContexts));
 
+            Span<Array10<Array9<byte>>> cKfYModeProbSpan1 = cm.Fc.Value.KfYModeProb.AsSpan();
+            
             for (int i = 0; i < EntropyMode.KfYModeProb.Length; i++)
             {
+                Span<Array9<byte>> cKfYModeProbSpan2 = cKfYModeProbSpan1[i].AsSpan();
+                
                 for (int j = 0; j < EntropyMode.KfYModeProb[i].Length; j++)
                 {
+                    Span<byte> cKfYModeProbSpan3 = cKfYModeProbSpan2[j].AsSpan();
+                    
                     for (int k = 0; k < EntropyMode.KfYModeProb[i][j].Length; k++)
                     {
-                        cm.Fc.Value.KfYModeProb[i][j][k] = EntropyMode.KfYModeProb[i][j][k];
+                        cKfYModeProbSpan3[k] = EntropyMode.KfYModeProb[i][j][k];
                     }
                 }
             }
+            
+            Span<Array9<byte>> cKfUvModeProbSpan1 = cm.Fc.Value.KfUvModeProb.AsSpan();
 
             for (int i = 0; i < EntropyMode.KfUvModeProb.Length; i++)
             {
+                Span<byte> cKfUvModeProbSpan2 = cKfUvModeProbSpan1[i].AsSpan();
+                
                 for (int j = 0; j < EntropyMode.KfUvModeProb[i].Length; j++)
                 {
-                    cm.Fc.Value.KfUvModeProb[i][j] = EntropyMode.KfUvModeProb[i][j];
+                    cKfUvModeProbSpan2[j] = EntropyMode.KfUvModeProb[i][j];
                 }
             }
 
@@ -88,12 +99,16 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
                 [57, 15, 9], // l split, a not split
                 [12, 3, 3] // a/l both split
             ];
+            
+            Span<Array3<byte>> cKfPartitionProbSpan1 = cm.Fc.Value.KfPartitionProb.AsSpan();
 
             for (int i = 0; i < KfPartitionProbs.Length; i++)
             {
+                Span<byte> cKfPartitionProbSpan2 = cKfPartitionProbSpan1[i].AsSpan();
+                
                 for (int j = 0; j < KfPartitionProbs[i].Length; j++)
                 {
-                    cm.Fc.Value.KfPartitionProb[i][j] = KfPartitionProbs[i][j];
+                    cKfPartitionProbSpan2[j] = KfPartitionProbs[i][j];
                 }
             }
 
@@ -101,11 +116,14 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
             NeedResync = 1;
 
+            Span<int> refFrameMapSpan = cm.RefFrameMap.AsSpan();
+            Span<int> nextRefFrameMapSpan = cm.NextRefFrameMap.AsSpan();
+
             // Initialize the references to not point to any frame buffers.
             for (int i = 0; i < 8; i++)
             {
-                cm.RefFrameMap[i] = -1;
-                cm.NextRefFrameMap[i] = -1;
+                refFrameMapSpan[i] = -1;
+                nextRefFrameMapSpan[i] = -1;
             }
 
             cm.CurrentVideoFrame = 0;
@@ -124,30 +142,34 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             int refIndex = 0, mask;
             ref Vp9Common cm = ref Common;
             ref BufferPool pool = ref cm.BufferPool.Value;
-            ref Array12<RefCntBuffer> frameBufs = ref cm.BufferPool.Value.FrameBufs;
+            Span<RefCntBuffer> frameBufs = cm.BufferPool.Value.FrameBufs.AsSpan();
+            
+            Span<int> refFrameMapSpan = cm.RefFrameMap.AsSpan();
+            Span<int> nextRefFrameMapSpan = cm.NextRefFrameMap.AsSpan();
+            Span<RefBuffer> frameRefsSpan = cm.FrameRefs.AsSpan();
 
             for (mask = RefreshFrameFlags; mask != 0; mask >>= 1)
             {
-                int oldIdx = cm.RefFrameMap[refIndex];
+                int oldIdx = refFrameMapSpan[refIndex];
                 // Current thread releases the holding of reference frame.
-                DecreaseRefCount(oldIdx, ref frameBufs, ref pool);
+                DecreaseRefCount(oldIdx, frameBufs, ref pool);
 
                 // Release the reference frame in reference map.
                 if ((mask & 1) != 0)
                 {
-                    DecreaseRefCount(oldIdx, ref frameBufs, ref pool);
+                    DecreaseRefCount(oldIdx, frameBufs, ref pool);
                 }
 
-                cm.RefFrameMap[refIndex] = cm.NextRefFrameMap[refIndex];
+                refFrameMapSpan[refIndex] = nextRefFrameMapSpan[refIndex];
                 ++refIndex;
             }
 
             // Current thread releases the holding of reference frame.
             for (; refIndex < Constants.RefFrames && cm.ShowExistingFrame == 0; ++refIndex)
             {
-                int oldIdx = cm.RefFrameMap[refIndex];
-                DecreaseRefCount(oldIdx, ref frameBufs, ref pool);
-                cm.RefFrameMap[refIndex] = cm.NextRefFrameMap[refIndex];
+                int oldIdx = refFrameMapSpan[refIndex];
+                DecreaseRefCount(oldIdx, frameBufs, ref pool);
+                refFrameMapSpan[refIndex] = nextRefFrameMapSpan[refIndex];
             }
 
             HoldRefBuf = 0;
@@ -158,7 +180,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             // Invalidate these references until the next frame starts.
             for (refIndex = 0; refIndex < 3; refIndex++)
             {
-                cm.FrameRefs[refIndex].Idx = RefBuffer.InvalidIdx;
+                frameRefsSpan[refIndex].Idx = RefBuffer.InvalidIdx;
             }
         }
 
@@ -166,7 +188,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
         {
             ref Vp9Common cm = ref Common;
             ref BufferPool pool = ref cm.BufferPool.Value;
-            ref Array12<RefCntBuffer> frameBufs = ref cm.BufferPool.Value.FrameBufs;
+            Span<RefCntBuffer> frameBufs = cm.BufferPool.Value.FrameBufs.AsSpan();
             ArrayPtr<byte> source = psource;
             CodecErr retcode = 0;
             cm.Error.ErrorCode = CodecErr.Ok;
@@ -177,10 +199,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
                 // We do not know if the missing frame(s) was supposed to update
                 // any of the reference buffers, but we act conservative and
                 // mark only the last buffer as corrupted.
+                
+                Span<RefBuffer> frameRefsSpan = cm.FrameRefs.AsSpan();
 
-                if (cm.FrameRefs[0].Idx > 0)
+                if (frameRefsSpan[0].Idx > 0)
                 {
-                    cm.FrameRefs[0].Buf.Corrupted = 1;
+                    frameRefsSpan[0].Buf.Corrupted = 1;
                 }
             }
 
@@ -278,9 +302,10 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
         {
             ArrayPtr<byte> dataStart = data;
             Array8<uint> frameSizes = new();
+            Span<uint> frameSizesSpan = frameSizes.AsSpan();
             int frameCount = 0;
 
-            CodecErr res = Decoder.ParseSuperframeIndex(data, (ulong)data.Length, ref frameSizes, out frameCount);
+            CodecErr res = Decoder.ParseSuperframeIndex(data, (ulong)data.Length, frameSizesSpan, out frameCount);
             if (res != CodecErr.Ok)
             {
                 return res;
@@ -292,7 +317,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
                 for (int i = 0; i < frameCount; ++i)
                 {
                     ArrayPtr<byte> dataStartCopy = dataStart;
-                    uint frameSize = frameSizes[i];
+                    uint frameSize = frameSizesSpan[i];
                     if (frameSize > (uint)dataStart.Length)
                     {
                         return CodecErr.CorruptFrame;
@@ -343,7 +368,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             return data[0];
         }
 
-        public static CodecErr ParseSuperframeIndex(ArrayPtr<byte> data, ulong dataSz, ref Array8<uint> sizes, out int count)
+        public static CodecErr ParseSuperframeIndex(ArrayPtr<byte> data, ulong dataSz, Span<uint> sizes, out int count)
         {
             // A chunk ending with a byte matching 0xc0 is an invalid chunk unless
             // it is a super frame index. If the last byte of real video compression

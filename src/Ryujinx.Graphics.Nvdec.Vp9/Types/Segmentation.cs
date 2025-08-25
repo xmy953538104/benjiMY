@@ -29,7 +29,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
         public Array8<uint> FeatureMask;
         public int AqAvOffset;
 
-        public static byte GetPredProbSegId(ref Array3<byte> segPredProbs, ref MacroBlockD xd)
+        public static byte GetPredProbSegId(ReadOnlySpan<byte> segPredProbs, ref MacroBlockD xd)
         {
             return segPredProbs[xd.GetPredContextSegId()];
         }
@@ -105,9 +105,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             UpdateMap = rb.ReadBit() != 0;
             if (UpdateMap)
             {
+                Span<byte> segTreeProbSpan = fc.SegTreeProb.AsSpan();
+                Span<byte> segPredProbSpan = fc.SegPredProb.AsSpan();
+                
                 for (int i = 0; i < SegTreeProbs; i++)
                 {
-                    fc.SegTreeProb[i] = rb.ReadBit() != 0
+                    segTreeProbSpan[i] = rb.ReadBit() != 0
                         ? (byte)rb.ReadLiteral(8)
                         : (byte)Prob.MaxProb;
                 }
@@ -117,7 +120,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
                 {
                     for (int i = 0; i < PredictionProbs; i++)
                     {
-                        fc.SegPredProb[i] = rb.ReadBit() != 0
+                        segPredProbSpan[i] = rb.ReadBit() != 0
                             ? (byte)rb.ReadLiteral(8)
                             : (byte)Prob.MaxProb;
                     }
@@ -126,7 +129,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
                 {
                     for (int i = 0; i < PredictionProbs; i++)
                     {
-                        fc.SegPredProb[i] = Prob.MaxProb;
+                        segPredProbSpan[i] = Prob.MaxProb;
                     }
                 }
             }

@@ -283,16 +283,16 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
         private static Array8<short> NewArray8Short(short e0, short e1, short e2, short e3, short e4, short e5, short e6, short e7)
         {
-            Array8<short> output = new Array8<short>();
-
-            output[0] = e0;
-            output[1] = e1;
-            output[2] = e2;
-            output[3] = e3;
-            output[4] = e4;
-            output[5] = e5;
-            output[6] = e6;
-            output[7] = e7;
+            Array8<short> output = new();
+            Span<short> outputSpan = output.AsSpan();
+            outputSpan[0] = e0;
+            outputSpan[1] = e1;
+            outputSpan[2] = e2;
+            outputSpan[3] = e3;
+            outputSpan[4] = e4;
+            outputSpan[5] = e5;
+            outputSpan[6] = e6;
+            outputSpan[7] = e7;
 
             return output;
         }
