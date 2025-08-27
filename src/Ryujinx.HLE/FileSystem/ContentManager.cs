@@ -42,12 +42,14 @@ namespace Ryujinx.HLE.FileSystem
 
         private readonly struct AocItem
         {
+            public readonly string ContainerPath;
             public readonly Stream ContainerStream;
             public readonly string NcaPath;
             public readonly string Extension;
 
-            public AocItem(Stream containerStream, string ncaPath, string extension)
+            public AocItem(string containerPath, Stream containerStream, string ncaPath, string extension)
             {
+                ContainerPath = containerPath;
                 ContainerStream = containerStream;
                 Extension = extension;
                 NcaPath = ncaPath;
@@ -189,10 +191,10 @@ namespace Ryujinx.HLE.FileSystem
             }
         }
 
-        public void AddAocItem(ulong titleId, Stream containerStream, string ncaPath, string extension, bool mergedToContainer = false)
+        public void AddAocItem(ulong titleId, string containerPath, Stream containerStream, string ncaPath, string extension, bool mergedToContainer = false)
         {
             // TODO: Check Aoc version.
-            if (!AocData.TryAdd(titleId, new AocItem(containerStream, ncaPath, extension)))
+            if (!AocData.TryAdd(titleId, new AocItem(containerPath, containerStream, ncaPath, extension)))
             {
                 Logger.Warning?.Print(LogClass.Application, $"Duplicate AddOnContent detected. TitleId {titleId:X16}");
             }
@@ -227,6 +229,7 @@ namespace Ryujinx.HLE.FileSystem
 
             if (AocData.TryGetValue(aocTitleId, out AocItem aoc))
             {
+                var file = new FileStream(aoc.ContainerPath, FileMode.Open, FileAccess.Read);
                 using var ncaFile = new UniqueRef<IFile>();
 
                 switch (aoc.Extension)
@@ -237,7 +240,7 @@ namespace Ryujinx.HLE.FileSystem
                         break;
                     case ".nsp":
                         var pfs = new PartitionFileSystem();
-                        pfs.Initialize(aoc.ContainerStream.AsStorage());
+                        pfs.Initialize(file.AsStorage());
                         pfs.OpenFile(ref ncaFile.Ref, aoc.NcaPath.ToU8Span(), OpenMode.Read).ThrowIfFailure();
                         break;
                     default:
@@ -708,7 +711,6 @@ namespace Ryujinx.HLE.FileSystem
             }
 
             FileInfo info = new(firmwarePackage);
-
 
             if (info.Extension == ".zip" || info.Extension == ".xci")
             {

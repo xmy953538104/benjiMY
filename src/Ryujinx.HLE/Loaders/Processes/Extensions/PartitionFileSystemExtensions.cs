@@ -131,7 +131,7 @@ namespace Ryujinx.HLE.Loaders.Processes.Extensions
                             {
                                 if (downloadableContentNca.Enabled)
                                 {
-                                    device.Configuration.ContentManager.AddAocItem(downloadableContentNca.TitleId, stream, downloadableContentNca.FullPath, System.IO.Path.GetExtension(downloadableContentContainer.ContainerPath));
+                                    device.Configuration.ContentManager.AddAocItem(downloadableContentNca.TitleId, downloadableContentContainer.ContainerPath, stream, downloadableContentNca.FullPath, System.IO.Path.GetExtension(downloadableContentContainer.ContainerPath));
                                 }
                             }
                             else
