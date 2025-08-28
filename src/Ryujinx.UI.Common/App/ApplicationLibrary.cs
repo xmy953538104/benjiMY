@@ -43,7 +43,7 @@ namespace Ryujinx.UI.App.Common
 {
     public class ApplicationLibrary
     {
-        public static string DefaultLanPlayWebHost = "ryuldnweb.vudjun.com";
+        public static string DefaultLanPlayWebHost = "ldn.ryujinx.app";
         public Language DesiredLanguage { get; set; }
         public event EventHandler<ApplicationCountUpdatedEventArgs> ApplicationCountUpdated;
         public event EventHandler<LdnGameDataReceivedEventArgs> LdnGameDataReceived;
