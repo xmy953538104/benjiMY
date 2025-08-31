@@ -182,11 +182,15 @@ namespace Ryujinx.Memory.Tracking
         {
             if (region.Guest)
             {
+                _guestVirtualRegions.Lock.EnterWriteLock();
                 _guestVirtualRegions.Remove(region);
+                _guestVirtualRegions.Lock.ExitWriteLock();
             }
             else
             {
+                _virtualRegions.Lock.EnterWriteLock();
                 _virtualRegions.Remove(region);
+                _virtualRegions.Lock.ExitWriteLock();
             }
         }
 
