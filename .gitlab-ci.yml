@@ -13,12 +13,13 @@ stages:
   - build
   - release
 
-# Baut die Debug-APK auf dem Branch libryujinx_bionic
+# Baut die Debug-APK auf deinem Branch oder bei Tags
 build_debug:
   stage: build
   image: ghcr.io/cirruslabs/android-sdk:34
   rules:
     - if: '$CI_COMMIT_BRANCH == "libryujinx_bionic"'
+    - if: '$CI_COMMIT_TAG'    # zusätzlich bei Tags
   before_script:
     - cd "$PROJECT_DIR"
     - chmod +x gradlew
@@ -31,31 +32,13 @@ build_debug:
       - $PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk
     expire_in: 2 weeks
 
-# Optional: baut eine Release-APK, falls du sie zusätzlich brauchst
-# build_release:
-#   stage: build
-#   image: ghcr.io/cirruslabs/android-sdk:34
-#   rules:
-#     - if: '$CI_COMMIT_TAG'        # nur bei Tags
-#   before_script:
-#     - cd "$PROJECT_DIR"
-#     - chmod +x gradlew
-#   script:
-#     - ./gradlew assembleRelease
-#   artifacts:
-#     when: always
-#     paths:
-#       - $PROJECT_DIR/app/build/outputs/apk/release/app-release.apk
-#     expire_in: 2 weeks
-
-# Erstellt automatisch eine GitLab Release, wenn du ein Tag pushst,
-# und hängt die Debug-APK an die Release an.
+# Erstellt automatisch eine Release auf GitLab, wenn du ein Tag pushst
 create_release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   needs: ["build_debug"]
   rules:
-    - if: '$CI_COMMIT_TAG'          # nur bei Tags
+    - if: '$CI_COMMIT_TAG'    # nur bei Tags
   script:
     - release-cli create
         --name "Kenji-SC $CI_COMMIT_TAG"
