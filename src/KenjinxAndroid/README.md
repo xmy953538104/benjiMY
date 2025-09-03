@@ -22,7 +22,7 @@ This edition introduces integrated **Homescreen Shortcut support** – allowing 
 ## 📲 Why “SC”?
 
 The **SC** suffix stands for **ShortCut**, highlighting the key feature of this fork:
-> *Start your favorite games directly from your homescreen.*
+Start your favorite games directly from your homescreen.
 
 ---
 
@@ -45,8 +45,4 @@ Please review the original Kenji-NX license and respect all upstream attribution
 Pull requests are welcome!  
 If you have ideas for additional shortcut improvements or UI enhancements, feel free to open an issue.
 
----
-
-👉 **Gitlab short description:**
-> Fork of Kenji-NX with integrated Homescreen Shortcut support – create & launch games directly from the Android launcher.  
 
