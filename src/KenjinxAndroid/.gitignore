@@ -1,12 +1,47 @@
-.idea/
-*.iml
-.gradle
-local.properties
-.DS_Store
-build/
+
 captures
 .externalNativeBuild
 .cxx/
 
+# === Android Studio / IntelliJ ===
+.idea/
+*.iml
+.gradle/
+local.properties
+.DS_Store
+
+# === Build outputs ===
+build/
+captures/
+outputs/
+release/
+debug/
+generated/
+
+# === Native builds (CMake/NDK) ===
+.externalNativeBuild/
+.cxx/
+
+# === OS-specific ===
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# === APKs (werden von CI erzeugt, nicht committen) ===
+*.apk
+*.ap_
+*.aab
+
+# === Keystore (niemals ins Repo!) ===
+*.jks
+*.keystore
+
+# === JNI Libraries ===
 app/src/main/jniLibs/arm64-v8a/**
 !app/src/main/jniLibs/arm64-v8a/.gitkeep
+
+# === Logs ===
+*.log
+
+# === Crash reports ===
+*.stacktrace
