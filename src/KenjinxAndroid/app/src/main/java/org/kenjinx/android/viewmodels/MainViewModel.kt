@@ -1,9 +1,11 @@
 package org.kenjinx.android.viewmodels
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavHostController
+import androidx.preference.PreferenceManager
 import com.anggrayudi.storage.extension.launchOnUiThread
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
@@ -49,6 +51,15 @@ class MainViewModel(val activity: MainActivity) {
     private var showLoading: MutableState<Boolean>? = null
     private var refreshUser: MutableState<Boolean>? = null
 
+    // Default Game Folder (für den Initial-Ordner im SAF)
+    var defaultGameFolderUri: Uri? = null
+        set(value) {
+            field = value
+            // direkt persistieren
+            val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+            prefs.edit().putString("defaultGameFolderUri", value?.toString() ?: "").apply()
+        }
+
     var gameHost: GameHost? = null
         set(value) {
             field = value
@@ -60,6 +71,14 @@ class MainViewModel(val activity: MainActivity) {
 
     init {
         performanceManager = PerformanceManager(activity)
+
+        // gespeicherten Default-Ordner laden
+        val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+        val saved = prefs.getString("defaultGameFolderUri", "") ?: ""
+        if (saved.isNotEmpty()) {
+            // nutzt den Setter -> speichert den gleichen Wert wieder, was ok ist (idempotent)
+            defaultGameFolderUri = Uri.parse(saved)
+        }
     }
 
     fun refreshFirmwareVersion() {

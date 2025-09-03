@@ -45,11 +45,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -77,7 +79,30 @@ import org.kenjinx.android.widgets.ActionButton
 import org.kenjinx.android.widgets.DropdownSelector
 import org.kenjinx.android.widgets.ExpandableView
 import org.kenjinx.android.widgets.SimpleAlertDialog
-import org.kenjinx.android.widgets.SwitchSelector
+
+// --- Local fallback for missing SwitchSelector widget ---
+// Fix: explizit mit `state` arbeiten, nicht direkt `this.value`
+@Composable
+fun MutableState<Boolean>.SwitchSelector(label: String = "", enabled: Boolean = true) {
+    val state = this
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(
+            checked = state.value,
+            onCheckedChange = { if (enabled) state.value = it },
+            enabled = enabled
+        )
+    }
+}
 
 class SettingViews {
     companion object {
@@ -130,6 +155,7 @@ class SettingViews {
             val enableDebugLogs = remember { mutableStateOf(true) }
             val enableGraphicsLogs = remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
+            val showShortcutGuide = remember { mutableStateOf(false) }
 
             if (!loaded.value) {
                 settingsViewModel.initializeState(
@@ -308,6 +334,23 @@ class SettingViews {
                             ) {
                                 ActionButton(
                                     onClick = {
+                                        showShortcutGuide.value = true
+                                    },
+                                    text = "Shortcut Guide",
+                                    icon = Icons.Default.Build,
+                                    modifier = Modifier.weight(1f),
+                                    isFullWidth = false,
+                                )
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                ActionButton(
+                                    onClick = {
                                         showDataResetDialog.value = true
                                     },
                                     text = "Reinit App Data",
@@ -381,6 +424,41 @@ class SettingViews {
                             }
                         }
                     }
+
+                    // === Shortcut Guide Dialog ===
+                    SimpleAlertDialog.Custom(
+                        showDialog = showShortcutGuide,
+                        onDismissRequest = { showShortcutGuide.value = false },
+                        properties = DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Shortcut Guide",
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                text = "How to create a home screen shortcut:\n\n" +
+                                    "1) Tap 'Create shortcut' on the Home screen.\n" +
+                                    "2) Pick your game file (.nsp, .xci).\n" +
+                                    "3) Enter a shortcut name and optionally choose a custom icon.\n" +
+                                    "4) Confirm Android's 'Add to Home screen' dialog.\n\n" +
+                                    "Tip: The confirmation requires a tap; rotation will revert shortly after.",
+                                textAlign = TextAlign.Start
+                            )
+                            Button(onClick = { showShortcutGuide.value = false }) {
+                                Text("OK")
+                            }
+                        }
+                    }
+
                     SimpleAlertDialog.Custom(
                         showDialog = showKeyDialog,
                         onDismissRequest = {
@@ -1201,7 +1279,6 @@ class SettingViews {
                                 }
                             )
 
-
                             var isDriverSelectorOpen = remember { mutableStateOf(false) }
 
                             Row(
@@ -1363,7 +1440,7 @@ class SettingViews {
                 onOptionSelected = onScaleSelected
             )
         }
-		
+
         @Composable
         fun AnisotropicFilteringDropdown(
             selectedAnisotropy: Float,

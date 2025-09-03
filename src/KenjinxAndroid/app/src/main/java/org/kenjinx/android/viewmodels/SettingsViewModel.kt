@@ -1,6 +1,7 @@
 package org.kenjinx.android.viewmodels
 
 import android.content.SharedPreferences
+import android.net.Uri
 import androidx.compose.runtime.MutableState
 import androidx.documentfile.provider.DocumentFile
 import androidx.preference.PreferenceManager
@@ -190,9 +191,15 @@ class SettingsViewModel(val activity: MainActivity) {
 
         activity.storageHelper!!.onFolderSelected = { _, folder ->
             val p = folder.getAbsolutePath(activity)
+            // Pfad (legacy) weiter speichern
             sharedPref.edit {
                 putString("gameFolder", p)
             }
+            // ➜ NEU: auch den SAF-URI als Default-Startort für den Shortcut-Picker merken
+            runCatching {
+                MainActivity.mainViewModel?.defaultGameFolderUri = folder.uri
+            }
+
             activity.storageHelper!!.onFolderSelected = previousFolderCallback
         }
 
