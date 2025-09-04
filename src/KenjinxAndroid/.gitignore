@@ -27,10 +27,7 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# === APKs (werden von CI erzeugt, nicht committen) ===
-*.apk
-*.ap_
-*.aab
+
 
 # === Keystore (niemals ins Repo!) ===
 *.jks
