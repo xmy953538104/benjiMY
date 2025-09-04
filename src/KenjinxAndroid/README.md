@@ -1,48 +1,42 @@
-# Kenji-SC (ShortCut Edition)
+# Kenjinx Android
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)  
-[![Platform](https://img.shields.io/badge/platform-Android-blue.svg)](#)  
-[![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](#)
+Kenjinx Android is a custom Android port of Ryujinx with additional features and optimizations for mobile devices.
 
-**Kenji-SC** is a fork of the Android emulator [Kenji-NX](https://git.ryujinx.app/kenji-nx/ryujinx).  
-This edition introduces integrated **Homescreen Shortcut support** – allowing you to launch your games directly from the Android launcher, just like native apps.
+## Branches
 
----
+- **kenji-2.0.3** → Stable base version (aligned with Ryujinx 2.0.3)
+- **libryujinx_bionic (2.0.4 patch)** → Experimental / extended version with Android-specific patches
 
-## ✨ Features
+## Features
 
-- 🔖 **Shortcut Integration** – Create homescreen shortcuts for your games with custom names and icons.
-- 📂 **Default Game Folder** – Automatically opens your configured game folder when creating a shortcut.
-- 📘 **Shortcut Guide** – Built-in help section in settings to revisit the shortcut setup instructions.
-- 🖼️ **Custom Icons** – Assign your own icon to each shortcut.
-- ⚡ **All Kenji-NX Features** – Full compatibility with the base emulator.
+- Game launching via shortcut support
+- Full external storage support
+- Firmware & keys installer
+- Import/export app data
+- User interface customizations
+- Motion sensor & performance mode controls
 
----
+## Build Instructions
 
-## 📲 Why “SC”?
+1. Clone the repository and initialize submodules:
+   ```bash
+   git clone <repo-url>
+   cd KenjinxAndroid
+   git submodule update --init --recursive
+   ```
 
-The **SC** suffix stands for **ShortCut**, highlighting the key feature of this fork:
-Start your favorite games directly from your homescreen.
+2. Open in **Android Studio**.
 
----
+3. Select desired branch (`kenji-2.0.3` or `libryujinx_bionic`).
 
-## 🔗 Original Project
+4. Build APK:
+   - Use `Build > Make Project`
+   - Or run: `./gradlew assembleDebug`
 
-Kenji-SC is based on the excellent emulator **[Kenji-NX](https://git.ryujinx.app/kenji-nx/ryujinx)**.  
-All credit for the emulation core and base features goes to the original developers.
+## Contribution
 
----
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our workflow and coding guidelines.
 
-## 📜 License
+## License
 
-Kenji-SC is released under the [MIT License](LICENSE).  
-Please review the original Kenji-NX license and respect all upstream attributions.
-
----
-
-## 🙌 Contributing
-
-Pull requests are welcome!  
-If you have ideas for additional shortcut improvements or UI enhancements, feel free to open an issue.
-
-
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.

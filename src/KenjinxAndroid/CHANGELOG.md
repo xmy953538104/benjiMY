@@ -11,12 +11,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) an
 
 ---
 
-## [2.0.4] - 2025-09-03
+## [2.0.3] - 2025-09-04
 ### Added
 - Initial fork of **Kenji-NX** → **Kenji-SC** ("ShortCut").
 - Integrated **shortcut creation** directly into the emulator app (no external helper required).
 - Added **"Shortcut Guide"** in the settings menu.
-- Added persistent **"Don’t show again"** option for the shortcut creation dialog.
 - Default game folder is suggested automatically when creating shortcuts.
 
 ### Changed
