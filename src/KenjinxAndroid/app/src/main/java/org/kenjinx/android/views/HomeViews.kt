@@ -1,5 +1,6 @@
 package org.kenjinx.android.views
 
+import android.content.Intent
 import android.content.res.Resources
 import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
@@ -60,12 +61,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -81,6 +82,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.kenjinx.android.R
+import org.kenjinx.android.ShortcutWizardActivity
 import org.kenjinx.android.viewmodels.FileType
 import org.kenjinx.android.viewmodels.GameModel
 import org.kenjinx.android.viewmodels.HomeViewModel
@@ -109,18 +111,16 @@ class HomeViews {
             val selectedModel = remember { mutableStateOf(viewModel.mainViewModel?.selected) }
             val query = remember { mutableStateOf("") }
             var refreshUser by remember { mutableStateOf(true) }
-            var isFabVisible by remember { mutableStateOf(true)}
+            var isFabVisible by remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
+
+            val context = LocalContext.current
 
             val nestedScrollConnection = remember {
                 object : NestedScrollConnection {
                     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                        if (available.y < -1) {
-                            isFabVisible = false
-                        }
-                        if (available.y > 1) {
-                            isFabVisible = true
-                        }
+                        if (available.y < -1) isFabVisible = false
+                        if (available.y > 1) isFabVisible = true
                         return Offset.Zero
                     }
                 }
@@ -132,7 +132,7 @@ class HomeViews {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp,vertical = 8.dp)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                             .background(MaterialTheme.colorScheme.surface),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
@@ -162,7 +162,6 @@ class HomeViews {
                                     .clickable {
                                         if (!isNavigating.value) {
                                             isNavigating.value = true
-
                                             val currentRoute = navController?.currentDestination?.route
                                             if (currentRoute != "user") {
                                                 navController?.navigate("user") {
@@ -170,7 +169,6 @@ class HomeViews {
                                                     restoreState = true
                                                 }
                                             }
-
                                             CoroutineScope(Dispatchers.Main).launch {
                                                 delay(500)
                                                 isNavigating.value = false
@@ -181,7 +179,6 @@ class HomeViews {
                             ) {
                                 if (refreshUser && viewModel.mainViewModel?.userViewModel?.openedUser?.userPicture?.isNotEmpty() == true) {
                                     val pic = viewModel.mainViewModel.userViewModel.openedUser.userPicture
-
                                     Image(
                                         bitmap = BitmapFactory.decodeByteArray(
                                             pic,
@@ -201,11 +198,12 @@ class HomeViews {
                                     )
                                 }
                             }
+
+                            // Settings
                             IconButton(
                                 onClick = {
                                     if (!isNavigating.value) {
                                         isNavigating.value = true
-
                                         val currentRoute = navController?.currentDestination?.route
                                         if (currentRoute != "settings") {
                                             navController?.navigate("settings") {
@@ -213,7 +211,6 @@ class HomeViews {
                                                 restoreState = true
                                             }
                                         }
-
                                         CoroutineScope(Dispatchers.Main).launch {
                                             delay(500)
                                             isNavigating.value = false
@@ -229,33 +226,40 @@ class HomeViews {
                                         shape = RoundedCornerShape(8.dp)
                                     )
                             ) {
-                                Icon(
-                                    Icons.Filled.Settings,
-                                    contentDescription = "Settings"
-                                )
+                                Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                            }
+
+                            // NEU: Shortcut-Wizard öffnen
+                            IconButton(
+                                onClick = {
+                                    // Startet die bereits integrierte Activity zum Erstellen von Shortcuts
+                                    context.startActivity(
+                                        Intent(context, ShortcutWizardActivity::class.java)
+                                    )
+                                },
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = "Add Shortcut")
                             }
                         }
 
                         OutlinedTextField(
                             value = query.value,
-                            onValueChange = {
-                                query.value = it
-                            },
+                            onValueChange = { query.value = it },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp),
                             placeholder = {
-                                Text(
-                                    "Search...",
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
+                                Text("Search...", modifier = Modifier.padding(bottom = 4.dp))
                             },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Filled.Search,
-                                    contentDescription = "Search"
-                                )
-                            },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
                             singleLine = true,
                             shape = RoundedCornerShape(8.dp),
                             colors = TextFieldDefaults.outlinedTextFieldColors(
@@ -289,11 +293,9 @@ class HomeViews {
                         viewModel.filter(query.value)
 
                         if (!isPreview) {
-                            var settings = QuickSettings(viewModel.activity!!)
-
+                            val settings = QuickSettings(viewModel.activity!!)
                             if (isLoading.value) {
-                                Box(modifier = Modifier.fillMaxSize())
-                                {
+                                Box(modifier = Modifier.fillMaxSize()) {
                                     CircularProgressIndicator(
                                         modifier = Modifier
                                             .width(64.dp)
@@ -304,8 +306,7 @@ class HomeViews {
                                 }
                             } else {
                                 if (settings.isGrid) {
-                                    val size =
-                                        GridImageSize / Resources.getSystem().displayMetrics.density
+                                    val size = GridImageSize / Resources.getSystem().displayMetrics.density
                                     LazyVerticalGrid(
                                         columns = GridCells.Adaptive(minSize = (size + 4).dp),
                                         modifier = Modifier
@@ -318,8 +319,7 @@ class HomeViews {
                                             it.titleName?.apply {
                                                 if (this.isNotEmpty() && (query.value.trim()
                                                         .isEmpty() || this.lowercase(Locale.getDefault())
-                                                        .contains(query.value))
-                                                )
+                                                        .contains(query.value))) {
                                                     GridGameItem(
                                                         it,
                                                         viewModel,
@@ -328,6 +328,7 @@ class HomeViews {
                                                         selectedModel,
                                                         showError
                                                     )
+                                                }
                                             }
                                         }
                                     }
@@ -336,11 +337,8 @@ class HomeViews {
                                         items(list) {
                                             it.titleName?.apply {
                                                 if (this.isNotEmpty() && (query.value.trim()
-                                                        .isEmpty() || this.lowercase(
-                                                        Locale.getDefault()
-                                                    )
-                                                        .contains(query.value))
-                                                )
+                                                        .isEmpty() || this.lowercase(Locale.getDefault())
+                                                        .contains(query.value))) {
                                                     Box(modifier = Modifier.animateItemPlacement()) {
                                                         ListGameItem(
                                                             it,
@@ -351,6 +349,7 @@ class HomeViews {
                                                             showError
                                                         )
                                                     }
+                                                }
                                             }
                                         }
                                     }
@@ -364,7 +363,7 @@ class HomeViews {
                 SimpleAlertDialog.Custom(
                     showDialog = openTitleUpdateDialog,
                     onDismissRequest = { openTitleUpdateDialog.value = false },
-                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                    properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
                 ) {
                     val titleId = viewModel.mainViewModel?.selected?.titleId ?: ""
                     val name = viewModel.mainViewModel?.selected?.titleName ?: ""
@@ -373,7 +372,7 @@ class HomeViews {
                 SimpleAlertDialog.Custom(
                     showDialog = openDlcDialog,
                     onDismissRequest = { openDlcDialog.value = false },
-                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                    properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
                 ) {
                     val titleId = viewModel.mainViewModel?.selected?.titleId ?: ""
                     val name = viewModel.mainViewModel?.selected?.titleName ?: ""
@@ -381,27 +380,27 @@ class HomeViews {
                 }
             }
 
-            if(viewModel.mainViewModel?.loadGameModel?.value != null)
+            if (viewModel.mainViewModel?.loadGameModel?.value != null)
                 LaunchedEffect(viewModel.mainViewModel.loadGameModel.value) {
-                    if (viewModel.mainViewModel.bootPath.value == "gameItem_${viewModel.mainViewModel.loadGameModel.value!!.titleName}") {
+                    if (viewModel.mainViewModel.bootPath.value ==
+                        "gameItem_${viewModel.mainViewModel.loadGameModel.value!!.titleName}"
+                    ) {
                         viewModel.mainViewModel.bootPath.value = null
 
                         thread {
                             showLoading.value = true
-                            val success =
-                                viewModel.mainViewModel.loadGame(
-                                    viewModel.mainViewModel.loadGameModel.value!!,
-                                    true,
-                                    viewModel.mainViewModel.forceNceAndPptc.value
-                                ) ?: false
+                            val success = viewModel.mainViewModel.loadGame(
+                                viewModel.mainViewModel.loadGameModel.value!!,
+                                true,
+                                viewModel.mainViewModel.forceNceAndPptc.value
+                            ) ?: false
                             if (success == 1) {
                                 launchOnUiThread {
                                     viewModel.mainViewModel.navigateToGame()
                                 }
                             } else {
                                 if (success == -2)
-                                    showError.value =
-                                        "Error loading update. Please re-add update file"
+                                    showError.value = "Error loading update. Please re-add update file"
                                 viewModel.mainViewModel.loadGameModel.value!!.close()
                             }
                             showLoading.value = false
@@ -421,8 +420,9 @@ class HomeViews {
                                     if (viewModel.mainViewModel?.selected != null) {
                                         thread {
                                             showLoading.value = true
-                                            val success =
-                                                viewModel.mainViewModel.loadGame(viewModel.mainViewModel.selected!!)
+                                            val success = viewModel.mainViewModel.loadGame(
+                                                viewModel.mainViewModel.selected!!
+                                            )
                                             if (success == 1) {
                                                 launchOnUiThread {
                                                     viewModel.mainViewModel.navigateToGame()
@@ -444,53 +444,54 @@ class HomeViews {
                                 }
                                 val showAppMenu = remember { mutableStateOf(false) }
                                 Box {
-                                    IconButton(onClick = {
-                                        showAppMenu.value = true
-                                    }) {
-                                        Icon(
-                                            Icons.Filled.Menu,
-                                            contentDescription = "Menu"
-                                        )
+                                    IconButton(onClick = { showAppMenu.value = true }) {
+                                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
                                     }
                                     DropdownMenu(
                                         expanded = showAppMenu.value,
-                                        onDismissRequest = { showAppMenu.value = false }) {
-                                        DropdownMenuItem(text = {
-                                            Text(text = "Clear PPTC Cache")
-                                        }, onClick = {
-                                            showAppMenu.value = false
-                                            viewModel.mainViewModel?.clearPptcCache(
-                                                viewModel.mainViewModel.selected?.titleId ?: ""
-                                            )
-                                        })
-                                        DropdownMenuItem(text = {
-                                            Text(text = "Purge Shader Cache")
-                                        }, onClick = {
-                                            showAppMenu.value = false
-                                            viewModel.mainViewModel?.purgeShaderCache(
-                                                viewModel.mainViewModel.selected?.titleId ?: ""
-                                            )
-                                        })
-                                        DropdownMenuItem(text = {
-                                            Text(text = "Delete All Cache")
-                                        }, onClick = {
-                                            showAppMenu.value = false
-                                            viewModel.mainViewModel?.deleteCache(
-                                                viewModel.mainViewModel.selected?.titleId ?: ""
-                                            )
-                                        })
-                                        DropdownMenuItem(text = {
-                                            Text(text = "Manage Updates")
-                                        }, onClick = {
-                                            showAppMenu.value = false
-                                            openTitleUpdateDialog.value = true
-                                        })
-                                        DropdownMenuItem(text = {
-                                            Text(text = "Manage DLC")
-                                        }, onClick = {
-                                            showAppMenu.value = false
-                                            openDlcDialog.value = true
-                                        })
+                                        onDismissRequest = { showAppMenu.value = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text(text = "Clear PPTC Cache") },
+                                            onClick = {
+                                                showAppMenu.value = false
+                                                viewModel.mainViewModel?.clearPptcCache(
+                                                    viewModel.mainViewModel.selected?.titleId ?: ""
+                                                )
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(text = "Purge Shader Cache") },
+                                            onClick = {
+                                                showAppMenu.value = false
+                                                viewModel.mainViewModel?.purgeShaderCache(
+                                                    viewModel.mainViewModel.selected?.titleId ?: ""
+                                                )
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(text = "Delete All Cache") },
+                                            onClick = {
+                                                showAppMenu.value = false
+                                                viewModel.mainViewModel?.deleteCache(
+                                                    viewModel.mainViewModel.selected?.titleId ?: ""
+                                                )
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(text = "Manage Updates") },
+                                            onClick = {
+                                                showAppMenu.value = false
+                                                openTitleUpdateDialog.value = true
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(text = "Manage DLC") },
+                                            onClick = {
+                                                showAppMenu.value = false
+                                                openDlcDialog.value = true
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -513,9 +514,7 @@ class HomeViews {
             selectedModel: MutableState<GameModel?>,
             showError: MutableState<String>
         ) {
-            remember {
-                selectedModel
-            }
+            remember { selectedModel }
             val color =
                 if (selectedModel.value == gameModel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
 
@@ -530,19 +529,17 @@ class HomeViews {
                         onClick = {
                             if (viewModel.mainViewModel?.selected != null) {
                                 showAppActions.value = false
-                                viewModel.mainViewModel.apply {
-                                    selected = null
-                                }
+                                viewModel.mainViewModel.apply { selected = null }
                                 selectedModel.value = null
-                            } else if (gameModel.titleId.isNullOrEmpty() || gameModel.titleId != "0000000000000000" || gameModel.type == FileType.Nro) {
+                            } else if (gameModel.titleId.isNullOrEmpty()
+                                || gameModel.titleId != "0000000000000000"
+                                || gameModel.type == FileType.Nro
+                            ) {
                                 thread {
                                     showLoading.value = true
-                                    val success =
-                                        viewModel.mainViewModel?.loadGame(gameModel) ?: false
+                                    val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
-                                        launchOnUiThread {
-                                            viewModel.mainViewModel?.navigateToGame()
-                                        }
+                                        launchOnUiThread { viewModel.mainViewModel?.navigateToGame() }
                                     } else {
                                         if (success == -2)
                                             showError.value =
@@ -557,7 +554,8 @@ class HomeViews {
                             viewModel.mainViewModel?.selected = gameModel
                             showAppActions.value = true
                             selectedModel.value = gameModel
-                        })
+                        }
+                    )
             ) {
                 Row(
                     modifier = Modifier
@@ -566,22 +564,21 @@ class HomeViews {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row {
-                        if (!gameModel.titleId.isNullOrEmpty() && (gameModel.titleId != "0000000000000000" || gameModel.type == FileType.Nro)) {
+                        if (!gameModel.titleId.isNullOrEmpty()
+                            && (gameModel.titleId != "0000000000000000" || gameModel.type == FileType.Nro)
+                        ) {
                             if (gameModel.icon?.isNotEmpty() == true) {
                                 val pic = decoder.decode(gameModel.icon)
-                                val size =
-                                    ListImageSize / Resources.getSystem().displayMetrics.density
+                                val size = ListImageSize / Resources.getSystem().displayMetrics.density
                                 Image(
-                                    bitmap = BitmapFactory.decodeByteArray(pic, 0, pic.size)
-                                        .asImageBitmap(),
+                                    bitmap = BitmapFactory.decodeByteArray(pic, 0, pic.size).asImageBitmap(),
                                     contentDescription = gameModel.titleName + " icon",
                                     modifier = Modifier
                                         .padding(end = 8.dp)
                                         .width(size.roundToInt().dp)
                                         .height(size.roundToInt().dp)
                                 )
-                            } else if (gameModel.type == FileType.Nro)
-                                NROIcon()
+                            } else if (gameModel.type == FileType.Nro) NROIcon()
                             else NotAvailableIcon()
                         } else NotAvailableIcon()
                         Column {
@@ -608,9 +605,7 @@ class HomeViews {
             selectedModel: MutableState<GameModel?>,
             showError: MutableState<String>
         ) {
-            remember {
-                selectedModel
-            }
+            remember { selectedModel }
             val color =
                 if (selectedModel.value == gameModel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
 
@@ -625,19 +620,17 @@ class HomeViews {
                         onClick = {
                             if (viewModel.mainViewModel?.selected != null) {
                                 showAppActions.value = false
-                                viewModel.mainViewModel.apply {
-                                    selected = null
-                                }
+                                viewModel.mainViewModel.apply { selected = null }
                                 selectedModel.value = null
-                            } else if (gameModel.titleId.isNullOrEmpty() || gameModel.titleId != "0000000000000000" || gameModel.type == FileType.Nro) {
+                            } else if (gameModel.titleId.isNullOrEmpty()
+                                || gameModel.titleId != "0000000000000000"
+                                || gameModel.type == FileType.Nro
+                            ) {
                                 thread {
                                     showLoading.value = true
-                                    val success =
-                                        viewModel.mainViewModel?.loadGame(gameModel) ?: false
+                                    val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
-                                        launchOnUiThread {
-                                            viewModel.mainViewModel?.navigateToGame()
-                                        }
+                                        launchOnUiThread { viewModel.mainViewModel?.navigateToGame() }
                                     } else {
                                         if (success == -2)
                                             showError.value =
@@ -652,23 +645,24 @@ class HomeViews {
                             viewModel.mainViewModel?.selected = gameModel
                             showAppActions.value = true
                             selectedModel.value = gameModel
-                        })
+                        }
+                    )
             ) {
                 Column(modifier = Modifier.padding(4.dp)) {
-                    if (!gameModel.titleId.isNullOrEmpty() && (gameModel.titleId != "0000000000000000" || gameModel.type == FileType.Nro)) {
+                    if (!gameModel.titleId.isNullOrEmpty()
+                        && (gameModel.titleId != "0000000000000000" || gameModel.type == FileType.Nro)
+                    ) {
                         if (gameModel.icon?.isNotEmpty() == true) {
                             val pic = decoder.decode(gameModel.icon)
                             Image(
-                                bitmap = BitmapFactory.decodeByteArray(pic, 0, pic.size)
-                                    .asImageBitmap(),
+                                bitmap = BitmapFactory.decodeByteArray(pic, 0, pic.size).asImageBitmap(),
                                 contentDescription = gameModel.titleName + " icon",
                                 modifier = Modifier
                                     .padding(0.dp)
                                     .clip(RoundedCornerShape(16.dp))
                                     .align(Alignment.CenterHorizontally)
                             )
-                        } else if (gameModel.type == FileType.Nro)
-                            NROIcon()
+                        } else if (gameModel.type == FileType.Nro) NROIcon()
                         else NotAvailableIcon()
                     } else NotAvailableIcon()
                     Text(
@@ -708,7 +702,6 @@ class HomeViews {
                     .height(size.roundToInt().dp)
             )
         }
-
     }
 
     @Preview

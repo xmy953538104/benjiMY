@@ -31,13 +31,11 @@ class SettingsViewModel(val activity: MainActivity) {
         sharedPref = getPreferences()
         previousFolderCallback = activity.storageHelper!!.onFolderSelected
         previousFileCallback = activity.storageHelper!!.onFileSelected
+
+        // Speichere ausgewählten Spieleordner in Preferences
         activity.storageHelper!!.onFolderSelected = { _, folder ->
-            run {
-                val p = folder.getAbsolutePath(activity)
-                val editor = sharedPref.edit()
-                editor?.putString("gameFolder", p)
-                editor?.apply()
-            }
+            val p = folder.getAbsolutePath(activity)
+            sharedPref.edit().putString("gameFolder", p).apply()
         }
     }
 
@@ -76,9 +74,11 @@ class SettingsViewModel(val activity: MainActivity) {
         enableDebugLogs: MutableState<Boolean>,
         enableGraphicsLogs: MutableState<Boolean>
     ) {
-        memoryManagerMode.value = MemoryManagerMode.values()[sharedPref.getInt("memoryManagerMode", MemoryManagerMode.HostMappedUnsafe.ordinal)]
+        memoryManagerMode.value =
+            MemoryManagerMode.values()[sharedPref.getInt("memoryManagerMode", MemoryManagerMode.HostMappedUnsafe.ordinal)]
         useNce.value = sharedPref.getBoolean("useNce", true)
-        memoryConfiguration.value = MemoryConfiguration.values()[sharedPref.getInt("memoryConfiguration", MemoryConfiguration.MemoryConfiguration4GiB.ordinal)]
+        memoryConfiguration.value =
+            MemoryConfiguration.values()[sharedPref.getInt("memoryConfiguration", MemoryConfiguration.MemoryConfiguration4GiB.ordinal)]
         vSyncMode.value = VSyncMode.values()[sharedPref.getInt("vSyncMode", VSyncMode.Switch.ordinal)]
         enableDocked.value = sharedPref.getBoolean("enableDocked", true)
         enablePptc.value = sharedPref.getBoolean("enablePptc", true)
@@ -96,13 +96,15 @@ class SettingsViewModel(val activity: MainActivity) {
         enableMotion.value = sharedPref.getBoolean("enableMotion", true)
         enablePerformanceMode.value = sharedPref.getBoolean("enablePerformanceMode", false)
         controllerStickSensitivity.value = sharedPref.getFloat("controllerStickSensitivity", 1.0f)
+
         enableStubLogs.value = sharedPref.getBoolean("enableStubLogs", false)
         enableInfoLogs.value = sharedPref.getBoolean("enableInfoLogs", true)
         enableWarningLogs.value = sharedPref.getBoolean("enableWarningLogs", true)
         enableErrorLogs.value = sharedPref.getBoolean("enableErrorLogs", true)
         enableGuestLogs.value = sharedPref.getBoolean("enableGuestLogs", true)
         enableFsAccessLogs.value = sharedPref.getBoolean("enableFsAccessLogs", false)
-        enableTraceLogs.value = sharedPref.getBoolean("enableStubLogs", false)
+        // BUGFIX: richtiger Key für Trace-Logs
+        enableTraceLogs.value = sharedPref.getBoolean("enableTraceLogs", false)
         enableDebugLogs.value = sharedPref.getBoolean("enableDebugLogs", false)
         enableGraphicsLogs.value = sharedPref.getBoolean("enableGraphicsLogs", false)
     }
@@ -138,41 +140,42 @@ class SettingsViewModel(val activity: MainActivity) {
         enableDebugLogs: MutableState<Boolean>,
         enableGraphicsLogs: MutableState<Boolean>
     ) {
-        val editor = sharedPref.edit()
+        sharedPref.edit()
+            .putInt("memoryManagerMode", memoryManagerMode.value.ordinal)
+            .putBoolean("useNce", useNce.value)
+            .putInt("memoryConfiguration", memoryConfiguration.value.ordinal)
+            .putInt("vSyncMode", vSyncMode.value.ordinal)
+            .putBoolean("enableDocked", enableDocked.value)
+            .putBoolean("enablePptc", enablePptc.value)
+            .putBoolean("enableFsIntegrityChecks", enableFsIntegrityChecks.value)
+            .putInt("fsGlobalAccessLogMode", fsGlobalAccessLogMode.value)
+            .putBoolean("ignoreMissingServices", ignoreMissingServices.value)
+            .putBoolean("enableShaderCache", enableShaderCache.value)
+            .putBoolean("enableTextureRecompression", enableTextureRecompression.value)
+            .putBoolean("enableMacroHLE", enableMacroHLE.value)
+            .putFloat("resScale", resScale.value)
+            .putFloat("maxAnisotropy", maxAnisotropy.value)
+            .putBoolean("useVirtualController", useVirtualController.value)
+            .putBoolean("isGrid", isGrid.value)
+            .putBoolean("useSwitchLayout", useSwitchLayout.value)
+            .putBoolean("enableMotion", enableMotion.value)
+            .putBoolean("enablePerformanceMode", enablePerformanceMode.value)
+            .putFloat("controllerStickSensitivity", controllerStickSensitivity.value)
+            .putBoolean("enableStubLogs", enableStubLogs.value)
+            .putBoolean("enableInfoLogs", enableInfoLogs.value)
+            .putBoolean("enableWarningLogs", enableWarningLogs.value)
+            .putBoolean("enableErrorLogs", enableErrorLogs.value)
+            .putBoolean("enableGuestLogs", enableGuestLogs.value)
+            .putBoolean("enableFsAccessLogs", enableFsAccessLogs.value)
+            .putBoolean("enableTraceLogs", enableTraceLogs.value)
+            .putBoolean("enableDebugLogs", enableDebugLogs.value)
+            .putBoolean("enableGraphicsLogs", enableGraphicsLogs.value)
+            .apply()
 
-        editor.putInt("memoryManagerMode", memoryManagerMode.value.ordinal)
-        editor.putBoolean("useNce", useNce.value)
-        editor.putInt("memoryConfiguration", memoryConfiguration.value.ordinal)
-        editor.putInt("vSyncMode", vSyncMode.value.ordinal)
-        editor.putBoolean("enableDocked", enableDocked.value)
-        editor.putBoolean("enablePptc", enablePptc.value)
-        editor.putBoolean("enableFsIntegrityChecks", enableFsIntegrityChecks.value)
-        editor.putInt("fsGlobalAccessLogMode", fsGlobalAccessLogMode.value)
-        editor.putBoolean("ignoreMissingServices", ignoreMissingServices.value)
-        editor.putBoolean("enableShaderCache", enableShaderCache.value)
-        editor.putBoolean("enableTextureRecompression", enableTextureRecompression.value)
-        editor.putBoolean("enableMacroHLE", enableMacroHLE.value)
-        editor.putFloat("resScale", resScale.value)
-        editor.putFloat("maxAnisotropy", maxAnisotropy.value)
-        editor.putBoolean("useVirtualController", useVirtualController.value)
-        editor.putBoolean("isGrid", isGrid.value)
-        editor.putBoolean("useSwitchLayout", useSwitchLayout.value)
-        editor.putBoolean("enableMotion", enableMotion.value)
-        editor.putBoolean("enablePerformanceMode", enablePerformanceMode.value)
-        editor.putFloat("controllerStickSensitivity", controllerStickSensitivity.value)
-        editor.putBoolean("enableStubLogs", enableStubLogs.value)
-        editor.putBoolean("enableInfoLogs", enableInfoLogs.value)
-        editor.putBoolean("enableWarningLogs", enableWarningLogs.value)
-        editor.putBoolean("enableErrorLogs", enableErrorLogs.value)
-        editor.putBoolean("enableGuestLogs", enableGuestLogs.value)
-        editor.putBoolean("enableFsAccessLogs", enableFsAccessLogs.value)
-        editor.putBoolean("enableTraceLogs", enableTraceLogs.value)
-        editor.putBoolean("enableDebugLogs", enableDebugLogs.value)
-        editor.putBoolean("enableGraphicsLogs", enableGraphicsLogs.value)
-
-        editor.apply()
+        // ursprünglichen Folder-Callback wiederherstellen (optional)
         activity.storageHelper!!.onFolderSelected = previousFolderCallback
 
+        // Logger-Flags an Native weitergeben
         KenjinxNative.jnaInstance.loggingSetEnabled(LogLevel.Info.ordinal, enableInfoLogs.value)
         KenjinxNative.jnaInstance.loggingSetEnabled(LogLevel.Stub.ordinal, enableStubLogs.value)
         KenjinxNative.jnaInstance.loggingSetEnabled(LogLevel.Warning.ordinal, enableWarningLogs.value)
@@ -186,31 +189,28 @@ class SettingsViewModel(val activity: MainActivity) {
 
     fun openGameFolder() {
         val path = sharedPref.getString("gameFolder", "") ?: ""
-
-        if (path.isEmpty())
+        if (path.isEmpty()) {
             activity.storageHelper?.storage?.openFolderPicker()
-        else
+        } else {
             activity.storageHelper?.storage?.openFolderPicker(
                 activity.storageHelper!!.storage.requestCodeFolderPicker,
                 FileFullPath(activity, path)
             )
+        }
     }
 
     fun selectKey(installState: MutableState<KeyInstallState>) {
-        if (installState.value != KeyInstallState.None)
-            return
+        if (installState.value != KeyInstallState.None) return
+
         activity.storageHelper!!.onFileSelected = { _, files ->
-            run {
-                activity.storageHelper!!.onFileSelected = previousFileCallback
-                val file = files.firstOrNull()
-                file?.apply {
-                    if (name == "prod.keys") {
-                        selectedKeyFile = file
-                        installState.value = KeyInstallState.Query
-                    }
-                    else {
-                        installState.value = KeyInstallState.Cancelled
-                    }
+            activity.storageHelper!!.onFileSelected = previousFileCallback
+            val file = files.firstOrNull()
+            file?.apply {
+                if (name == "prod.keys") {
+                    selectedKeyFile = file
+                    installState.value = KeyInstallState.Query
+                } else {
+                    installState.value = KeyInstallState.Cancelled
                 }
             }
         }
@@ -218,8 +218,7 @@ class SettingsViewModel(val activity: MainActivity) {
     }
 
     fun installKey(installState: MutableState<KeyInstallState>) {
-        if (installState.value != KeyInstallState.Query)
-            return
+        if (installState.value != KeyInstallState.Query) return
         if (selectedKeyFile == null) {
             installState.value = KeyInstallState.None
             return
@@ -251,31 +250,28 @@ class SettingsViewModel(val activity: MainActivity) {
     }
 
     fun selectFirmware(installState: MutableState<FirmwareInstallState>) {
-        if (installState.value != FirmwareInstallState.None)
-            return
+        if (installState.value != FirmwareInstallState.None) return
+
         activity.storageHelper!!.onFileSelected = { _, files ->
-            run {
-                activity.storageHelper!!.onFileSelected = previousFileCallback
-                val file = files.firstOrNull()
-                file?.apply {
-                    if (extension == "xci" || extension == "zip") {
-                        installState.value = FirmwareInstallState.Verifying
-                        thread {
-                            Thread.sleep(1000)
-                            val descriptor = activity.contentResolver.openFileDescriptor(file.uri, "rw")
-                            descriptor?.use { d ->
-                                selectedFirmwareVersion = KenjinxNative.jnaInstance.deviceVerifyFirmware(d.fd, extension == "xci")
-                                selectedFirmwareFile = file
-                                if (!selectedFirmwareVersion.isEmpty()) {
-                                    installState.value = FirmwareInstallState.Query
-                                } else {
-                                    installState.value = FirmwareInstallState.Cancelled
-                                }
-                            }
+            activity.storageHelper!!.onFileSelected = previousFileCallback
+            val file = files.firstOrNull()
+            file?.apply {
+                if (extension == "xci" || extension == "zip") {
+                    installState.value = FirmwareInstallState.Verifying
+                    thread {
+                        Thread.sleep(1000)
+                        val descriptor = activity.contentResolver.openFileDescriptor(file.uri, "rw")
+                        descriptor?.use { d ->
+                            selectedFirmwareVersion =
+                                KenjinxNative.jnaInstance.deviceVerifyFirmware(d.fd, extension == "xci")
+                            selectedFirmwareFile = file
+                            installState.value =
+                                if (selectedFirmwareVersion.isNotEmpty()) FirmwareInstallState.Query
+                                else FirmwareInstallState.Cancelled
                         }
-                    } else {
-                        installState.value = FirmwareInstallState.Cancelled
                     }
+                } else {
+                    installState.value = FirmwareInstallState.Cancelled
                 }
             }
         }
@@ -283,23 +279,19 @@ class SettingsViewModel(val activity: MainActivity) {
     }
 
     fun installFirmware(installState: MutableState<FirmwareInstallState>) {
-        if (installState.value != FirmwareInstallState.Query)
-            return
+        if (installState.value != FirmwareInstallState.Query) return
         if (selectedFirmwareFile == null) {
             installState.value = FirmwareInstallState.None
             return
         }
         selectedFirmwareFile?.apply {
             val descriptor = activity.contentResolver.openFileDescriptor(uri, "rw")
-
-            if(descriptor != null)
-            {
+            descriptor?.let {
                 installState.value = FirmwareInstallState.Install
                 thread {
                     Thread.sleep(1000)
-
                     try {
-                        KenjinxNative.jnaInstance.deviceInstallFirmware(descriptor.fd,extension == "xci")
+                        KenjinxNative.jnaInstance.deviceInstallFirmware(it.fd, extension == "xci")
                     } finally {
                         MainActivity.mainViewModel?.refreshFirmwareVersion()
                         installState.value = FirmwareInstallState.Done
@@ -326,33 +318,25 @@ class SettingsViewModel(val activity: MainActivity) {
                 stream?.apply {
                     val folders = listOf("bis", "games", "profiles", "system")
                     for (f in folders) {
-                        val dir = File(MainActivity.AppPath + "${File.separator}${f}")
-                        if (dir.exists()) {
-                            dir.deleteRecursively()
-                        }
-
+                        val dir = File(MainActivity.AppPath + "${File.separator}$f")
+                        if (dir.exists()) dir.deleteRecursively()
                         dir.mkdirs()
                     }
                     ZipInputStream(stream).use { zip ->
                         while (true) {
                             val header = zip.nextEntry ?: break
-                            if (!folders.any { header.fileName.startsWith(it) }) {
-                                continue
-                            }
-                            val filePath =
-                                MainActivity.AppPath + File.separator + header.fileName
-
+                            if (!folders.any { header.fileName.startsWith(it) }) continue
+                            val filePath = MainActivity.AppPath + File.separator + header.fileName
                             if (!header.isDirectory) {
                                 val bos = BufferedOutputStream(FileOutputStream(filePath))
                                 val bytesIn = ByteArray(4096)
-                                var read: Int = 0
+                                var read: Int
                                 while (zip.read(bytesIn).also { read = it } > 0) {
                                     bos.write(bytesIn, 0, read)
                                 }
                                 bos.close()
                             } else {
-                                val dir = File(filePath)
-                                dir.mkdir()
+                                File(filePath).mkdir()
                             }
                         }
                     }

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Panorama
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.VideogameAsset
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -84,14 +85,16 @@ class SettingViews {
         @Composable
         fun Main(settingsViewModel: SettingsViewModel, mainViewModel: MainViewModel) {
             val loaded = remember { mutableStateOf(false) }
+
+            // — States mit expliziten Typen —
             val memoryManagerMode = remember { mutableStateOf(MemoryManagerMode.HostMappedUnsafe) }
-            val useNce = remember { mutableStateOf(false)  }
-            val memoryConfiguration = remember { mutableStateOf(MemoryConfiguration.MemoryConfiguration4GiB)  }
+            val useNce = remember { mutableStateOf(false) }
+            val memoryConfiguration = remember { mutableStateOf(MemoryConfiguration.MemoryConfiguration4GiB) }
             val vSyncMode = remember { mutableStateOf(VSyncMode.Switch) }
             val enableDocked = remember { mutableStateOf(false) }
             val enablePptc = remember { mutableStateOf(false) }
-            var enableFsIntegrityChecks = remember { mutableStateOf(false) }
-            var fsGlobalAccessLogMode = remember { mutableStateOf(0) }
+            val enableFsIntegrityChecks = remember { mutableStateOf(false) }
+            val fsGlobalAccessLogMode = remember { mutableStateOf(0) }
             val ignoreMissingServices = remember { mutableStateOf(false) }
             val enableShaderCache = remember { mutableStateOf(false) }
             val enableTextureRecompression = remember { mutableStateOf(false) }
@@ -99,19 +102,24 @@ class SettingViews {
             val resScale = remember { mutableStateOf(1f) }
             val maxAnisotropy = remember { mutableStateOf(0f) }
             val useVirtualController = remember { mutableStateOf(true) }
+
             val showKeyDialog = remember { mutableStateOf(false) }
             val keyInstallState = remember { mutableStateOf(KeyInstallState.None) }
+
             val showFirwmareDialog = remember { mutableStateOf(false) }
             val firmwareInstallState = remember { mutableStateOf(FirmwareInstallState.None) }
             val firmwareVersion = remember { mutableStateOf(mainViewModel.firmwareVersion) }
+
             val showDataImportDialog = remember { mutableStateOf(false) }
             val dataImportState = remember { mutableStateOf(DataImportState.None) }
-            var dataFile = remember { mutableStateOf<DocumentFile?>(null) }
+            val dataFile = remember { mutableStateOf<DocumentFile?>(null) }
+
             val isGrid = remember { mutableStateOf(true) }
             val useSwitchLayout = remember { mutableStateOf(true) }
             val enableMotion = remember { mutableStateOf(true) }
             val enablePerformanceMode = remember { mutableStateOf(true) }
             val controllerStickSensitivity = remember { mutableStateOf(1.0f) }
+
             val enableStubLogs = remember { mutableStateOf(true) }
             val enableInfoLogs = remember { mutableStateOf(true) }
             val enableWarningLogs = remember { mutableStateOf(true) }
@@ -121,7 +129,11 @@ class SettingViews {
             val enableTraceLogs = remember { mutableStateOf(true) }
             val enableDebugLogs = remember { mutableStateOf(true) }
             val enableGraphicsLogs = remember { mutableStateOf(true) }
+
             val isNavigating = remember { mutableStateOf(false) }
+
+            // Dialog-State für den Shortcut-Guide
+            val showShortcutGuide = remember { mutableStateOf(false) }
 
             if (!loaded.value) {
                 settingsViewModel.initializeState(
@@ -157,12 +169,12 @@ class SettingViews {
                 )
                 loaded.value = true
             }
+
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 topBar = {
-                    TopAppBar(title = {
-                        Text(text = "Settings")
-                    },
+                    TopAppBar(
+                        title = { Text(text = "Settings") },
                         navigationIcon = {
                             IconButton(onClick = {
                                 settingsViewModel.save(
@@ -200,32 +212,39 @@ class SettingViews {
                                 if (!isNavigating.value) {
                                     isNavigating.value = true
                                     mainViewModel.navController?.popBackStack()
-
                                     CoroutineScope(Dispatchers.Main).launch {
                                         delay(500)
                                         isNavigating.value = false
                                     }
                                 }
-
                             }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                             }
-                        })
-                }) { contentPadding ->
+                        }
+                    )
+                }
+            ) { contentPadding ->
                 Column(
                     modifier = Modifier
                         .padding(contentPadding)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    ExpandableView(onCardArrowClick = { }, title = "User Interface", icon = Icons.Outlined.BarChart ,isFirst = true) {
+                    // UI
+                    ExpandableView(
+                        onCardArrowClick = { },
+                        title = "User Interface",
+                        icon = Icons.Outlined.BarChart,
+                        isFirst = true
+                    ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             isGrid.SwitchSelector("Use Grid")
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp)
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
                                     text = "System Firmware",
@@ -236,55 +255,20 @@ class SettingViews {
                                     modifier = Modifier.align(Alignment.CenterVertically)
                                 )
                             }
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp)
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ){
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
                                 ActionButton(
-                                    onClick = {
-                                        settingsViewModel.openGameFolder()
-                                    },
+                                    onClick = { settingsViewModel.openGameFolder() },
                                     text = "Add Game Folder",
                                     icon = Icons.Default.Add,
                                     modifier = Modifier.weight(1f),
-                                    isFullWidth = false,
-                                )
-                            }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp)
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ){
-                                ActionButton(
-                                    onClick = {
-                                        showKeyDialog.value = true
-                                    },
-                                    text = "Install Keys",
-                                    icon = Icons.Default.Build,
-                                    modifier = Modifier.weight(1f),
-                                    isFullWidth = false,
-                                )
-                            }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp)
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                ActionButton(
-                                    onClick = {
-                                        showFirwmareDialog.value = true
-                                    },
-                                    text = "Install Firmware",
-                                    icon = Icons.Default.Build,
-                                    modifier = Modifier.weight(1f),
-                                    isFullWidth = false,
+                                    isFullWidth = false
                                 )
                             }
 
@@ -293,66 +277,117 @@ class SettingViews {
                                     .fillMaxWidth()
                                     .height(56.dp)
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 ActionButton(
-                                    onClick = {
-                                        showDataImportDialog.value = true
-                                    },
-                                    text = "Import App Data",
-                                    icon = Icons.Default.FileDownload,
+                                    onClick = { showKeyDialog.value = true },
+                                    text = "Install Keys",
+                                    icon = Icons.Default.Build,
                                     modifier = Modifier.weight(1f),
-                                    isFullWidth = false,
+                                    isFullWidth = false
                                 )
                             }
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp)
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                ActionButton(
+                                    onClick = { showFirwmareDialog.value = true },
+                                    text = "Install Firmware",
+                                    icon = Icons.Default.Build,
+                                    modifier = Modifier.weight(1f),
+                                    isFullWidth = false
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                ActionButton(
+                                    onClick = { showDataImportDialog.value = true },
+                                    text = "Import App Data",
+                                    icon = Icons.Default.FileDownload,
+                                    modifier = Modifier.weight(1f),
+                                    isFullWidth = false
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 ActionButton(
                                     onClick = {
                                         fun createIntent(action: String): Intent {
-                                            val intent = Intent(action)
-                                            intent.addCategory(Intent.CATEGORY_DEFAULT)
-                                            intent.data = DocumentsContract.buildRootUri(
-                                                DocumentProvider.AUTHORITY,
-                                                DocumentProvider.ROOT_ID
-                                            )
-                                            intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                                            val intent = Intent(action).apply {
+                                                addCategory(Intent.CATEGORY_DEFAULT)
+                                                data = DocumentsContract.buildRootUri(
+                                                    DocumentProvider.AUTHORITY,
+                                                    DocumentProvider.ROOT_ID
+                                                )
+                                                addFlags(
+                                                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
+                                                        Intent.FLAG_GRANT_PREFIX_URI_PERMISSION or
+                                                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                                )
+                                            }
                                             return intent
                                         }
                                         try {
                                             mainViewModel.activity.startActivity(createIntent(Intent.ACTION_VIEW))
                                             return@ActionButton
-                                        } catch (_: ActivityNotFoundException) {
-                                        }
+                                        } catch (_: ActivityNotFoundException) {}
                                         try {
                                             mainViewModel.activity.startActivity(createIntent("android.provider.action.BROWSE"))
                                             return@ActionButton
-                                        } catch (_: ActivityNotFoundException) {
-                                        }
+                                        } catch (_: ActivityNotFoundException) {}
                                         try {
                                             mainViewModel.activity.startActivity(createIntent("com.google.android.documentsui"))
                                             return@ActionButton
-                                        } catch (_: ActivityNotFoundException) {
-                                        }
+                                        } catch (_: ActivityNotFoundException) {}
                                         try {
                                             mainViewModel.activity.startActivity(createIntent("com.android.documentsui"))
                                             return@ActionButton
-                                        } catch (_: ActivityNotFoundException) {
-                                        }
+                                        } catch (_: ActivityNotFoundException) {}
                                     },
                                     text = "Open App Folder",
                                     icon = Icons.Default.Home,
                                     modifier = Modifier.weight(1f),
-                                    isFullWidth = false,
+                                    isFullWidth = false
+                                )
+                            }
+
+                            // "Shortcut Guide" Button
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                ActionButton(
+                                    onClick = { showShortcutGuide.value = true },
+                                    text = "Shortcut Guide",
+                                    icon = Icons.Outlined.Settings,
+                                    modifier = Modifier.weight(1f),
+                                    isFullWidth = false
                                 )
                             }
                         }
                     }
+
+                    // Keys
                     SimpleAlertDialog.Custom(
                         showDialog = showKeyDialog,
                         onDismissRequest = {
@@ -393,17 +428,11 @@ class SettingViews {
                                             .padding(top = 16.dp)
                                     ) {
                                         Button(
-                                            onClick = {
-                                                settingsViewModel.selectKey(
-                                                    keyInstallState
-                                                )
-                                            },
+                                            onClick = { settingsViewModel.selectKey(keyInstallState) },
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Select File")
-                                        }
+                                        ) { Text(text = "Select File") }
                                         Button(
                                             onClick = {
                                                 showKeyDialog.value = false
@@ -412,11 +441,10 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Cancel")
-                                        }
+                                        ) { Text(text = "Cancel") }
                                     }
                                 }
+
                                 KeyInstallState.Query -> {
                                     Text(
                                         text = "Key file will be installed. Do you want to continue?",
@@ -433,10 +461,7 @@ class SettingViews {
                                     ) {
                                         Button(
                                             onClick = {
-                                                settingsViewModel.installKey(
-                                                    keyInstallState
-                                                )
-
+                                                settingsViewModel.installKey(keyInstallState)
                                                 if (keyInstallState.value == KeyInstallState.None) {
                                                     showKeyDialog.value = false
                                                     settingsViewModel.clearKeySelection(keyInstallState)
@@ -445,9 +470,7 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Yes")
-                                        }
+                                        ) { Text(text = "Yes") }
                                         Button(
                                             onClick = {
                                                 showKeyDialog.value = false
@@ -456,11 +479,10 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "No")
-                                        }
+                                        ) { Text(text = "No") }
                                     }
                                 }
+
                                 KeyInstallState.Install -> {
                                     Text(
                                         text = "Installing key file...",
@@ -475,6 +497,7 @@ class SettingViews {
                                             .padding(top = 16.dp)
                                     )
                                 }
+
                                 KeyInstallState.Done -> {
                                     Text(
                                         text = "Key file installed.",
@@ -497,11 +520,10 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Close")
-                                        }
+                                        ) { Text(text = "Close") }
                                     }
                                 }
+
                                 KeyInstallState.Cancelled -> {
                                     val file = settingsViewModel.selectedKeyFile
                                     if (file != null) {
@@ -546,15 +568,14 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Close")
-                                        }
+                                        ) { Text(text = "Close") }
                                     }
                                 }
-                                else -> {}
                             }
                         }
                     }
+
+                    // Firmware
                     SimpleAlertDialog.Custom(
                         showDialog = showFirwmareDialog,
                         onDismissRequest = {
@@ -595,15 +616,11 @@ class SettingViews {
                                             .padding(top = 16.dp)
                                     ) {
                                         Button(
-                                            onClick = {
-                                                settingsViewModel.selectFirmware(firmwareInstallState)
-                                            },
+                                            onClick = { settingsViewModel.selectFirmware(firmwareInstallState) },
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Select File")
-                                        }
+                                        ) { Text(text = "Select File") }
                                         Button(
                                             onClick = {
                                                 showFirwmareDialog.value = false
@@ -612,11 +629,10 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Cancel")
-                                        }
+                                        ) { Text(text = "Cancel") }
                                     }
                                 }
+
                                 FirmwareInstallState.Query -> {
                                     Text(
                                         text = "Firmware ${settingsViewModel.selectedFirmwareVersion} will be installed. Do you want to continue?",
@@ -634,7 +650,6 @@ class SettingViews {
                                         Button(
                                             onClick = {
                                                 settingsViewModel.installFirmware(firmwareInstallState)
-
                                                 if (firmwareInstallState.value == FirmwareInstallState.None) {
                                                     showFirwmareDialog.value = false
                                                     settingsViewModel.clearFirmwareSelection(firmwareInstallState)
@@ -643,9 +658,7 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Yes")
-                                        }
+                                        ) { Text(text = "Yes") }
                                         Button(
                                             onClick = {
                                                 showFirwmareDialog.value = false
@@ -654,11 +667,10 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "No")
-                                        }
+                                        ) { Text(text = "No") }
                                     }
                                 }
+
                                 FirmwareInstallState.Verifying -> {
                                     Text(
                                         text = "Verifying selected file...",
@@ -673,6 +685,7 @@ class SettingViews {
                                             .padding(top = 16.dp)
                                     )
                                 }
+
                                 FirmwareInstallState.Install -> {
                                     Text(
                                         text = "Installing firmware ${settingsViewModel.selectedFirmwareVersion}...",
@@ -687,6 +700,7 @@ class SettingViews {
                                             .padding(top = 16.dp)
                                     )
                                 }
+
                                 FirmwareInstallState.Done -> {
                                     Text(
                                         text = "Firmware ${settingsViewModel.selectedFirmwareVersion}.",
@@ -696,7 +710,6 @@ class SettingViews {
                                         textAlign = TextAlign.Start
                                     )
                                     firmwareVersion.value = mainViewModel.firmwareVersion
-
                                     Row(
                                         horizontalArrangement = Arrangement.SpaceEvenly,
                                         modifier = Modifier
@@ -711,11 +724,10 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Close")
-                                        }
+                                        ) { Text(text = "Close") }
                                     }
                                 }
+
                                 FirmwareInstallState.Cancelled -> {
                                     val file = settingsViewModel.selectedFirmwareFile
                                     if (file != null) {
@@ -770,15 +782,14 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Close")
-                                        }
+                                        ) { Text(text = "Close") }
                                     }
                                 }
-                                else -> {}
                             }
                         }
                     }
+
+                    // Data Import
                     SimpleAlertDialog.Custom(
                         showDialog = showDataImportDialog,
                         onDismissRequest = {
@@ -825,15 +836,13 @@ class SettingViews {
                                                 storage?.apply {
                                                     val callBack = this.onFileSelected
                                                     onFileSelected = { requestCode, files ->
-                                                        run {
-                                                            onFileSelected = callBack
-                                                            if (requestCode == IMPORT_CODE) {
-                                                                val file = files.firstOrNull()
-                                                                file?.apply {
-                                                                    if (this.extension == "zip") {
-                                                                        dataFile.value = this
-                                                                        dataImportState.value = DataImportState.Query
-                                                                    }
+                                                        onFileSelected = callBack
+                                                        if (requestCode == IMPORT_CODE) {
+                                                            val filePicked = files.firstOrNull()
+                                                            filePicked?.apply {
+                                                                if (this.extension == "zip") {
+                                                                    dataFile.value = this
+                                                                    dataImportState.value = DataImportState.Query
                                                                 }
                                                             }
                                                         }
@@ -847,9 +856,7 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Select File")
-                                        }
+                                        ) { Text(text = "Select File") }
                                         Button(
                                             onClick = {
                                                 showDataImportDialog.value = false
@@ -859,11 +866,10 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Cancel")
-                                        }
+                                        ) { Text(text = "Cancel") }
                                     }
                                 }
+
                                 DataImportState.Query -> {
                                     Text(
                                         text = "Current app data will be wiped and replaced. Do you want to continue?",
@@ -880,9 +886,9 @@ class SettingViews {
                                     ) {
                                         Button(
                                             onClick = {
-                                                val file = dataFile.value
+                                                val picked = dataFile.value
                                                 dataFile.value = null
-                                                file?.apply {
+                                                picked?.apply {
                                                     thread {
                                                         settingsViewModel.importAppData(this, dataImportState)
                                                     }
@@ -891,9 +897,7 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Yes")
-                                        }
+                                        ) { Text(text = "Yes") }
                                         Button(
                                             onClick = {
                                                 showDataImportDialog.value = false
@@ -902,11 +906,10 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "No")
-                                        }
+                                        ) { Text(text = "No") }
                                     }
                                 }
+
                                 DataImportState.Import -> {
                                     Text(
                                         text = "Importing app data...",
@@ -930,7 +933,6 @@ class SettingViews {
                                             .padding(start = 8.dp, bottom = 8.dp),
                                         textAlign = TextAlign.Start
                                     )
-
                                     Row(
                                         horizontalArrangement = Arrangement.SpaceEvenly,
                                         modifier = Modifier
@@ -949,43 +951,51 @@ class SettingViews {
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .padding(horizontal = 8.dp)
-                                        ) {
-                                            Text(text = "Close")
-                                        }
+                                        ) { Text(text = "Close") }
                                     }
                                 }
                             }
                         }
                     }
-                    ExpandableView(onCardArrowClick = { }, title = "Input", icon = Icons.Outlined.VideogameAsset) {
+
+                    // Input
+                    ExpandableView(
+                        onCardArrowClick = { },
+                        title = "Input",
+                        icon = Icons.Outlined.VideogameAsset
+                    ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             useVirtualController.SwitchSelector(label = "Use Virtual Controller")
                             useSwitchLayout.SwitchSelector(label = "Use Switch Controller Layout")
 
-                            val interactionSource: MutableInteractionSource = remember { MutableInteractionSource() }
+                            val interactionSource = remember { MutableInteractionSource() }
 
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp)
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
                                     text = "Controller Stick Sensitivity",
                                     modifier = Modifier.align(Alignment.CenterVertically)
                                 )
-                                Slider(modifier = Modifier.width(250.dp), value = controllerStickSensitivity.value, onValueChange = {
-                                    controllerStickSensitivity.value = it
-                                }, valueRange = 0.1f..2f,
+                                Slider(
+                                    modifier = Modifier.width(250.dp),
+                                    value = controllerStickSensitivity.value,
+                                    onValueChange = { controllerStickSensitivity.value = it },
+                                    valueRange = 0.1f..2f,
                                     steps = 20,
                                     interactionSource = interactionSource,
                                     thumb = {
                                         Label(
                                             label = {
-                                                PlainTooltip(modifier = Modifier
-                                                    .sizeIn(45.dp, 25.dp)
-                                                    .wrapContentWidth()) {
+                                                PlainTooltip(
+                                                    modifier = Modifier
+                                                        .sizeIn(45.dp, 25.dp)
+                                                        .wrapContentWidth()
+                                                ) {
                                                     Text("%.2f".format(controllerStickSensitivity.value))
                                                 }
                                             },
@@ -1008,13 +1018,17 @@ class SettingViews {
                             enableMotion.SwitchSelector(label = "Motion Sensor")
                         }
                     }
-                    ExpandableView(onCardArrowClick = { }, title = "System", icon = Icons.Outlined.Settings) {
+
+                    // System
+                    ExpandableView(
+                        onCardArrowClick = { },
+                        title = "System",
+                        icon = Icons.Outlined.Settings
+                    ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             VSyncDropdown(
                                 selectedVSyncMode = vSyncMode.value,
-                                onModeSelected = { mode ->
-                                    vSyncMode.value = mode
-                                }
+                                onModeSelected = { mode -> vSyncMode.value = mode }
                             )
                             MemoryDropdown(
                                 selectedMemoryConfiguration = memoryConfiguration.value,
@@ -1028,68 +1042,77 @@ class SettingViews {
                             enablePerformanceMode.SwitchSelector(label = "Performance Mode")
                         }
                     }
-                    ExpandableView(onCardArrowClick = { }, title = "Cpu", icon = Icons.Outlined.Memory) {
+
+                    // CPU
+                    ExpandableView(
+                        onCardArrowClick = { },
+                        title = "Cpu",
+                        icon = Icons.Outlined.Memory
+                    ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             useNce.SwitchSelector(label = "Enable NCE (Native Code Execution)")
                             enablePptc.SwitchSelector(label = "Enable PPTC (Profiled Persistent Translation Cache)")
                             MemoryModeDropdown(
                                 selectedMemoryManagerMode = memoryManagerMode.value,
-                                onModeSelected = { mode ->
-                                    memoryManagerMode.value = mode
-                                }
+                                onModeSelected = { mode -> memoryManagerMode.value = mode }
                             )
                         }
                     }
-                    ExpandableView(onCardArrowClick = { }, title = "Graphics", icon = Icons.Outlined.Panorama) {
+
+                    // Graphics
+                    ExpandableView(
+                        onCardArrowClick = { },
+                        title = "Graphics",
+                        icon = Icons.Outlined.Panorama
+                    ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             enableShaderCache.SwitchSelector(label = "Enable Shader Cache")
                             enableTextureRecompression.SwitchSelector(label = "Enable Texture Recompression")
                             enableMacroHLE.SwitchSelector(label = "Enable Macro HLE")
+
                             ResolutionScaleDropdown(
                                 selectedScale = resScale.value,
-                                onScaleSelected = { scale ->
-                                    resScale.value = scale
-                                }
+                                onScaleSelected = { scale -> resScale.value = scale }
                             )
                             AnisotropicFilteringDropdown(
                                 selectedAnisotropy = maxAnisotropy.value,
-                                onAnisotropySelected = { anisotropy ->
-                                    maxAnisotropy.value = anisotropy
-                                }
+                                onAnisotropySelected = { anisotropy -> maxAnisotropy.value = anisotropy }
                             )
 
-
-                            var isDriverSelectorOpen = remember { mutableStateOf(false) }
+                            val isDriverSelectorOpen = remember { mutableStateOf(false) }
 
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp)
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 ActionButton(
-                                    onClick = {
-                                        isDriverSelectorOpen.value = !isDriverSelectorOpen.value
-                                    },
+                                    onClick = { isDriverSelectorOpen.value = !isDriverSelectorOpen.value },
                                     text = "Install Driver",
                                     icon = Icons.Default.Build,
                                     modifier = Modifier.weight(1f),
-                                    isFullWidth = false,
+                                    isFullWidth = false
                                 )
                             }
 
                             SimpleAlertDialog.Custom(
                                 showDialog = isDriverSelectorOpen,
                                 onDismissRequest = { isDriverSelectorOpen.value = false },
-                                properties = DialogProperties(usePlatformDefaultWidth = false),
+                                properties = DialogProperties(usePlatformDefaultWidth = false)
                             ) {
                                 VulkanDriverViews.Main(settingsViewModel.activity, isDriverSelectorOpen)
                             }
                         }
                     }
 
-                    ExpandableView(onCardArrowClick = { }, title = "Logging", icon = Icons.Outlined.FileOpen) {
+                    // Logging
+                    ExpandableView(
+                        onCardArrowClick = { },
+                        title = "Logging",
+                        icon = Icons.Outlined.FileOpen
+                    ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             enableStubLogs.SwitchSelector(label = "Enable Stub Logs")
                             enableInfoLogs.SwitchSelector(label = "Enable Info Logs")
@@ -1100,6 +1123,7 @@ class SettingViews {
                             enableFsAccessLogs.SwitchSelector(label = "Enable Fs Access Logs")
                             enableDebugLogs.SwitchSelector(label = "Enable Debug Logs")
                             enableGraphicsLogs.SwitchSelector(label = "Enable Graphics Logs")
+
                             FsGlobalAccessLogModeDropdown(
                                 selectedFsGlobalAccess = fsGlobalAccessLogMode.value,
                                 onFsGlobalAccessSelected = { fsGlobalAccess ->
@@ -1112,22 +1136,62 @@ class SettingViews {
                                     .fillMaxWidth()
                                     .height(56.dp)
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 ActionButton(
-                                    onClick = {
-                                        mainViewModel.logging.requestExport()
-                                    },
+                                    onClick = { mainViewModel.logging.requestExport() },
                                     text = "Send Logs",
                                     icon = Icons.Default.MailOutline,
                                     modifier = Modifier.weight(1f),
-                                    isFullWidth = false,
+                                    isFullWidth = false
                                 )
                             }
                         }
                     }
                 }
+
+                // Der Shortcut-Guide-Dialog kann außerhalb stehen; er ist modal und unabhängig
+                ShortcutGuideDialog(
+                    show = showShortcutGuide.value,
+                    onDismiss = { showShortcutGuide.value = false }
+                )
             }
+        }
+
+        // Breiter + scrollbar
+        @Composable
+        private fun ShortcutGuideDialog(
+            show: Boolean,
+            onDismiss: () -> Unit
+        ) {
+            if (!show) return
+            val scroll = rememberScrollState()
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .sizeIn(minWidth = 280.dp, maxWidth = 600.dp),
+                title = { Text("Shortcut Guide") },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .verticalScroll(scroll)
+                            .sizeIn(maxHeight = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("1) Tap the “+” button in the top bar.")
+                        Text("2) Select your game file.")
+                        Text("3) Enter a shortcut name. Optionally select a custom icon or use the app icon.")
+                        Text("4) Confirm the Android prompt.")
+                        Text("Tip: The app stays in portrait during the system dialog and returns to landscape after some seconds.")
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = onDismiss) { Text("OK") }
+                }
+            )
         }
 
         @Composable
@@ -1136,14 +1200,13 @@ class SettingViews {
             onModeSelected: (MemoryManagerMode) -> Unit,
             modifier: Modifier = Modifier
         ) {
-            val modes = MemoryManagerMode.values()
-
+            val modes = MemoryManagerMode.values().toList()
             DropdownSelector(
                 label = "Memory Manager Mode",
                 selectedValue = selectedMemoryManagerMode,
-                options = modes.toList(),
+                options = modes,
                 getDisplayText = { mode ->
-                    when(mode) {
+                    when (mode) {
                         MemoryManagerMode.SoftwarePageTable -> "Software"
                         MemoryManagerMode.HostMapped -> "Host (fast)"
                         MemoryManagerMode.HostMappedUnsafe -> "Host Unchecked (fastest, unsafe)"
@@ -1160,14 +1223,13 @@ class SettingViews {
             onModeSelected: (VSyncMode) -> Unit,
             modifier: Modifier = Modifier
         ) {
-            val modes = VSyncMode.values()
-
+            val modes = VSyncMode.values().toList()
             DropdownSelector(
                 label = "VSync",
                 selectedValue = selectedVSyncMode,
-                options = modes.toList(),
+                options = modes,
                 getDisplayText = { mode ->
-                    when(mode) {
+                    when (mode) {
                         VSyncMode.Switch -> "Switch"
                         VSyncMode.Unbounded -> "Unbounded"
                     }
@@ -1183,14 +1245,13 @@ class SettingViews {
             onConfigurationSelected: (MemoryConfiguration) -> Unit,
             modifier: Modifier = Modifier
         ) {
-            val modes = MemoryConfiguration.values()
-
+            val modes = MemoryConfiguration.values().toList()
             DropdownSelector(
                 label = "Dram Size",
                 selectedValue = selectedMemoryConfiguration,
-                options = modes.toList(),
+                options = modes,
                 getDisplayText = { configuration ->
-                    when(configuration) {
+                    when (configuration) {
                         MemoryConfiguration.MemoryConfiguration4GiB -> "4GB"
                         MemoryConfiguration.MemoryConfiguration6GiB -> "6GB"
                         MemoryConfiguration.MemoryConfiguration8GiB -> "8GB"
@@ -1216,7 +1277,6 @@ class SettingViews {
                 3f to "3.0x (2160p/3240p)",
                 4f to "4.0x (2800p/4320p)"
             )
-
             DropdownSelector(
                 label = "Resolution Scale",
                 selectedValue = selectedScale,
@@ -1228,7 +1288,7 @@ class SettingViews {
                 modifier = modifier
             )
         }
-		
+
         @Composable
         fun AnisotropicFilteringDropdown(
             selectedAnisotropy: Float,
@@ -1242,7 +1302,6 @@ class SettingViews {
                 3.0f to "8x",
                 4.0f to "16x"
             )
-
             DropdownSelector(
                 label = "Anisotropic Filtering",
                 selectedValue = selectedAnisotropy,
@@ -1267,13 +1326,13 @@ class SettingViews {
                 2 to "2",
                 3 to "3"
             )
-
             DropdownSelector(
                 label = "Fs Global Access Log Mode",
                 selectedValue = selectedFsGlobalAccess,
                 options = fsGlobalAccessOptions.map { it.first },
                 getDisplayText = { fsGlobalAccess ->
-                    fsGlobalAccessOptions.find { it.first == fsGlobalAccess }?.second ?: "${fsGlobalAccess}x"
+                    fsGlobalAccessOptions.find { it.first == fsGlobalAccess }?.second
+                        ?: "$fsGlobalAccess"
                 },
                 onOptionSelected = onFsGlobalAccessSelected,
                 modifier = modifier

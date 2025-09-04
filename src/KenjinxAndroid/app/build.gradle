@@ -8,7 +8,7 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "org.kenjinx.android"
+        applicationId "org.kenjisc.android"
         minSdk 30
         targetSdk 34
         versionCode 10044
