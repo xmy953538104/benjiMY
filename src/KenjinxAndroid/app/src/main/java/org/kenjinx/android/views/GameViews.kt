@@ -250,6 +250,13 @@ class GameViews {
                     mutableStateOf(false)
                 }
 
+                // NEU: Wenn das Software-Keyboard offen ist, fange Back ab und schließe NUR den Dialog.
+                val uiHandler = mainViewModel.activity.uiHandler
+                BackHandler(enabled = uiHandler.showMessage.value) {
+                    KenjinxNative.uiHandlerSetResponse(false, "")
+                    uiHandler.showMessage.value = false
+                }
+
                 BackHandler {
                     showBackNotice.value = true
                 }

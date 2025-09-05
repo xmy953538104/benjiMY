@@ -26,8 +26,6 @@ import org.kenjinx.android.viewmodels.MainViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.viewmodels.GameModel
 import org.kenjinx.android.views.MainView
-import androidx.core.net.toUri
-
 
 class MainActivity : BaseActivity() {
     private var physicalControllerManager: PhysicalControllerManager =
@@ -123,9 +121,7 @@ class MainActivity : BaseActivity() {
         motionSensorManager = MotionSensorManager(this)
         Thread.setDefaultUncaughtExceptionHandler(crashHandler)
 
-        if (
-            !Environment.isExternalStorageManager()
-        ) {
+        if (!Environment.isExternalStorageManager()) {
             storageHelper?.storage?.requestFullStorageAccess()
         }
 
@@ -143,6 +139,9 @@ class MainActivity : BaseActivity() {
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
+        // >>> Wichtig: UI-Handler initialisieren (für Software-Keyboard/Dialog)
+        uiHandler = UiHandler()
+
         mainViewModel = MainViewModel(this)
         mainViewModel!!.physicalControllerManager = physicalControllerManager
         mainViewModel!!.motionSensorManager = motionSensorManager
@@ -152,7 +151,6 @@ class MainActivity : BaseActivity() {
         mainViewModel?.apply {
             setContent {
                 KenjinxAndroidTheme {
-                    // A surface container using the 'background' color from the theme
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
@@ -219,7 +217,7 @@ class MainActivity : BaseActivity() {
 
     override fun onPause() {
         super.onPause()
-        isActive = true
+        isActive = false
 
         if (isGameRunning) {
             mainViewModel?.performanceManager?.setTurboMode(false)
@@ -232,7 +230,7 @@ class MainActivity : BaseActivity() {
         when (storedIntent.action) {
             Intent.ACTION_VIEW, "org.kenjinx.android.LAUNCH_GAME" -> {
                 val bootPath = storedIntent.getStringExtra("bootPath")
-                val forceNceAndPptc = storedIntent.getBooleanExtra("forceNceAndPptc",false)
+                val forceNceAndPptc = storedIntent.getBooleanExtra("forceNceAndPptc", false)
 
                 if (bootPath != null) {
                     val uri = bootPath.toUri()
@@ -260,7 +258,6 @@ class MainActivity : BaseActivity() {
 
         // Clean up resources if needed
         mainViewModel?.let {
-            // Perform any critical cleanup
             it.performanceManager?.setTurboMode(false)
         }
 

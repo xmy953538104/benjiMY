@@ -97,7 +97,8 @@ val jnaInstance: KenjinxNativeJna = Native.load(
 
 object KenjinxNative : KenjinxNativeJna by jnaInstance {
 
-    fun loggingSetEnabled(logLevel: LogLevel, enabled: Boolean) = loggingSetEnabled(logLevel.ordinal, enabled)
+    fun loggingSetEnabled(logLevel: LogLevel, enabled: Boolean) =
+        loggingSetEnabled(logLevel.ordinal, enabled)
 
     @JvmStatic
     fun frameEnded() = MainActivity.frameEnded()
@@ -116,6 +117,10 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
             progress
         )
 
+    /**
+     * Variante A (Pointer → Strings via NativeHelpers).
+     * Wird von älteren JNI/Interop-Pfaden benutzt.
+     */
     @JvmStatic
     fun updateUiHandler(
         newTitlePointer: Long,
@@ -127,15 +132,54 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
         nMode: Int,
         newSubtitlePointer: Long,
         newInitialTextPointer: Long
-    ) = MainActivity.mainViewModel?.activity?.uiHandler?.update(
-        newTitle = NativeHelpers.instance.getStringJava(newTitlePointer),
-        newMessage = NativeHelpers.instance.getStringJava(newMessagePointer),
-        newWatermark = NativeHelpers.instance.getStringJava(newWatermarkPointer),
-        newType,
-        min,
-        max,
-        newMode = KeyboardMode.entries[nMode],
-        newSubtitle = NativeHelpers.instance.getStringJava(newSubtitlePointer),
-        NativeHelpers.instance.getStringJava(newInitialTextPointer)
-    )
+    ) {
+        val title = NativeHelpers.instance.getStringJava(newTitlePointer)
+        val message = NativeHelpers.instance.getStringJava(newMessagePointer)
+        val watermark = NativeHelpers.instance.getStringJava(newWatermarkPointer)
+        val subtitle = NativeHelpers.instance.getStringJava(newSubtitlePointer)
+        val initialText = NativeHelpers.instance.getStringJava(newInitialTextPointer)
+        val mode = KeyboardMode.entries.getOrNull(nMode) ?: KeyboardMode.Default
+
+        MainActivity.mainViewModel?.activity?.uiHandler?.update(
+            newTitle = title,
+            newMessage = message,
+            newWatermark = watermark,
+            newType = newType,
+            min = min,
+            max = max,
+            newMode = mode,
+            newSubtitle = subtitle,
+            newInitialText = initialText
+        )
+    }
+
+    /**
+     * Variante B (Strings direkt). Wird von neueren JNI/Interop-Pfaden benutzt.
+     * Signatur entspricht exakt dem C#-Aufruf in AndroidUIHandler.cs / Interop.UpdateUiHandler(...).
+     */
+    @JvmStatic
+    fun uiHandlerUpdate(
+        title: String,
+        message: String,
+        watermark: String,
+        type: Int,
+        min: Int,
+        max: Int,
+        nMode: Int,
+        subtitle: String,
+        initialText: String
+    ) {
+        val mode = KeyboardMode.entries.getOrNull(nMode) ?: KeyboardMode.Default
+        MainActivity.mainViewModel?.activity?.uiHandler?.update(
+            newTitle = title,
+            newMessage = message,
+            newWatermark = watermark,
+            newType = type,
+            min = min,
+            max = max,
+            newMode = mode,
+            newSubtitle = subtitle,
+            newInitialText = initialText
+        )
+    }
 }

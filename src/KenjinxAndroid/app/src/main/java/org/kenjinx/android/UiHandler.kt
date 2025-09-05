@@ -17,8 +17,12 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -27,6 +31,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.halilibo.richtext.markdown.Markdown
 import com.halilibo.richtext.ui.material3.RichText
 import org.kenjinx.android.widgets.SimpleAlertDialog
+import kotlinx.coroutines.delay
 
 enum class KeyboardMode {
     Default, Numeric, ASCII, FullLatin, Alphabet, SimplifiedChinese, TraditionalChinese, Korean, LanguageSet2, LanguageSet2Latin
@@ -46,6 +51,7 @@ class UiHandler {
     var message: String = ""
 
     init {
+        // 2.0.3-kompatibel: keine Parameter
         KenjinxNative.uiHandlerSetup()
     }
 
@@ -77,15 +83,21 @@ class UiHandler {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun Compose() {
-        val showMessageListener = remember {
-            showMessage
-        }
+        val showMessageListener = remember { showMessage }
+        val inputListener = remember { inputText }
+        val validation = remember { mutableStateOf("") }
 
-        val inputListener = remember {
-            inputText
-        }
-        val validation = remember {
-            mutableStateOf("")
+        // Fokus & Keyboard-Steuerung, damit das Popup wie in 2.0.3 sofort tippen lässt
+        val focusRequester = remember { FocusRequester() }
+        val keyboard = LocalSoftwareKeyboardController.current
+
+        LaunchedEffect(showMessageListener.value, type) {
+            if (showMessageListener.value && type == 2) {
+                // kleines Delay, bis der Dialog gemountet ist
+                delay(100)
+                focusRequester.requestFocus()
+                keyboard?.show()
+            }
         }
 
         fun validate(): Boolean {
@@ -94,7 +106,6 @@ class UiHandler {
             } else {
                 return inputText.value.length < minLength || inputText.value.length > maxLength
             }
-
             return false
         }
 
@@ -103,9 +114,7 @@ class UiHandler {
                 KeyboardMode.Default -> KeyboardType.Text
                 KeyboardMode.Numeric -> KeyboardType.Decimal
                 KeyboardMode.ASCII -> KeyboardType.Ascii
-                else -> {
-                    KeyboardType.Text
-                }
+                else -> KeyboardType.Text
             }
         }
 
@@ -160,10 +169,9 @@ class UiHandler {
                                 onValueChange = { inputListener.value = it },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(4.dp),
-                                label = {
-                                    Text(text = watermark)
-                                },
+                                    .padding(4.dp)
+                                    .focusRequester(focusRequester),
+                                label = { Text(text = watermark) },
                                 keyboardOptions = KeyboardOptions(keyboardType = getInputType()),
                                 isError = validate()
                             )
@@ -173,7 +181,8 @@ class UiHandler {
                                 onValueChange = { inputListener.value = it },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(4.dp),
+                                    .padding(4.dp)
+                                    .focusRequester(focusRequester),
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = getInputType(),
                                     imeAction = ImeAction.Done
@@ -211,4 +220,3 @@ class UiHandler {
         }
     }
 }
-
