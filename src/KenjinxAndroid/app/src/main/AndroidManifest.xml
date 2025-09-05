@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Hardware / Permissions -->
     <uses-feature
         android:name="android.hardware.audio.output"
         android:required="true" />
@@ -9,6 +11,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- Storage (bestehende App nutzt MANAGE_/READ_/WRITE_ EXTERNAL_STORAGE) -->
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
@@ -29,6 +33,7 @@
         android:largeHeap="true"
         tools:targetApi="31">
 
+        <!-- Launcher / Main -->
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"
@@ -37,19 +42,55 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
             android:hardwareAccelerated="true"
             android:theme="@style/Theme.KenjinxAndroid">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Für Shortcuts/Deep-Links per ACTION_VIEW -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+
+            <!-- Kompatibel: alter und neuer LAUNCH_GAME-Action-Name -->
             <intent-filter>
                 <action android:name="org.kenjinx.android.LAUNCH_GAME" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="org.kenjisc.android.LAUNCH_GAME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
+
+        <!-- NEU: Shortcut-Wizard Activity -->
+        <!-- Shortcut-Wizard: frei drehbar -->
+        <activity
+            android:name=".ShortcutWizardActivity"
+            android:exported="false"
+            android:theme="@style/Theme.KenjinxAndroid.Transparent"
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"/>
+        <!--
+        Optionaler Intent-Filter, falls du extern starten willst:
+        <intent-filter>
+            <action android:name="org.kenjisc.android.action.CREATE_SHORTCUT" />
+            <category android:name="android.intent.category.DEFAULT" />
+        </intent-filter>
+        -->
+        <!-- Bridge-Aktivität: transparent, nur für den Picker -->
+        <activity
+            android:name=".OrientationBridgeActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:screenOrientation="unspecified"
+            android:resizeableActivity="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
+            android:theme="@style/Theme.KenjinxAndroid.Transparent" />
+
+        <!-- FileProvider (unverändert, app-spezifische Authority) -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -59,9 +100,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+
+        <!-- DocumentProvider: Authority auf *.documents vereinheitlicht -->
         <provider
             android:name=".providers.DocumentProvider"
-            android:authorities="${applicationId}.providers"
+            android:authorities="${applicationId}.documents"
             android:exported="true"
             android:grantUriPermissions="true"
             android:permission="android.permission.MANAGE_DOCUMENTS">

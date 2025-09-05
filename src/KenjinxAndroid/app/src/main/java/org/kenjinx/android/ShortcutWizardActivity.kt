@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.EditText
 import android.widget.Toast
+import android.content.pm.ActivityInfo
 
 class ShortcutWizardActivity : Activity() {
 
@@ -20,6 +21,9 @@ class ShortcutWizardActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Portrait for the whole wizard until pin result is done
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+
         // Beim Start direkt Game auswählen (simpel & schnell)
         requestGameFile()
     }
@@ -108,8 +112,27 @@ class ShortcutWizardActivity : Activity() {
         val gameUri = pickedGameUri
         if (gameUri == null) { finish(); return }
 
-        val ok = ShortcutUtils.pinShortcutForGame(this, gameUri, label, bmp)
-        Toast.makeText(this, if (ok) "Shortcut “$label” created." else "Shortcut failed.", Toast.LENGTH_SHORT).show()
-        finish()
+        val ok = ShortcutUtils.pinShortcutForGame(
+            activity = this,
+            gameUri = gameUri,
+            label = label,
+            iconBitmap = bmp
+        ) {
+            // wird erst aufgerufen, wenn Portrait wieder freigegeben wurde
+            finish()
+        }
+
+        // Kein finish() hier! — wir warten auf den Callback
+        Toast.makeText(
+            this,
+            if (ok) "Shortcut “$label” created." else "Shortcut failed.",
+            Toast.LENGTH_SHORT
+        ).show()
     }
+    override fun onResume() {
+        super.onResume()
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    }
+
+
 }

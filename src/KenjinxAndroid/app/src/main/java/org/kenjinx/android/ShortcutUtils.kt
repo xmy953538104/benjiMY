@@ -36,18 +36,18 @@ object ShortcutUtils {
     }
 
     /**
-     * Erzwingt Portrait während des System-Pin-Dialogs und stellt danach sicher wieder zurück.
-     * Wartet auf den IntentSender-Callback (wenn vom Launcher unterstützt),
-     * sonst Fallback: erster Touch + 2s oder ein 15s-Timeout.
+     * Portrait während des System-Pin-Dialogs erzwingen und erst danach auf LANDSCAPE zurück.
+     * Warten auf IntentSender-Callback, sonst Fallback: erster Touch (+2s) oder 15s Timeout.
+     * Nach dem Restore optional onCompleted() ausführen (z.B. Activity.finish()).
      */
     fun pinShortcutForGame(
         activity: Activity,
         gameUri: Uri,
         label: String,
-        iconBitmap: Bitmap? = null
+        iconBitmap: Bitmap? = null,
+        onCompleted: (() -> Unit)? = null
     ): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
-
         val sm = activity.getSystemService(ShortcutManager::class.java) ?: return false
 
         val rw = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -72,43 +72,41 @@ object ShortcutUtils {
             .setIntent(launchIntent)
             .build()
 
-        // ---- Portrait erzwingen + saubere Wiederherstellung planen ----
-        val previousOrientation = activity.requestedOrientation
+        // ---- Portrait erzwingen ----
         activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
         val mainHandler = Handler(Looper.getMainLooper())
         val decorView = activity.window?.decorView
         var restored = false
         var touchScheduled = false
-
-        // Receiver-Variable VOR restore-Funktion deklarieren, damit der Zugriff gültig ist
         var pinResultReceiver: BroadcastReceiver? = null
 
         fun restoreOrientation(@Suppress("UNUSED_PARAMETER") reason: String) {
             if (restored) return
             restored = true
-            // Touch-Listener entfernen
             try { decorView?.setOnTouchListener(null) } catch (_: Exception) {}
-            // Receiver abmelden, falls registriert
             try { pinResultReceiver?.let { activity.unregisterReceiver(it) } } catch (_: Exception) {}
-            // Timeout entfernen
             mainHandler.removeCallbacksAndMessages(null)
-            // Orientierung zurück
-            activity.requestedOrientation = previousOrientation
+
+            // → explizit auf LANDSCAPE zurück (MainActivity ist Landscape-locked)
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+
+            // jetzt darf die Wizard-Activity zu, wenn gewünscht
+            onCompleted?.invoke()
         }
 
-        // Touch-Fallback: erster Touch -> nach 2s zurückstellen
+        // Touch-Fallback: erster Touch → 2s später
         val touchListener = View.OnTouchListener { _: View, _: MotionEvent ->
             if (!restored && !touchScheduled) {
                 touchScheduled = true
                 mainHandler.postDelayed({ restoreOrientation("touch+delay") }, 2000)
             }
-            false // Event nicht verbrauchen
+            false
         }
         decorView?.setOnTouchListener(touchListener)
 
-        // Absolutes Fallback-Timeout (falls Launcher keinen Callback liefert und kein Touch kommt)
-        mainHandler.postDelayed({ restoreOrientation("timeout") }, 5_000)
+        // Harte Obergrenze: 15s
+        mainHandler.postDelayed({ restoreOrientation("timeout15s") }, 15_000)
 
         // BroadcastReceiver für den IntentSender-Callback
         val ACTION_PIN_RESULT = "${activity.packageName}.PIN_SHORTCUT_RESULT"
@@ -138,10 +136,10 @@ object ShortcutUtils {
             ).intentSender
 
             sm.requestPinShortcut(shortcut, sender)
-            // KEIN sofortiges Restore: wir warten auf Callback/Touch/Timeout
+            // Kein sofortiges Restore: wir warten auf Callback/Touch/Timeout
             return true
         } else {
-            // Fallback: kein System-Dialog -> direkt dynamisch hinzufügen und sofort zurückstellen
+            // Fallback: kein Systemdialog → dynamisch hinzufügen und sofort zurückstellen
             sm.addDynamicShortcuts(listOf(shortcut))
             restoreOrientation("no-pin-support")
             return true
