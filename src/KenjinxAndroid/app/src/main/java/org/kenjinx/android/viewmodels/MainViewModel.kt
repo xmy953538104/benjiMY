@@ -94,6 +94,20 @@ class MainViewModel(val activity: MainActivity) {
         motionSensorManager?.setControllerId(-1)
     }
 
+    // ---- NEU: Sprache/Region aus Preferences laden (Defaults: AmericanEnglish/USA) ----
+    private fun loadSystemLanguage(): SystemLanguage {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+        val stored = prefs.getString("system_language", "AmericanEnglish") ?: "AmericanEnglish"
+        return runCatching { SystemLanguage.valueOf(stored) }.getOrElse { SystemLanguage.AmericanEnglish }
+    }
+
+    private fun loadRegionCode(): RegionCode {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+        val stored = prefs.getString("region_code", "USA") ?: "USA"
+        return runCatching { RegionCode.valueOf(stored) }.getOrElse { RegionCode.USA }
+    }
+    // -------------------------------------------------------------------------------
+
     fun loadGame(game: GameModel, overrideSettings: Boolean? = false, forceNceAndPptc: Boolean? = false): Int {
         KenjinxNative.deviceReinitEmulation()
         MainActivity.mainViewModel?.activity?.uiHandler = UiHandler()
@@ -193,8 +207,10 @@ class MainViewModel(val activity: MainActivity) {
                     settings.memoryManagerMode.ordinal,
                     settings.useNce,
                     settings.memoryConfiguration.ordinal,
-                    SystemLanguage.AmericanEnglish.ordinal,
-                    RegionCode.USA.ordinal,
+                    /* ALT: war fest -> SystemLanguage.AmericanEnglish.ordinal */
+                    loadSystemLanguage().ordinal,
+                    /* ALT: war fest -> RegionCode.USA.ordinal */
+                    loadRegionCode().ordinal,
                     settings.vSyncMode.ordinal,
                     settings.enableDocked,
                     settings.enablePptc,
@@ -301,8 +317,10 @@ class MainViewModel(val activity: MainActivity) {
                     settings.memoryManagerMode.ordinal,
                     settings.useNce,
                     settings.memoryConfiguration.ordinal,
-                    SystemLanguage.AmericanEnglish.ordinal,
-                    RegionCode.USA.ordinal,
+                    /* ALT: war fest -> SystemLanguage.AmericanEnglish.ordinal */
+                    loadSystemLanguage().ordinal,
+                    /* ALT: war fest -> RegionCode.USA.ordinal */
+                    loadRegionCode().ordinal,
                     settings.vSyncMode.ordinal,
                     settings.enableDocked,
                     settings.enablePptc,

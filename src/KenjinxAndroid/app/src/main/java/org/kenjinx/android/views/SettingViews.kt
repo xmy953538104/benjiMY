@@ -43,9 +43,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -80,8 +80,11 @@ import org.kenjinx.android.widgets.DropdownSelector
 import org.kenjinx.android.widgets.ExpandableView
 import org.kenjinx.android.widgets.SimpleAlertDialog
 
+// NEU: Enums importieren
+import org.kenjinx.android.SystemLanguage
+import org.kenjinx.android.RegionCode
+
 // --- Local fallback for missing SwitchSelector widget ---
-// Fix: explizit mit `state` arbeiten, nicht direkt `this.value`
 @Composable
 fun MutableState<Boolean>.SwitchSelector(label: String = "", enabled: Boolean = true) {
     val state = this
@@ -157,6 +160,10 @@ class SettingViews {
             val isNavigating = remember { mutableStateOf(false) }
             val showShortcutGuide = remember { mutableStateOf(false) }
 
+            // NEU: Sprache & Region States
+            val systemLanguage = remember { mutableStateOf(SystemLanguage.AmericanEnglish) }
+            val regionCode = remember { mutableStateOf(RegionCode.USA) }
+
             if (!loaded.value) {
                 settingsViewModel.initializeState(
                     memoryManagerMode,
@@ -189,7 +196,10 @@ class SettingViews {
                     enableFsAccessLogs,
                     enableTraceLogs,
                     enableDebugLogs,
-                    enableGraphicsLogs
+                    enableGraphicsLogs,
+                    // NEU:
+                    systemLanguage,
+                    regionCode
                 )
                 loaded.value = true
             }
@@ -232,7 +242,10 @@ class SettingViews {
                                     enableFsAccessLogs,
                                     enableTraceLogs,
                                     enableDebugLogs,
-                                    enableGraphicsLogs
+                                    enableGraphicsLogs,
+                                    // NEU:
+                                    systemLanguage,
+                                    regionCode
                                 )
 
                                 if (!isNavigating.value) {
@@ -1229,6 +1242,17 @@ class SettingViews {
                     }
                     ExpandableView(onCardArrowClick = { }, title = "System", icon = Icons.Outlined.Settings) {
                         Column(modifier = Modifier.fillMaxWidth()) {
+
+                            // NEU: Sprache & Region
+                            LanguageDropdown(
+                                selectedLanguage = systemLanguage.value,
+                                onLanguageSelected = { lang -> systemLanguage.value = lang }
+                            )
+                            RegionDropdown(
+                                selectedRegion = regionCode.value,
+                                onRegionSelected = { reg -> regionCode.value = reg }
+                            )
+
                             VSyncDropdown(
                                 selectedVSyncMode = vSyncMode.value,
                                 onModeSelected = { mode ->
@@ -1349,6 +1373,71 @@ class SettingViews {
                 }
             }
         }
+
+        // ---- NEU: Dropdowns für Sprache & Region ----
+
+        @Composable
+        fun LanguageDropdown(
+            selectedLanguage: SystemLanguage,
+            onLanguageSelected: (SystemLanguage) -> Unit
+        ) {
+            val options = SystemLanguage.entries.toTypedArray()
+            DropdownSelector(
+                label = "System Language",
+                selectedValue = selectedLanguage,
+                options = options.toList(),
+                getDisplayText = { lang ->
+                    when (lang) {
+                        SystemLanguage.Japanese -> "Japanese"
+                        SystemLanguage.AmericanEnglish -> "English (US)"
+                        SystemLanguage.French -> "French"
+                        SystemLanguage.German -> "German"
+                        SystemLanguage.Italian -> "Italian"
+                        SystemLanguage.Spanish -> "Spanish (EU)"
+                        SystemLanguage.Chinese -> "Chinese"
+                        SystemLanguage.Korean -> "Korean"
+                        SystemLanguage.Dutch -> "Dutch"
+                        SystemLanguage.Portuguese -> "Portuguese (EU)"
+                        SystemLanguage.Russian -> "Russian"
+                        SystemLanguage.Taiwanese -> "Chinese (Taiwan)"
+                        SystemLanguage.BritishEnglish -> "English (UK)"
+                        SystemLanguage.CanadianFrench -> "French (Canada)"
+                        SystemLanguage.LatinAmericanSpanish -> "Spanish (LatAm)"
+                        SystemLanguage.SimplifiedChinese -> "Chinese (Simplified)"
+                        SystemLanguage.TraditionalChinese -> "Chinese (Traditional)"
+                        SystemLanguage.BrazilianPortuguese -> "Portuguese (Brazil)"
+                    }
+                },
+                onOptionSelected = onLanguageSelected
+            )
+        }
+
+        @Composable
+        fun RegionDropdown(
+            selectedRegion: RegionCode,
+            onRegionSelected: (RegionCode) -> Unit
+        ) {
+            val options = RegionCode.entries.toTypedArray()
+            DropdownSelector(
+                label = "Region",
+                selectedValue = selectedRegion,
+                options = options.toList(),
+                getDisplayText = { region ->
+                    when (region) {
+                        RegionCode.Japan -> "Japan"
+                        RegionCode.USA -> "USA"
+                        RegionCode.Europe -> "Europe"
+                        RegionCode.Australia -> "Australia"
+                        RegionCode.China -> "China"
+                        RegionCode.Korea -> "Korea"
+                        RegionCode.Taiwan -> "Taiwan"
+                    }
+                },
+                onOptionSelected = onRegionSelected
+            )
+        }
+
+        // ---- bereits vorhandene Dropdowns ----
 
         @Composable
         fun MemoryModeDropdown(

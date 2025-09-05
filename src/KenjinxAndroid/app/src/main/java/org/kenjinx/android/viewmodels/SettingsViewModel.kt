@@ -21,6 +21,10 @@ import java.io.FileOutputStream
 import kotlin.concurrent.thread
 import androidx.core.content.edit
 
+// NEU: Enums importieren
+import org.kenjinx.android.SystemLanguage
+import org.kenjinx.android.RegionCode
+
 class SettingsViewModel(val activity: MainActivity) {
     var selectedFirmwareVersion: String = ""
     private var previousFileCallback: ((requestCode: Int, files: List<DocumentFile>) -> Unit)?
@@ -70,7 +74,10 @@ class SettingsViewModel(val activity: MainActivity) {
         enableFsAccessLogs: MutableState<Boolean>,
         enableTraceLogs: MutableState<Boolean>,
         enableDebugLogs: MutableState<Boolean>,
-        enableGraphicsLogs: MutableState<Boolean>
+        enableGraphicsLogs: MutableState<Boolean>,
+        // NEU:
+        systemLanguage: MutableState<SystemLanguage>,
+        regionCode: MutableState<RegionCode>
     ) {
         memoryManagerMode.value = MemoryManagerMode.entries.toTypedArray()[sharedPref.getInt("memoryManagerMode", MemoryManagerMode.HostMappedUnsafe.ordinal)]
         useNce.value = sharedPref.getBoolean("useNce", false)
@@ -103,6 +110,12 @@ class SettingsViewModel(val activity: MainActivity) {
         enableTraceLogs.value = sharedPref.getBoolean("enableTraceLogs", false)
         enableDebugLogs.value = sharedPref.getBoolean("enableDebugLogs", false)
         enableGraphicsLogs.value = sharedPref.getBoolean("enableGraphicsLogs", false)
+
+        // NEU: Sprache/Region laden (Strings, fallback auf Defaults, dann .valueOf)
+        val langName = sharedPref.getString("system_language", "AmericanEnglish") ?: "AmericanEnglish"
+        val regionName = sharedPref.getString("region_code", "USA") ?: "USA"
+        systemLanguage.value = runCatching { SystemLanguage.valueOf(langName) }.getOrElse { SystemLanguage.AmericanEnglish }
+        regionCode.value = runCatching { RegionCode.valueOf(regionName) }.getOrElse { RegionCode.USA }
     }
 
     fun save(
@@ -136,7 +149,10 @@ class SettingsViewModel(val activity: MainActivity) {
         enableFsAccessLogs: MutableState<Boolean>,
         enableTraceLogs: MutableState<Boolean>,
         enableDebugLogs: MutableState<Boolean>,
-        enableGraphicsLogs: MutableState<Boolean>
+        enableGraphicsLogs: MutableState<Boolean>,
+        // NEU:
+        systemLanguage: MutableState<SystemLanguage>,
+        regionCode: MutableState<RegionCode>
     ) {
         sharedPref.edit {
 
@@ -172,6 +188,9 @@ class SettingsViewModel(val activity: MainActivity) {
             putBoolean("enableDebugLogs", enableDebugLogs.value)
             putBoolean("enableGraphicsLogs", enableGraphicsLogs.value)
 
+            // NEU: Sprache/Region als String speichern (Enumname)
+            putString("system_language", systemLanguage.value.name)
+            putString("region_code", regionCode.value.name)
         }
         activity.storageHelper!!.onFolderSelected = previousFolderCallback
 
