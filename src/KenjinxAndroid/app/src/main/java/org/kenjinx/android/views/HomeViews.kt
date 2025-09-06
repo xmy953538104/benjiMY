@@ -1,8 +1,13 @@
 package org.kenjinx.android.views
 
+import android.app.Activity
 import android.content.Intent
 import android.content.res.Resources
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -34,6 +39,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -48,6 +54,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -82,6 +89,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.kenjinx.android.R
+import org.kenjinx.android.ShortcutUtils
 import org.kenjinx.android.ShortcutWizardActivity
 import org.kenjinx.android.viewmodels.FileType
 import org.kenjinx.android.viewmodels.GameModel
@@ -94,7 +102,7 @@ class HomeViews {
         const val ListImageSize = 150
         const val GridImageSize = 300
 
-        // --- NEU: kleines Versions-Badge unten links
+        // --- Versions-Badge unten links
         @Composable
         private fun VersionBadge(modifier: Modifier = Modifier) {
             Text(
@@ -103,6 +111,19 @@ class HomeViews {
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 modifier = modifier.padding(8.dp)
             )
+        }
+
+        // -- Hilfen für Shortcut-Flow (direkt aus ausgewähltem Game)
+        private fun resolveGameUri(gm: GameModel): Uri? = gm.file.uri
+
+        private fun decodeGameIcon(gm: GameModel): Bitmap? {
+            return try {
+                val b64 = gm.icon ?: return null
+                val bytes = Base64.getDecoder().decode(b64)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } catch (_: Throwable) {
+                null
+            }
         }
 
         @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -125,7 +146,43 @@ class HomeViews {
             var isFabVisible by remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
 
+            // Shortcut-Dialog-State
+            val showShortcutDialog = remember { mutableStateOf(false) }
+            val shortcutName = remember { mutableStateOf("") }
+
             val context = LocalContext.current
+            val activity = LocalContext.current as? Activity
+
+            // Launcher für "Custom icon" (OpenDocument)
+            val pickImageLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                if (uri != null && gm != null && activity != null) {
+                    // Bitmap laden
+                    val bmp = runCatching {
+                        context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) }
+                    }.getOrNull()
+
+                    val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
+                    val gameUri = resolveGameUri(gm)
+                    if (gameUri != null) {
+                        // Persistente Rechte für die Spieldatei (wichtig für Shortcut)
+                        ShortcutUtils.persistReadWrite(activity, gameUri)
+
+                        ShortcutUtils.pinShortcutForGame(
+                            activity = activity,
+                            gameUri = gameUri,
+                            label = label,
+                            iconBitmap = bmp
+                        ) {
+                            // optionaler Callback nach System-Dialog
+                        }
+                    } else {
+                        showError.value = "Shortcut failed (no game URI found)."
+                    }
+                }
+            }
 
             val nestedScrollConnection = remember {
                 object : NestedScrollConnection {
@@ -137,7 +194,7 @@ class HomeViews {
                 }
             }
 
-            // --- NEU: Box um Scaffold, damit wir das Badge overlayen können
+            // --- Box um Scaffold, damit wir das Badge overlayen können
             Box(Modifier.fillMaxSize()) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -242,10 +299,9 @@ class HomeViews {
                                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                                 }
 
-                                // NEU: Shortcut-Wizard öffnen
+                                // Shortcut-Wizard (allgemein)
                                 IconButton(
                                     onClick = {
-                                        // Startet die bereits integrierte Activity zum Erstellen von Shortcuts
                                         context.startActivity(
                                             Intent(context, ShortcutWizardActivity::class.java)
                                         )
@@ -429,6 +485,7 @@ class HomeViews {
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
                                 if (showAppActions.value) {
+                                    // Start (Play)
                                     IconButton(onClick = {
                                         if (viewModel.mainViewModel?.selected != null) {
                                             thread {
@@ -455,6 +512,22 @@ class HomeViews {
                                             contentDescription = "Run"
                                         )
                                     }
+
+                                    // Shortcut erstellen (direkt fürs ausgewählte Spiel)
+                                    IconButton(onClick = {
+                                        val gm = viewModel.mainViewModel?.selected
+                                        if (gm != null) {
+                                            shortcutName.value = gm.titleName ?: ""
+                                            showShortcutDialog.value = true
+                                        }
+                                    }) {
+                                        Icon(
+                                            Icons.Filled.Add,
+                                            contentDescription = "Create Shortcut"
+                                        )
+                                    }
+
+                                    // Menü
                                     val showAppMenu = remember { mutableStateOf(false) }
                                     Box {
                                         IconButton(onClick = { showAppMenu.value = true }) {
@@ -516,11 +589,77 @@ class HomeViews {
                         }
                     )
 
-                // --- NEU: Version-Badge unten links über dem gesamten Inhalt
+                // --- Shortcut-Dialog: Name + Icon-Quelle
+                if (showShortcutDialog.value) {
+                    val gm = viewModel.mainViewModel?.selected
+                    AlertDialog(
+                        onDismissRequest = { showShortcutDialog.value = false },
+                        title = { Text("Create shortcut") },
+                        text = {
+                            Column {
+                                OutlinedTextField(
+                                    value = shortcutName.value,
+                                    onValueChange = { shortcutName.value = it },
+                                    label = { Text("Name") },
+                                    singleLine = true
+                                )
+                                Text(
+                                    text = "Choose icon:",
+                                    modifier = Modifier.padding(top = 12.dp)
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp)
+                                ) {
+                                    TextButton(onClick = {
+                                        // App icon (Grid image)
+                                        if (gm != null && activity != null) {
+                                            val gameUri = resolveGameUri(gm)
+                                            if (gameUri != null) {
+                                                // persist rights for the game file
+                                                ShortcutUtils.persistReadWrite(activity, gameUri)
+
+                                                val bmp = decodeGameIcon(gm)
+                                                val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
+
+                                                ShortcutUtils.pinShortcutForGame(
+                                                    activity = activity,
+                                                    gameUri = gameUri,
+                                                    label = label,
+                                                    iconBitmap = bmp
+                                                ) { }
+                                                showShortcutDialog.value = false
+                                            } else {
+                                                showShortcutDialog.value = false
+                                            }
+                                        } else {
+                                            showShortcutDialog.value = false
+                                        }
+                                    }) { Text("App icon") }
+
+                                    TextButton(onClick = {
+                                        // Custom icon: open picker
+                                        pickImageLauncher.launch(arrayOf("image/*"))
+                                        showShortcutDialog.value = false
+                                    }) { Text("Custom icon") }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showShortcutDialog.value = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
+                }
+
+                // --- Version-Badge unten links
                 VersionBadge(
                     modifier = Modifier.align(Alignment.BottomStart)
                 )
-            } // Ende Box
+            } // Box
         }
 
         @OptIn(ExperimentalFoundationApi::class)
@@ -640,7 +779,7 @@ class HomeViews {
                             if (viewModel.mainViewModel?.selected != null) {
                                 showAppActions.value = false
                                 viewModel.mainViewModel.apply { selected = null }
-                                selectedModel.value = null
+                                selectedModel.value = gameModel
                             } else if (gameModel.titleId.isNullOrEmpty()
                                 || gameModel.titleId != "0000000000000000"
                                 || gameModel.type == FileType.Nro

@@ -1,11 +1,14 @@
 package org.kenjinx.android
 
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Base64
+import android.widget.Toast
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -17,7 +20,7 @@ object ShortcutHelper {
      *
      * @param context           Context
      * @param title             Anzeigename des Shortcuts
-     * @param bootPathUri       URI/String, den deine MainActivity beim Intent auswertet
+     * @param bootPathUri       URI/String der Game-Datei
      * @param useGridIcon       Wenn true, wird das Grid-Icon bevorzugt (Bitmap oder Base64).
      * @param gridIconBitmap    Optional: direkt das Bitmap aus deinem Grid (empfohlen)
      * @param gridIconBase64    Optional: Base64-Icon (falls du das an der Stelle hast)
@@ -30,34 +33,57 @@ object ShortcutHelper {
         gridIconBitmap: Bitmap? = null,
         gridIconBase64: String? = null
     ) {
-        // Intent, der dein Spiel startet (du wertest ACTION + Extras bereits in MainActivity.handleIntent() aus)
-        val launchIntent = Intent("org.kenjinx.android.LAUNCH_GAME").apply {
-            setPackage(context.packageName)
-            putExtra("bootPath", bootPathUri)
-            putExtra("forceNceAndPptc", false)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        }
+        val uri = runCatching { Uri.parse(bootPathUri) }.getOrNull()
 
-        // Fallback: App-Icon
+        // --- Icon wählen (Grid-Bitmap > Base64 > App-Icon)
         var icon = IconCompat.createWithResource(context, R.mipmap.ic_launcher)
-
-        // Falls gewünscht und vorhanden: Grid-Icon benutzen
         if (useGridIcon) {
             val bmp = gridIconBitmap ?: decodeBase64ToBitmap(gridIconBase64)
-            if (bmp != null) {
-                icon = IconCompat.createWithBitmap(bmp)
-            }
+            if (bmp != null) icon = IconCompat.createWithBitmap(bmp)
         }
 
-        // Shortcut bauen
-        val shortcut = ShortcutInfoCompat.Builder(context, makeStableId(title, bootPathUri))
+        // --- EXPLIZITER Intent exakt wie im funktionierenden Wizard ---
+        // ACTION_VIEW + setDataAndType + clipData + GRANT-Flags + Component auf MainActivity
+        val launchIntent = Intent(Intent.ACTION_VIEW).apply {
+            component = ComponentName(context, MainActivity::class.java)
+            if (uri != null) {
+                setDataAndType(uri, context.contentResolver.getType(uri) ?: "*/*")
+                clipData = android.content.ClipData.newUri(
+                    context.contentResolver,
+                    "GameUri",
+                    uri
+                )
+            }
+            putExtra("bootPath", bootPathUri)
+            putExtra("forceNceAndPptc", false)
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        }
+
+        // Bestmögliche Persistierung/Grants (failsafe, falls bereits persistiert → Exceptions ignorieren)
+        if (uri != null) {
+            val rw = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, rw) }
+            runCatching { context.grantUriPermission(context.packageName, uri, rw) }
+        }
+
+        // Stabiles ID-Schema, damit derselbe Titel/bootPath nicht zigmal dupliziert wird.
+        val shortcutId = makeStableId(title, bootPathUri)
+
+        val shortcut = ShortcutInfoCompat.Builder(context, shortcutId)
             .setShortLabel(title)
             .setLongLabel(title)
             .setIcon(icon)
             .setIntent(launchIntent)
             .build()
 
-        // Optional: Callback wenn das Pinnen abgeschlossen ist (keine Pflicht)
+        // Eigene App-Meldung (wie vorher): direkt vor dem System-Pin-Dialog
+        Toast.makeText(context, "Creating shortcut “$title”…", Toast.LENGTH_SHORT).show()
+
         val callbackIntent = ShortcutManagerCompat.createShortcutResultIntent(context, shortcut)
         val successCallback = PendingIntent.getBroadcast(
             context,
@@ -66,12 +92,10 @@ object ShortcutHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Anfrage an den Launcher
         ShortcutManagerCompat.requestPinShortcut(context, shortcut, successCallback.intentSender)
     }
 
-    /**
-     * Stabiles ID-Schema, damit derselbe Titel/bootPath nicht zigmal dupliziert wird.
-     */
     private fun makeStableId(title: String?, bootPath: String?): String {
         val safeTitle = (title ?: "").trim()
         val safeBoot = (bootPath ?: "").trim()

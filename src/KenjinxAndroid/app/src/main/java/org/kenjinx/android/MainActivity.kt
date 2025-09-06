@@ -10,6 +10,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +29,7 @@ import org.kenjinx.android.viewmodels.MainViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.viewmodels.GameModel
 import org.kenjinx.android.views.MainView
+import java.io.File
 
 class MainActivity : BaseActivity() {
     private var physicalControllerManager: PhysicalControllerManager =
@@ -73,7 +75,6 @@ class MainActivity : BaseActivity() {
         }
     }
 
-
     init {
         storageHelper = SimpleStorageHelper(this)
         StorageHelper = storageHelper
@@ -89,7 +90,7 @@ class MainActivity : BaseActivity() {
 
         val appPath: String = AppPath
 
-        var quickSettings = QuickSettings(this)
+        val quickSettings = QuickSettings(this)
         KenjinxNative.loggingSetEnabled(
             LogLevel.Info,
             quickSettings.enableInfoLogs
@@ -181,6 +182,8 @@ class MainActivity : BaseActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         storedIntent = intent
+        handleIntent()               // sofort verarbeiten (wichtig bei launchMode=singleTop)
+        storedIntent = Intent()      // „verbrauchen“, damit nichts doppelt läuft
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -241,62 +244,100 @@ class MainActivity : BaseActivity() {
     }
 
     private fun handleIntent() {
-        when (storedIntent.action) {
-            Intent.ACTION_VIEW, "org.kenjinx.android.LAUNCH_GAME" -> {
-                val bootPath = storedIntent.getStringExtra(EXTRA_BOOT_PATH)
-                val forceNceAndPptc = storedIntent.getBooleanExtra(EXTRA_FORCE_NCE_PPTC, false)
+        val action = storedIntent.action
+        if (action == null) return
 
-                // Neu: TitleId/TitleName (robust bei Update/DLC)
+        when (action) {
+            Intent.ACTION_VIEW,
+            "org.kenjinx.android.LAUNCH_GAME",
+            "org.kenjisc.android.LAUNCH_GAME" -> {
+
+                val bootPathExtra = storedIntent.getStringExtra(EXTRA_BOOT_PATH)
+                val forceNceAndPptc = storedIntent.getBooleanExtra(EXTRA_FORCE_NCE_PPTC, false)
                 val titleId = storedIntent.getStringExtra(EXTRA_TITLE_ID) ?: ""
                 val titleName = storedIntent.getStringExtra(EXTRA_TITLE_NAME) ?: ""
+                val dataUri: Uri? = storedIntent.data
 
-                // 1) Bevorzugt: per bootPath starten (DocumentFile)
-                if (!bootPath.isNullOrEmpty()) {
-                    val uri = bootPath.toUri()
-                    val documentFile = DocumentFile.fromSingleUri(this, uri)
-                    if (documentFile != null && documentFile.exists()) {
-                        val gameModel = GameModel(documentFile, this)
-                        // GameInfo befüllt u. a. TitleId – falls wir sie noch nicht hatten
+                Log.d(
+                    "ShortcutDebug",
+                    "handleIntent(): action=$action, bootPathExtra=$bootPathExtra, dataUri=$dataUri, titleId=$titleId, titleName=$titleName"
+                )
+
+                // Bevorzugt: Extra; Fallback: data-URI
+                val chosenUri: Uri? = when {
+                    !bootPathExtra.isNullOrEmpty() -> bootPathExtra.toUri()
+                    dataUri != null -> dataUri
+                    else -> null
+                }
+
+                if (chosenUri != null) {
+                    val doc = when (chosenUri.scheme?.lowercase()) {
+                        "content" -> DocumentFile.fromSingleUri(this, chosenUri)
+                        "file" -> {
+                            val f = chosenUri.path?.let { File(it) }
+                            if (f != null) DocumentFile.fromFile(f) else null
+                        }
+                        else -> {
+                            // Manche Launcher liefern keine scheme → best effort
+                            val asFile = chosenUri.path?.let { File(it) }
+                            if (asFile != null && asFile.exists()) {
+                                DocumentFile.fromFile(asFile)
+                            } else {
+                                DocumentFile.fromSingleUri(this, chosenUri)
+                            }
+                        }
+                    }
+
+                    if (doc != null && doc.exists()) {
+                        val gameModel = GameModel(doc, this)
                         gameModel.getGameInfo()
 
                         mainViewModel?.loadGameModel?.value = gameModel
-                        // Für die UI-Navigation (wie bisher genutzt)
                         mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
                         mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
+
+                        // Intent ist abgearbeitet
+                        storedIntent = Intent()
                         return
+                    } else {
+                        Log.w(
+                            "ShortcutDebug",
+                            "DocumentFile not found or not accessible: $chosenUri"
+                        )
                     }
                 }
 
-                // 2) Fallback: Wenn bootPath ungültig, aber TitleId vorhanden ->
-                //    (Optional) könntest du hier deine eigene "Bibliothek" nach TitleId durchsuchen
-                //    und eine passende Datei/URI finden.
-                //    Wir loggen nur freundlich und lassen die UI normal.
-                if (titleId.isNotEmpty()) {
-                    // TODO: Falls du eine Spieleliste / Index hast, hier anhand titleId auflösen und wie oben starten.
-                    // Für jetzt: sanftes Logging und kein Crash.
-                    // Logger o. ä. falls vorhanden:
-                    // Log.i("Shortcut", "Shortcut gestartet für TitleId=$titleId ($titleName), aber bootPath fehlt/ungültig.")
+                // Fallback: versuchen, über TitleId/Name zu finden (nur wenn vorhanden)
+                if (titleId.isNotEmpty() || titleName.isNotEmpty()) {
+                    resolveGameByTitleIdOrName(titleId, titleName)?.let { doc ->
+                        val gameModel = GameModel(doc, this)
+                        gameModel.getGameInfo()
+
+                        mainViewModel?.loadGameModel?.value = gameModel
+                        mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
+                        mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
+
+                        storedIntent = Intent()
+                        return
+                    }
                 }
             }
         }
     }
 
-
-    // --- NEU: Hilfsfunktionen für Shortcut-Fallback ---
+    // --- Hilfsfunktionen für Shortcut-Fallback ---
 
     private fun resolveGameByTitleIdOrName(titleIdHex: String?, displayName: String?): DocumentFile? {
         val gamesRoot = getDefaultGamesTree() ?: return null
-        // Flache Suche (Top-Level). Wenn du Unterordner hast, könntest du hier rekursiv werden.
+        // Flache Suche – bei Bedarf rekursiv erweitern
         for (child in gamesRoot.listFiles()) {
             if (!child.isFile) continue
-            // Schneller Name-Check
             if (!displayName.isNullOrBlank()) {
                 val n = child.name ?: ""
                 if (n.contains(displayName, ignoreCase = true)) {
                     return child
                 }
             }
-            // Verlässlicher: TitleId auslesen
             if (!titleIdHex.isNullOrBlank()) {
                 val tid = getTitleIdFast(child)
                 if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) {
@@ -304,7 +345,6 @@ class MainActivity : BaseActivity() {
                 }
             }
         }
-        // Zweite Runde: erst TitleId prüfen (falls im ersten Durchlauf keins passte), dann Name
         if (!titleIdHex.isNullOrBlank()) {
             for (child in gamesRoot.listFiles()) {
                 if (!child.isFile) continue
@@ -327,8 +367,7 @@ class MainActivity : BaseActivity() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         val legacyPath = prefs.getString("gameFolder", null)
         if (!legacyPath.isNullOrEmpty()) {
-            // Es gibt hier keine direkte Baum-URI – ohne SAF-URI kann Android den Ordner i.d.R. nicht listen
-            // => Gib null zurück, damit wir nicht in eine Sackgasse laufen
+            // Ohne SAF-URI lässt sich der Ordner i.d.R. nicht als Tree listen → lieber null zurückgeben
         }
         return null
     }
@@ -340,7 +379,7 @@ class MainActivity : BaseActivity() {
         val ext = name.substring(dot + 1).lowercase()
         return try {
             contentResolver.openFileDescriptor(file.uri, "r")?.use { pfd ->
-                val info = org.kenjinx.android.viewmodels.GameInfo() // JNA-Struktur (Java)
+                val info = org.kenjinx.android.viewmodels.GameInfo()
                 KenjinxNative.deviceGetGameInfo(pfd.fd, ext, info)
                 info.TitleId?.lowercase()
             }

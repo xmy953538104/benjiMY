@@ -2,6 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Android 11+ Package Visibility: was diese App sehen/ansprechen darf -->
+    <queries>
+        <!-- Falls andere Flavors/Starter beteiligt sind, hier sichtbar machen -->
+        <package android:name="org.kenjinx.android"/>
+        <package android:name="org.kenjinxsc.android"/>
+
+        <!-- Allgemein: LAUNCHER-Activities und ACTION_VIEW-Dateien auflösbar machen -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <!-- Hardware / Permissions -->
     <uses-feature
         android:name="android.hardware.audio.output"
@@ -38,21 +51,17 @@
             android:name=".MainActivity"
             android:launchMode="singleTop"
             android:exported="true"
-            android:screenOrientation="sensorLandscape"
+            android:screenOrientation="sensor"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
             android:hardwareAccelerated="true"
             android:theme="@style/Theme.KenjinxAndroid">
 
+            <!-- Launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Für Shortcuts/Deep-Links per ACTION_VIEW -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
 
             <!-- Kompatibel: alter und neuer LAUNCH_GAME-Action-Name -->
             <intent-filter>
@@ -65,21 +74,14 @@
             </intent-filter>
         </activity>
 
-        <!-- NEU: Shortcut-Wizard Activity -->
-        <!-- Shortcut-Wizard: frei drehbar -->
+        <!-- Shortcut-Wizard Activity (transparent, frei drehbar) -->
         <activity
             android:name=".ShortcutWizardActivity"
             android:exported="false"
             android:theme="@style/Theme.KenjinxAndroid.Transparent"
             android:screenOrientation="unspecified"
-            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"/>
-        <!--
-        Optionaler Intent-Filter, falls du extern starten willst:
-        <intent-filter>
-            <action android:name="org.kenjisc.android.action.CREATE_SHORTCUT" />
-            <category android:name="android.intent.category.DEFAULT" />
-        </intent-filter>
-        -->
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+
         <!-- Bridge-Aktivität: transparent, nur für den Picker -->
         <activity
             android:name=".OrientationBridgeActivity"
