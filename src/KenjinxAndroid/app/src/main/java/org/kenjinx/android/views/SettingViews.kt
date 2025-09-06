@@ -84,6 +84,10 @@ import org.kenjinx.android.widgets.SimpleAlertDialog
 import org.kenjinx.android.SystemLanguage
 import org.kenjinx.android.RegionCode
 
+// >>> NEU: QuickSettings + OrientationPreference
+import org.kenjinx.android.viewmodels.QuickSettings
+import org.kenjinx.android.viewmodels.QuickSettings.OrientationPreference
+
 // --- Local fallback for missing SwitchSelector widget ---
 @Composable
 fun MutableState<Boolean>.SwitchSelector(label: String = "", enabled: Boolean = true) {
@@ -163,6 +167,11 @@ class SettingViews {
             // NEU: Sprache & Region States
             val systemLanguage = remember { mutableStateOf(SystemLanguage.AmericanEnglish) }
             val regionCode = remember { mutableStateOf(RegionCode.USA) }
+
+            // NEU: Orientation aus QuickSettings laden
+            val orientationPref = remember {
+                mutableStateOf(QuickSettings(mainViewModel.activity).orientationPreference)
+            }
 
             if (!loaded.value) {
                 settingsViewModel.initializeState(
@@ -270,6 +279,20 @@ class SettingViews {
                 ) {
                     ExpandableView(onCardArrowClick = { }, title = "User Interface", icon = Icons.Outlined.BarChart ,isFirst = true) {
                         Column(modifier = Modifier.fillMaxWidth()) {
+
+                            // NEU: Screen Orientation
+                            OrientationDropdown(
+                                selectedOrientation = orientationPref.value,
+                                onOrientationSelected = { sel ->
+                                    orientationPref.value = sel
+                                    // sofort speichern und anwenden
+                                    val qs = QuickSettings(mainViewModel.activity)
+                                    qs.orientationPreference = sel
+                                    qs.save()
+                                    mainViewModel.activity.requestedOrientation = sel.value
+                                }
+                            )
+
                             isGrid.SwitchSelector("Use Grid")
                             Row(
                                 modifier = Modifier
@@ -1372,6 +1395,33 @@ class SettingViews {
                     }
                 }
             }
+        }
+
+        // ---- NEU: Dropdown für Orientation ----
+        @Composable
+        fun OrientationDropdown(
+            selectedOrientation: OrientationPreference,
+            onOrientationSelected: (OrientationPreference) -> Unit
+        ) {
+            val options = listOf(
+                OrientationPreference.Sensor,
+                OrientationPreference.SensorLandscape,
+                OrientationPreference.SensorPortrait
+            )
+
+            DropdownSelector(
+                label = "Screen Orientation",
+                selectedValue = selectedOrientation,
+                options = options,
+                getDisplayText = { opt ->
+                    when (opt) {
+                        OrientationPreference.Sensor -> "Sensor"
+                        OrientationPreference.SensorLandscape -> "Sensor Landscape"
+                        OrientationPreference.SensorPortrait -> "Sensor Portrait"
+                    }
+                },
+                onOptionSelected = onOrientationSelected
+            )
         }
 
         // ---- NEU: Dropdowns für Sprache & Region ----

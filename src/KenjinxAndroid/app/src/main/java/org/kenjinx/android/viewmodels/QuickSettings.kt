@@ -2,10 +2,25 @@ package org.kenjinx.android.viewmodels
 
 import android.app.Activity
 import android.content.SharedPreferences
+import android.content.pm.ActivityInfo
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 
 class QuickSettings(val activity: Activity) {
+    // --- NEU: Ausrichtung
+    enum class OrientationPreference(val value: Int) {
+        Sensor(ActivityInfo.SCREEN_ORIENTATION_SENSOR),
+        SensorLandscape(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE),
+        SensorPortrait(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
+
+        companion object {
+            fun fromValue(v: Int): OrientationPreference =
+                entries.firstOrNull { it.value == v } ?: Sensor
+        }
+    }
+
+    var orientationPreference: OrientationPreference
+
     var ignoreMissingServices: Boolean
     var enablePptc: Boolean
     var enableLowPowerPptc: Boolean
@@ -41,6 +56,10 @@ class QuickSettings(val activity: Activity) {
     private var sharedPref: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
 
     init {
+        // --- NEU: Ausrichtung laden (Default: Sensor)
+        val oriValue = sharedPref.getInt("orientationPreference", ActivityInfo.SCREEN_ORIENTATION_SENSOR)
+        orientationPreference = OrientationPreference.fromValue(oriValue)
+
         memoryManagerMode = MemoryManagerMode.entries.toTypedArray()[sharedPref.getInt("memoryManagerMode", MemoryManagerMode.HostMappedUnsafe.ordinal)]
         useNce = sharedPref.getBoolean("useNce", false)
         memoryConfiguration = MemoryConfiguration.entries.toTypedArray()[sharedPref.getInt("memoryConfiguration", MemoryConfiguration.MemoryConfiguration4GiB.ordinal)]
@@ -76,6 +95,8 @@ class QuickSettings(val activity: Activity) {
 
     fun save() {
         sharedPref.edit {
+            // --- NEU: Ausrichtung speichern
+            putInt("orientationPreference", orientationPreference.value)
 
             putInt("memoryManagerMode", memoryManagerMode.ordinal)
             putBoolean("useNce", useNce)

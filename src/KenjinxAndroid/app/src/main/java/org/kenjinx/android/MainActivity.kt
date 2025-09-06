@@ -149,6 +149,9 @@ class MainActivity : BaseActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // --- NEU: Ausrichtung anwenden
+        applyOrientationPreference()
+
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -223,6 +226,9 @@ class MainActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        // --- NEU: Ausrichtung ggf. erneut anwenden
+        applyOrientationPreference()
+
         handler.postDelayed(delayedHandleIntent, 10)
         isActive = true
 
@@ -263,7 +269,6 @@ class MainActivity : BaseActivity() {
                     "handleIntent(): action=$action, bootPathExtra=$bootPathExtra, dataUri=$dataUri, titleId=$titleId, titleName=$titleName"
                 )
 
-                // Bevorzugt: Extra; Fallback: data-URI
                 val chosenUri: Uri? = when {
                     !bootPathExtra.isNullOrEmpty() -> bootPathExtra.toUri()
                     dataUri != null -> dataUri
@@ -278,7 +283,6 @@ class MainActivity : BaseActivity() {
                             if (f != null) DocumentFile.fromFile(f) else null
                         }
                         else -> {
-                            // Manche Launcher liefern keine scheme → best effort
                             val asFile = chosenUri.path?.let { File(it) }
                             if (asFile != null && asFile.exists()) {
                                 DocumentFile.fromFile(asFile)
@@ -296,18 +300,13 @@ class MainActivity : BaseActivity() {
                         mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
                         mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
 
-                        // Intent ist abgearbeitet
                         storedIntent = Intent()
                         return
                     } else {
-                        Log.w(
-                            "ShortcutDebug",
-                            "DocumentFile not found or not accessible: $chosenUri"
-                        )
+                        Log.w("ShortcutDebug", "DocumentFile not found or not accessible: $chosenUri")
                     }
                 }
 
-                // Fallback: versuchen, über TitleId/Name zu finden (nur wenn vorhanden)
                 if (titleId.isNotEmpty() || titleName.isNotEmpty()) {
                     resolveGameByTitleIdOrName(titleId, titleName)?.let { doc ->
                         val gameModel = GameModel(doc, this)
@@ -325,11 +324,15 @@ class MainActivity : BaseActivity() {
         }
     }
 
+    private fun applyOrientationPreference() {
+        val pref = QuickSettings(this).orientationPreference
+        requestedOrientation = pref.value
+    }
+
     // --- Hilfsfunktionen für Shortcut-Fallback ---
 
     private fun resolveGameByTitleIdOrName(titleIdHex: String?, displayName: String?): DocumentFile? {
         val gamesRoot = getDefaultGamesTree() ?: return null
-        // Flache Suche – bei Bedarf rekursiv erweitern
         for (child in gamesRoot.listFiles()) {
             if (!child.isFile) continue
             if (!displayName.isNullOrBlank()) {
@@ -358,16 +361,14 @@ class MainActivity : BaseActivity() {
     }
 
     private fun getDefaultGamesTree(): DocumentFile? {
-        // bevorzugt die in den Settings gemerkte SAF-URI
         val vm = mainViewModel
         if (vm?.defaultGameFolderUri != null) {
             return DocumentFile.fromTreeUri(this, vm.defaultGameFolderUri!!)
         }
-        // Fallback: alter Legacy-Pfad in den Preferences (falls noch gesetzt)
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         val legacyPath = prefs.getString("gameFolder", null)
         if (!legacyPath.isNullOrEmpty()) {
-            // Ohne SAF-URI lässt sich der Ordner i.d.R. nicht als Tree listen → lieber null zurückgeben
+            // Ohne SAF-URI lässt sich der Ordner i.d.R. nicht als Tree listen
         }
         return null
     }
@@ -389,21 +390,15 @@ class MainActivity : BaseActivity() {
     }
 
     fun shutdownAndRestart() {
-        // Create an intent to restart the app
         val packageManager = packageManager
         val intent = packageManager.getLaunchIntentForPackage(packageName)
         val componentName = intent?.component
         val restartIntent = Intent.makeRestartActivityTask(componentName)
 
-        // Clean up resources if needed
         mainViewModel?.let {
             it.performanceManager?.setTurboMode(false)
         }
-
-        // Start the new activity directly
         startActivity(restartIntent)
-
-        // Force immediate process termination
         Runtime.getRuntime().exit(0)
     }
 }

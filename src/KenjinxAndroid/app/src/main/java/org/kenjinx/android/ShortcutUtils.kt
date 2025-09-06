@@ -96,17 +96,17 @@ object ShortcutUtils {
         }
 
         // Touch-Fallback: erster Touch → 2s später
-        val touchListener = View.OnTouchListener { _: View, _: MotionEvent ->
-            if (!restored && !touchScheduled) {
-                touchScheduled = true
-                mainHandler.postDelayed({ restoreOrientation("touch+delay") }, 2000)
-            }
-            false
-        }
-        decorView?.setOnTouchListener(touchListener)
+        //val touchListener = View.OnTouchListener { _: View, _: MotionEvent ->
+        //    if (!restored && !touchScheduled) {
+        //        touchScheduled = true
+        //        mainHandler.postDelayed({ restoreOrientation("touch+delay") }, 2000)
+        //    }
+        //    false
+        //}
+        //decorView?.setOnTouchListener(touchListener)
 
         // Harte Obergrenze: 15s
-        mainHandler.postDelayed({ restoreOrientation("timeout15s") }, 15_000)
+        //mainHandler.postDelayed({ restoreOrientation("timeout15s") }, 15_000)
 
         // BroadcastReceiver für den IntentSender-Callback
         val ACTION_PIN_RESULT = "${activity.packageName}.PIN_SHORTCUT_RESULT"
