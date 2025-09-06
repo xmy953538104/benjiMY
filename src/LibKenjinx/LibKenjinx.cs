@@ -35,6 +35,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using Path = System.IO.Path;
 
 namespace LibKenjinx
@@ -209,13 +210,13 @@ namespace LibKenjinx
                             GetControlFsAndTitleId(pfs, out IFileSystem? controlFs, out string? id);
 
                             gameInfo.TitleId = id;
-							
+
                             if (controlFs == null)
                             {
                                 Logger.Error?.Print(LogClass.Application, $"No control FS was returned. Unable to process game any further: {gameInfo.TitleName}");
                                 return null;
                             }
-							
+
                             // Check if there is an update available.
                             if (IsUpdateApplied(gameInfo.TitleId, out IFileSystem? updatedControlFs))
                             {
@@ -516,17 +517,17 @@ namespace LibKenjinx
                         {
                             FileStream file = new(updatePath, FileMode.Open, FileAccess.Read);
                             IFileSystem pfs = null;
-							
-                            if(Path.GetExtension(updatePath).ToLower() == ".xci")
+
+                            if (Path.GetExtension(updatePath).ToLower() == ".xci")
                             {
-                            	pfs = new Xci(fileSystem.KeySet, file.AsStorage()).OpenPartition(XciPartitionType.Secure);
+                                pfs = new Xci(fileSystem.KeySet, file.AsStorage()).OpenPartition(XciPartitionType.Secure);
                             }
                             else
                             {
-                            	var pfsTemp = new PartitionFileSystem();
-								
-                            	pfsTemp.Initialize(file.AsStorage()).ThrowIfFailure();
-                            	pfs = pfsTemp;
+                                var pfsTemp = new PartitionFileSystem();
+
+                                pfsTemp.Initialize(file.AsStorage()).ThrowIfFailure();
+                                pfs = pfsTemp;
                             }
 
                             return GetGameUpdateDataFromPartition(fileSystem, pfs, titleIdBase.ToString("x16"), programIndex);
@@ -625,7 +626,7 @@ namespace LibKenjinx
             {
                 return new Nca(SwitchDevice?.VirtualFileSystem.KeySet, ncaStorage);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
 
@@ -879,20 +880,151 @@ namespace LibKenjinx
                 control.SaveDataOwnerId = applicationId.Value;
             }
 
-            LibHac.Result resultCode = LibHacHorizonManager.RyujinxClient.Fs.EnsureApplicationCacheStorage(out _, out _, applicationId, in control);
-            if (resultCode.IsFailure())
+            // --- Pfade fürs physische Save-Verzeichnis (Android-Sandbox) vorbereiten
+            string savesRoot = Path.Combine(
+                AppDataManager.BaseDirPath,
+                Ryujinx.HLE.FileSystem.VirtualFileSystem.UserNandPath,
+                "save"
+            );
+
+            // Vorher-Liste der existierenden Save-Dirs merken (um Neu-Erstellung zu erkennen)
+            string[] before = Array.Empty<string>();
+            try
             {
-                Logger.Error?.Print(LogClass.Application, $"Error calling EnsureApplicationCacheStorage. Result code {resultCode.ToStringWithName()}");
+                if (Directory.Exists(savesRoot))
+                    before = Directory.GetDirectories(savesRoot);
+            }
+            catch { /* ignore */ }
+
+            // Bestehende Horizon-APIs zum Erzeugen/Absichern der Saves aufrufen
+            var rc = LibHacHorizonManager.RyujinxClient.Fs.EnsureApplicationCacheStorage(out _, out _, applicationId, in control);
+            if (rc.IsFailure())
+            {
+                Logger.Error?.Print(LogClass.Application, $"Error calling EnsureApplicationCacheStorage. Result code {rc.ToStringWithName()}");
             }
 
             Uid userId = AccountManager.LastOpenedUser.UserId.ToLibHacUid();
-
-            resultCode = LibHacHorizonManager.RyujinxClient.Fs.EnsureApplicationSaveData(out _, applicationId, in control, in userId);
-            if (resultCode.IsFailure())
+            rc = LibHacHorizonManager.RyujinxClient.Fs.EnsureApplicationSaveData(out _, applicationId, in control, in userId);
+            if (rc.IsFailure())
             {
-                Logger.Error?.Print(LogClass.Application, $"Error calling EnsureApplicationSaveData. Result code {resultCode.ToStringWithName()}");
+                Logger.Error?.Print(LogClass.Application, $"Error calling EnsureApplicationSaveData. Result code {rc.ToStringWithName()}");
+            }
+
+            // Nachher-Liste der Save-Dirs holen und Differenz bilden
+            string? createdSaveDirName = null;
+            try
+            {
+                Directory.CreateDirectory(savesRoot);
+
+                var after = Directory.GetDirectories(savesRoot);
+                var beforeSet = new HashSet<string>(before, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var d in after)
+                {
+                    if (!beforeSet.Contains(d))
+                    {
+                        // dies ist sehr wahrscheinlich der frisch angelegte Save-Ordner
+                        createdSaveDirName = Path.GetFileName(d);
+                        break;
+                    }
+                }
+            }
+            catch
+            {
+                // Falls das Listing scheitert, laufen wir einfach ohne Erkennung weiter.
+            }
+
+            // TitleId-String normalisiert
+            string titleIdHex = titleId.ToString("x16");
+
+            // Marker-Datei im Save-Ordner + zentrales Mapping unter .../save/_titleid_map.json
+            try
+            {
+                // 1) Falls wir den neu angelegten Ordner erkannt haben: Marker rein
+                if (!string.IsNullOrEmpty(createdSaveDirName))
+                {
+                    string markerFile = Path.Combine(savesRoot, createdSaveDirName, "TITLEID.txt");
+                    File.WriteAllText(markerFile, titleIdHex);
+                }
+
+                // 2) Mapping-Datei laden/aktualisieren
+                WriteOrUpdateTitleMapJson(savesRoot, titleIdHex, createdSaveDirName);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning?.Print(LogClass.Application, $"Save TitleId mapping write failed: {ex.Message}");
             }
         }
+
+        // ---------- Helper für TitleId→SaveId-Mapping ----------
+
+        private sealed class TitleMap
+        {
+            public Dictionary<string, string> Map { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static void WriteOrUpdateTitleMapJson(string savesRoot, string titleIdHex, string? createdSaveDirName)
+        {
+            string mapFile = Path.Combine(savesRoot, "_titleid_map.json");
+
+            TitleMap map;
+            try
+            {
+                if (File.Exists(mapFile))
+                {
+                    var json = File.ReadAllText(mapFile);
+                    map = JsonSerializer.Deserialize<TitleMap>(json) ?? new TitleMap();
+                }
+                else
+                {
+                    map = new TitleMap();
+                }
+            }
+            catch
+            {
+                map = new TitleMap();
+            }
+
+            // Wenn wir den neu angelegten Ordner kennen, diese Info nehmen.
+            // Ansonsten nichts überschreiben (bestehendes Mapping bleibt erhalten).
+            if (!string.IsNullOrEmpty(createdSaveDirName))
+            {
+                map.Map[titleIdHex] = createdSaveDirName!;
+            }
+            else if (!map.Map.ContainsKey(titleIdHex))
+            {
+                // Heuristik: Ordner mit TITLEID.txt scannen und ggf. zuordnen
+                try
+                {
+                    foreach (var dir in Directory.GetDirectories(savesRoot))
+                    {
+                        var marker = Path.Combine(dir, "TITLEID.txt");
+                        if (File.Exists(marker))
+                        {
+                            var txt = File.ReadAllText(marker).Trim();
+                            if (string.Equals(txt, titleIdHex, StringComparison.OrdinalIgnoreCase))
+                            {
+                                map.Map[titleIdHex] = Path.GetFileName(dir);
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch { /* ignore */ }
+            }
+
+            try
+            {
+                var json = JsonSerializer.Serialize(map, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(mapFile, json);
+            }
+            catch
+            {
+                // ignorieren – Mapping ist „Best Effort“.
+            }
+        }
+
+        // -------------------------------------------------------
 
         internal void ReloadFileSystem()
         {
