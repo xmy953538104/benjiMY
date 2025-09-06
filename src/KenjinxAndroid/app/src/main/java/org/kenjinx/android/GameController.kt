@@ -238,8 +238,8 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
 
     if (isLeft) {
         return GamePadConfig(
-            12,
-            PrimaryDialConfig.Stick(
+            /* ringSegments = */ 12,
+            /* Primary (Stick)  */ PrimaryDialConfig.Stick(
                 GamePadButtonInputId.LeftStick.ordinal,
                 GamePadButtonInputId.LeftStickButton.ordinal,
                 setOf(),
@@ -247,10 +247,11 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                 null
             ),
             listOf(
+                // D-Pad (unverändert)
                 SecondaryDialConfig.Cross(
-                    10,
-                    3,
-                    2.5f,
+                    /* sector */ 10,
+                    /* size   */ 3,
+                    /* gap    */ 2.5f,
                     distance,
                     CrossConfig(
                         GamePadButtonInputId.DpadUp.ordinal,
@@ -263,8 +264,10 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     ),
                     SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // Minus (unverändert)
                 SecondaryDialConfig.SingleButton(
-                    1,
+                    /* sector */ 1,
                     buttonScale,
                     distance,
                     ButtonConfig(
@@ -280,8 +283,10 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     null,
                     SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // L-Bumper (unverändert, DoubleButton bedeutet breiteres Target)
                 SecondaryDialConfig.DoubleButton(
-                    2,
+                    /* sector */ 2,
                     distance,
                     ButtonConfig(
                         GamePadButtonInputId.LeftShoulder.ordinal,
@@ -296,8 +301,10 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     null,
                     SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // ZL-Trigger (unverändert)
                 SecondaryDialConfig.SingleButton(
-                    9,
+                    /* sector */ 9,
                     buttonScale,
                     distance,
                     ButtonConfig(
@@ -313,12 +320,31 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     null,
                     SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // *** NEU: L3 als eigener Button (oben am linken Pad) ***
+                SecondaryDialConfig.SingleButton(
+                    /* sector */ 1,
+                    buttonScale,
+                    1.5f,
+                    ButtonConfig(
+                        GamePadButtonInputId.LeftStickButton.ordinal,
+                        "L3",
+                        true,
+                        null,
+                        "LeftStickButton",
+                        setOf(),
+                        true,
+                        null
+                    ),
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
+                ),
             )
         )
     } else {
         return GamePadConfig(
-            12,
-            PrimaryDialConfig.PrimaryButtons(
+            /* ringSegments = */ 12,
+            /* Primary (ABXY) */ PrimaryDialConfig.PrimaryButtons(
                 listOf(
                     ButtonConfig(
                         GamePadButtonInputId.A.ordinal,
@@ -367,10 +393,11 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                 null
             ),
             listOf(
+                // Rechter Stick (unverändert)
                 SecondaryDialConfig.Stick(
-                    7,
-                    2,
-                    2f,
+                    /* sector */ 7,
+                    /* size   */ 2,
+                    /* gap    */ 2f,
                     distance,
                     GamePadButtonInputId.RightStick.ordinal,
                     GamePadButtonInputId.RightStickButton.ordinal,
@@ -379,8 +406,10 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     "RightStick",
                     SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // Plus (unverändert)
                 SecondaryDialConfig.SingleButton(
-                    6,
+                    /* sector */ 6,
                     buttonScale,
                     distance,
                     ButtonConfig(
@@ -396,8 +425,10 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     null,
                     SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // R-Bumper (unverändert)
                 SecondaryDialConfig.DoubleButton(
-                    3,
+                    /* sector */ 3,
                     distance,
                     ButtonConfig(
                         GamePadButtonInputId.RightShoulder.ordinal,
@@ -412,8 +443,10 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     null,
                     SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // ZR-Trigger (unverändert)
                 SecondaryDialConfig.SingleButton(
-                    9,
+                    /* sector */ 9,
                     buttonScale,
                     distance,
                     ButtonConfig(
@@ -428,8 +461,28 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     ),
                     null,
                     SecondaryDialConfig.RotationProcessor()
-                )
+                ),
+
+                // *** NEU: R3 als eigener Button (oben am rechten Pad) ***
+                SecondaryDialConfig.SingleButton(
+                    /* sector */ 5,
+                    buttonScale,
+                    1.5f,
+                    ButtonConfig(
+                        GamePadButtonInputId.RightStickButton.ordinal,
+                        "R3",
+                        true,
+                        null,
+                        "RightStickButton",
+                        setOf(),
+                        true,
+                        null
+                    ),
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
+                ),
             )
         )
     }
 }
+
