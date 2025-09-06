@@ -94,6 +94,17 @@ class HomeViews {
         const val ListImageSize = 150
         const val GridImageSize = 300
 
+        // --- NEU: kleines Versions-Badge unten links
+        @Composable
+        private fun VersionBadge(modifier: Modifier = Modifier) {
+            Text(
+                text = "v" + org.kenjinx.android.BuildConfig.VERSION_NAME,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = modifier.padding(8.dp)
+            )
+        }
+
         @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
         @Composable
         fun Home(
@@ -126,45 +137,89 @@ class HomeViews {
                 }
             }
 
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                topBar = {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .background(MaterialTheme.colorScheme.surface),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+            // --- NEU: Box um Scaffold, damit wir das Badge overlayen können
+            Box(Modifier.fillMaxSize()) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    topBar = {
                         Row(
-                            horizontalArrangement = Arrangement.Start,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .background(MaterialTheme.colorScheme.surface),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(end = 8.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(end = 8.dp)
-                                    .size(56.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (refreshUser && viewModel.mainViewModel?.userViewModel?.openedUser?.userPicture?.isNotEmpty() == true) {
-                                            Color.Transparent
-                                        } else {
-                                            MaterialTheme.colorScheme.surface
-                                        }
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = MaterialTheme.colorScheme.outline,
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable {
+                            Row(
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(end = 8.dp)
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (refreshUser && viewModel.mainViewModel?.userViewModel?.openedUser?.userPicture?.isNotEmpty() == true) {
+                                                Color.Transparent
+                                            } else {
+                                                MaterialTheme.colorScheme.surface
+                                            }
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = MaterialTheme.colorScheme.outline,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable {
+                                            if (!isNavigating.value) {
+                                                isNavigating.value = true
+                                                val currentRoute = navController?.currentDestination?.route
+                                                if (currentRoute != "user") {
+                                                    navController?.navigate("user") {
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                }
+                                                CoroutineScope(Dispatchers.Main).launch {
+                                                    delay(500)
+                                                    isNavigating.value = false
+                                                }
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (refreshUser && viewModel.mainViewModel?.userViewModel?.openedUser?.userPicture?.isNotEmpty() == true) {
+                                        val pic = viewModel.mainViewModel.userViewModel.openedUser.userPicture
+                                        Image(
+                                            bitmap = BitmapFactory.decodeByteArray(
+                                                pic,
+                                                0,
+                                                pic?.size ?: 0
+                                            ).asImageBitmap(),
+                                            contentDescription = "user image",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Filled.Person,
+                                            contentDescription = "User",
+                                            modifier = Modifier.size(28.dp),
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+
+                                // Settings
+                                IconButton(
+                                    onClick = {
                                         if (!isNavigating.value) {
                                             isNavigating.value = true
                                             val currentRoute = navController?.currentDestination?.route
-                                            if (currentRoute != "user") {
-                                                navController?.navigate("user") {
+                                            if (currentRoute != "settings") {
+                                                navController?.navigate("settings") {
                                                     launchSingleTop = true
                                                     restoreState = true
                                                 }
@@ -175,172 +230,110 @@ class HomeViews {
                                             }
                                         }
                                     },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (refreshUser && viewModel.mainViewModel?.userViewModel?.openedUser?.userPicture?.isNotEmpty() == true) {
-                                    val pic = viewModel.mainViewModel.userViewModel.openedUser.userPicture
-                                    Image(
-                                        bitmap = BitmapFactory.decodeByteArray(
-                                            pic,
-                                            0,
-                                            pic?.size ?: 0
-                                        ).asImageBitmap(),
-                                        contentDescription = "user image",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Filled.Person,
-                                        contentDescription = "User",
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(
+                                            width = 1.dp,
+                                            color = MaterialTheme.colorScheme.outline,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                ) {
+                                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                                }
+
+                                // NEU: Shortcut-Wizard öffnen
+                                IconButton(
+                                    onClick = {
+                                        // Startet die bereits integrierte Activity zum Erstellen von Shortcuts
+                                        context.startActivity(
+                                            Intent(context, ShortcutWizardActivity::class.java)
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(
+                                            width = 1.dp,
+                                            color = MaterialTheme.colorScheme.outline,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                ) {
+                                    Icon(Icons.Filled.Add, contentDescription = "Add Shortcut")
                                 }
                             }
 
-                            // Settings
-                            IconButton(
-                                onClick = {
-                                    if (!isNavigating.value) {
-                                        isNavigating.value = true
-                                        val currentRoute = navController?.currentDestination?.route
-                                        if (currentRoute != "settings") {
-                                            navController?.navigate("settings") {
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        }
-                                        CoroutineScope(Dispatchers.Main).launch {
-                                            delay(500)
-                                            isNavigating.value = false
-                                        }
-                                    }
-                                },
+                            OutlinedTextField(
+                                value = query.value,
+                                onValueChange = { query.value = it },
                                 modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(
-                                        width = 1.dp,
-                                        color = MaterialTheme.colorScheme.outline,
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                            ) {
-                                Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                            }
-
-                            // NEU: Shortcut-Wizard öffnen
-                            IconButton(
-                                onClick = {
-                                    // Startet die bereits integrierte Activity zum Erstellen von Shortcuts
-                                    context.startActivity(
-                                        Intent(context, ShortcutWizardActivity::class.java)
-                                    )
+                                    .weight(1f)
+                                    .height(56.dp),
+                                placeholder = {
+                                    Text("Search...", modifier = Modifier.padding(bottom = 4.dp))
                                 },
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(
-                                        width = 1.dp,
-                                        color = MaterialTheme.colorScheme.outline,
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                            ) {
-                                Icon(Icons.Filled.Add, contentDescription = "Add Shortcut")
-                            }
-                        }
-
-                        OutlinedTextField(
-                            value = query.value,
-                            onValueChange = { query.value = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(56.dp),
-                            placeholder = {
-                                Text("Search...", modifier = Modifier.padding(bottom = 4.dp))
-                            },
-                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(8.dp),
-                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(8.dp),
+                                colors = TextFieldDefaults.outlinedTextFieldColors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                )
                             )
-                        )
-                    }
-                },
-                floatingActionButton = {
-                    AnimatedVisibility(visible = isFabVisible) {
-                        FloatingActionButton(
-                            onClick = {
-                                viewModel.requestReload()
-                                viewModel.ensureReloadIfNecessary()
-                            },
-                            shape = MaterialTheme.shapes.small,
-                            containerColor = MaterialTheme.colorScheme.tertiary
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "refresh")
                         }
-                    }
-                },
-                floatingActionButtonPosition = FabPosition.End
-            ) { contentPadding ->
-                Column(modifier = Modifier.padding(contentPadding)) {
-                    Box {
-                        val list = remember { viewModel.gameList }
-                        val isLoading = remember { viewModel.isLoading }
+                    },
+                    floatingActionButton = {
+                        AnimatedVisibility(visible = isFabVisible) {
+                            FloatingActionButton(
+                                onClick = {
+                                    viewModel.requestReload()
+                                    viewModel.ensureReloadIfNecessary()
+                                },
+                                shape = MaterialTheme.shapes.small,
+                                containerColor = MaterialTheme.colorScheme.tertiary
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = "refresh")
+                            }
+                        }
+                    },
+                    floatingActionButtonPosition = FabPosition.End
+                ) { contentPadding ->
+                    Column(modifier = Modifier.padding(contentPadding)) {
+                        Box {
+                            val list = remember { viewModel.gameList }
+                            val isLoading = remember { viewModel.isLoading }
 
-                        viewModel.filter(query.value)
+                            viewModel.filter(query.value)
 
-                        if (!isPreview) {
-                            val settings = QuickSettings(viewModel.activity!!)
-                            if (isLoading.value) {
-                                Box(modifier = Modifier.fillMaxSize()) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier
-                                            .width(64.dp)
-                                            .align(Alignment.Center),
-                                        color = MaterialTheme.colorScheme.secondary,
-                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                }
-                            } else {
-                                if (settings.isGrid) {
-                                    val size = GridImageSize / Resources.getSystem().displayMetrics.density
-                                    LazyVerticalGrid(
-                                        columns = GridCells.Adaptive(minSize = (size + 4).dp),
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(4.dp)
-                                            .nestedScroll(nestedScrollConnection),
-                                        horizontalArrangement = Arrangement.SpaceEvenly
-                                    ) {
-                                        items(list) {
-                                            it.titleName?.apply {
-                                                if (this.isNotEmpty() && (query.value.trim()
-                                                        .isEmpty() || this.lowercase(Locale.getDefault())
-                                                        .contains(query.value))) {
-                                                    GridGameItem(
-                                                        it,
-                                                        viewModel,
-                                                        showAppActions,
-                                                        showLoading,
-                                                        selectedModel,
-                                                        showError
-                                                    )
-                                                }
-                                            }
-                                        }
+                            if (!isPreview) {
+                                val settings = QuickSettings(viewModel.activity!!)
+                                if (isLoading.value) {
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier
+                                                .width(64.dp)
+                                                .align(Alignment.Center),
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                        )
                                     }
                                 } else {
-                                    LazyColumn(Modifier.fillMaxSize()) {
-                                        items(list) {
-                                            it.titleName?.apply {
-                                                if (this.isNotEmpty() && (query.value.trim()
-                                                        .isEmpty() || this.lowercase(Locale.getDefault())
-                                                        .contains(query.value))) {
-                                                    Box(modifier = Modifier.animateItemPlacement()) {
-                                                        ListGameItem(
+                                    if (settings.isGrid) {
+                                        val size = GridImageSize / Resources.getSystem().displayMetrics.density
+                                        LazyVerticalGrid(
+                                            columns = GridCells.Adaptive(minSize = (size + 4).dp),
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(4.dp)
+                                                .nestedScroll(nestedScrollConnection),
+                                            horizontalArrangement = Arrangement.SpaceEvenly
+                                        ) {
+                                            items(list) {
+                                                it.titleName?.apply {
+                                                    if (this.isNotEmpty() && (query.value.trim()
+                                                            .isEmpty() || this.lowercase(Locale.getDefault())
+                                                            .contains(query.value))) {
+                                                        GridGameItem(
                                                             it,
                                                             viewModel,
                                                             showAppActions,
@@ -352,156 +345,182 @@ class HomeViews {
                                                 }
                                             }
                                         }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                SimpleAlertDialog.Loading(showDialog = showLoading)
-                SimpleAlertDialog.Custom(
-                    showDialog = openTitleUpdateDialog,
-                    onDismissRequest = { openTitleUpdateDialog.value = false },
-                    properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
-                ) {
-                    val titleId = viewModel.mainViewModel?.selected?.titleId ?: ""
-                    val name = viewModel.mainViewModel?.selected?.titleName ?: ""
-                    TitleUpdateViews.Main(titleId, name, openTitleUpdateDialog, canClose)
-                }
-                SimpleAlertDialog.Custom(
-                    showDialog = openDlcDialog,
-                    onDismissRequest = { openDlcDialog.value = false },
-                    properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
-                ) {
-                    val titleId = viewModel.mainViewModel?.selected?.titleId ?: ""
-                    val name = viewModel.mainViewModel?.selected?.titleName ?: ""
-                    DlcViews.Main(titleId, name, openDlcDialog, canClose)
-                }
-            }
-
-            if (viewModel.mainViewModel?.loadGameModel?.value != null)
-                LaunchedEffect(viewModel.mainViewModel.loadGameModel.value) {
-                    if (viewModel.mainViewModel.bootPath.value ==
-                        "gameItem_${viewModel.mainViewModel.loadGameModel.value!!.titleName}"
-                    ) {
-                        viewModel.mainViewModel.bootPath.value = null
-
-                        thread {
-                            showLoading.value = true
-                            val success = viewModel.mainViewModel.loadGame(
-                                viewModel.mainViewModel.loadGameModel.value!!,
-                                true,
-                                viewModel.mainViewModel.forceNceAndPptc.value
-                            ) ?: false
-                            if (success == 1) {
-                                launchOnUiThread {
-                                    viewModel.mainViewModel.navigateToGame()
-                                }
-                            } else {
-                                if (success == -2)
-                                    showError.value = "Error loading update. Please re-add update file"
-                                viewModel.mainViewModel.loadGameModel.value!!.close()
-                            }
-                            showLoading.value = false
-                        }
-                    }
-                }
-
-            if (showAppActions.value)
-                ModalBottomSheet(
-                    content = {
-                        Row(
-                            modifier = Modifier.padding(8.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            if (showAppActions.value) {
-                                IconButton(onClick = {
-                                    if (viewModel.mainViewModel?.selected != null) {
-                                        thread {
-                                            showLoading.value = true
-                                            val success = viewModel.mainViewModel.loadGame(
-                                                viewModel.mainViewModel.selected!!
-                                            )
-                                            if (success == 1) {
-                                                launchOnUiThread {
-                                                    viewModel.mainViewModel.navigateToGame()
+                                    } else {
+                                        LazyColumn(Modifier.fillMaxSize()) {
+                                            items(list) {
+                                                it.titleName?.apply {
+                                                    if (this.isNotEmpty() && (query.value.trim()
+                                                            .isEmpty() || this.lowercase(Locale.getDefault())
+                                                            .contains(query.value))) {
+                                                        Box(modifier = Modifier.animateItemPlacement()) {
+                                                            ListGameItem(
+                                                                it,
+                                                                viewModel,
+                                                                showAppActions,
+                                                                showLoading,
+                                                                selectedModel,
+                                                                showError
+                                                            )
+                                                        }
+                                                    }
                                                 }
-                                            } else {
-                                                if (success == -2)
-                                                    showError.value =
-                                                        "Error loading update. Please re-add update file"
-                                                viewModel.mainViewModel.selected!!.close()
                                             }
-                                            showLoading.value = false
                                         }
                                     }
-                                }) {
-                                    Icon(
-                                        org.kenjinx.android.Icons.playArrow(MaterialTheme.colorScheme.onSurface),
-                                        contentDescription = "Run"
-                                    )
-                                }
-                                val showAppMenu = remember { mutableStateOf(false) }
-                                Box {
-                                    IconButton(onClick = { showAppMenu.value = true }) {
-                                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
-                                    }
-                                    DropdownMenu(
-                                        expanded = showAppMenu.value,
-                                        onDismissRequest = { showAppMenu.value = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text(text = "Clear PPTC Cache") },
-                                            onClick = {
-                                                showAppMenu.value = false
-                                                viewModel.mainViewModel?.clearPptcCache(
-                                                    viewModel.mainViewModel.selected?.titleId ?: ""
-                                                )
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(text = "Purge Shader Cache") },
-                                            onClick = {
-                                                showAppMenu.value = false
-                                                viewModel.mainViewModel?.purgeShaderCache(
-                                                    viewModel.mainViewModel.selected?.titleId ?: ""
-                                                )
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(text = "Delete All Cache") },
-                                            onClick = {
-                                                showAppMenu.value = false
-                                                viewModel.mainViewModel?.deleteCache(
-                                                    viewModel.mainViewModel.selected?.titleId ?: ""
-                                                )
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(text = "Manage Updates") },
-                                            onClick = {
-                                                showAppMenu.value = false
-                                                openTitleUpdateDialog.value = true
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(text = "Manage DLC") },
-                                            onClick = {
-                                                showAppMenu.value = false
-                                                openDlcDialog.value = true
-                                            }
-                                        )
-                                    }
                                 }
                             }
                         }
-                    },
-                    onDismissRequest = {
-                        showAppActions.value = false
-                        selectedModel.value = null
                     }
+
+                    SimpleAlertDialog.Loading(showDialog = showLoading)
+                    SimpleAlertDialog.Custom(
+                        showDialog = openTitleUpdateDialog,
+                        onDismissRequest = { openTitleUpdateDialog.value = false },
+                        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        val titleId = viewModel.mainViewModel?.selected?.titleId ?: ""
+                        val name = viewModel.mainViewModel?.selected?.titleName ?: ""
+                        TitleUpdateViews.Main(titleId, name, openTitleUpdateDialog, canClose)
+                    }
+                    SimpleAlertDialog.Custom(
+                        showDialog = openDlcDialog,
+                        onDismissRequest = { openDlcDialog.value = false },
+                        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        val titleId = viewModel.mainViewModel?.selected?.titleId ?: ""
+                        val name = viewModel.mainViewModel?.selected?.titleName ?: ""
+                        DlcViews.Main(titleId, name, openDlcDialog, canClose)
+                    }
+                }
+
+                if (viewModel.mainViewModel?.loadGameModel?.value != null)
+                    LaunchedEffect(viewModel.mainViewModel.loadGameModel.value) {
+                        if (viewModel.mainViewModel.bootPath.value ==
+                            "gameItem_${viewModel.mainViewModel.loadGameModel.value!!.titleName}"
+                        ) {
+                            viewModel.mainViewModel.bootPath.value = null
+
+                            thread {
+                                showLoading.value = true
+                                val success = viewModel.mainViewModel.loadGame(
+                                    viewModel.mainViewModel.loadGameModel.value!!,
+                                    true,
+                                    viewModel.mainViewModel.forceNceAndPptc.value
+                                ) ?: false
+                                if (success == 1) {
+                                    launchOnUiThread {
+                                        viewModel.mainViewModel.navigateToGame()
+                                    }
+                                } else {
+                                    if (success == -2)
+                                        showError.value = "Error loading update. Please re-add update file"
+                                    viewModel.mainViewModel.loadGameModel.value!!.close()
+                                }
+                                showLoading.value = false
+                            }
+                        }
+                    }
+
+                if (showAppActions.value)
+                    ModalBottomSheet(
+                        content = {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                if (showAppActions.value) {
+                                    IconButton(onClick = {
+                                        if (viewModel.mainViewModel?.selected != null) {
+                                            thread {
+                                                showLoading.value = true
+                                                val success = viewModel.mainViewModel.loadGame(
+                                                    viewModel.mainViewModel.selected!!
+                                                )
+                                                if (success == 1) {
+                                                    launchOnUiThread {
+                                                        viewModel.mainViewModel.navigateToGame()
+                                                    }
+                                                } else {
+                                                    if (success == -2)
+                                                        showError.value =
+                                                            "Error loading update. Please re-add update file"
+                                                    viewModel.mainViewModel.selected!!.close()
+                                                }
+                                                showLoading.value = false
+                                            }
+                                        }
+                                    }) {
+                                        Icon(
+                                            org.kenjinx.android.Icons.playArrow(MaterialTheme.colorScheme.onSurface),
+                                            contentDescription = "Run"
+                                        )
+                                    }
+                                    val showAppMenu = remember { mutableStateOf(false) }
+                                    Box {
+                                        IconButton(onClick = { showAppMenu.value = true }) {
+                                            Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                                        }
+                                        DropdownMenu(
+                                            expanded = showAppMenu.value,
+                                            onDismissRequest = { showAppMenu.value = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Clear PPTC Cache") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    viewModel.mainViewModel?.clearPptcCache(
+                                                        viewModel.mainViewModel.selected?.titleId ?: ""
+                                                    )
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Purge Shader Cache") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    viewModel.mainViewModel?.purgeShaderCache(
+                                                        viewModel.mainViewModel.selected?.titleId ?: ""
+                                                    )
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Delete All Cache") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    viewModel.mainViewModel?.deleteCache(
+                                                        viewModel.mainViewModel.selected?.titleId ?: ""
+                                                    )
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Manage Updates") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    openTitleUpdateDialog.value = true
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Manage DLC") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    openDlcDialog.value = true
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        onDismissRequest = {
+                            showAppActions.value = false
+                            selectedModel.value = null
+                        }
+                    )
+
+                // --- NEU: Version-Badge unten links über dem gesamten Inhalt
+                VersionBadge(
+                    modifier = Modifier.align(Alignment.BottomStart)
                 )
+            } // Ende Box
         }
 
         @OptIn(ExperimentalFoundationApi::class)
