@@ -116,6 +116,11 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
         val text = NativeHelpers.instance.getStringJava(infoPtr)
         MainActivity.mainViewModel?.gameHost?.setProgress(text, progress)
     }
+    @JvmStatic
+    fun onSurfaceSizeChanged(width: Int, height: Int) {
+        // No-Op: Platzhalter. Wenn du in C#/C++ einen Hook hast (Swapchain/Viewport neu),
+        // kannst du den hier ausrufen.
+    }
 
     /**
      * Variante A (Pointer → Strings via NativeHelpers).

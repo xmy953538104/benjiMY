@@ -2,6 +2,9 @@ package org.kenjinx.android
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.runtime.MutableState
@@ -12,6 +15,7 @@ import kotlin.concurrent.thread
 @SuppressLint("ViewConstructor")
 class GameHost(context: Context?, private val mainViewModel: MainViewModel) : SurfaceView(context),
     SurfaceHolder.Callback {
+
     private var isProgressHidden: Boolean = false
     private var progress: MutableState<String>? = null
     private var progressValue: MutableState<Float>? = null
@@ -27,19 +31,20 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
     private var _isStarted: Boolean = false
     private val _nativeWindow: NativeWindow
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // Stabilizer-State
+    private var stabilizerActive = false
+
     var currentSurface: Long = -1
         private set
 
     val currentWindowHandle: Long
-        get() {
-            return _nativeWindow.nativePointer
-        }
+        get() = _nativeWindow.nativePointer
 
     init {
         holder.addCallback(this)
-
         _nativeWindow = NativeWindow(this)
-
         mainViewModel.gameHost = this
     }
 
@@ -47,45 +52,35 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
         // no-op
     }
 
-    fun setProgress(info : String, progressVal: Float) {
+    fun setProgress(info: String, progressVal: Float) {
         showLoading?.apply {
-            progressValue?.apply {
-                this.value = progressVal
-            }
-
-            progress?.apply {
-                this.value = info
-            }
+            progressValue?.apply { this.value = progressVal }
+            progress?.apply { this.value = info }
         }
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        if (_isClosed)
-            return
+        if (_isClosed) return
 
-        if (_width != width || _height != height) {
+        val sizeChanged = (_width != width || _height != height)
+
+        if (sizeChanged) {
             currentSurface = _nativeWindow.requeryWindowHandle()
-
             _nativeWindow.swapInterval = 0
         }
 
         _width = width
         _height = height
 
+        // Renderer starten (falls noch nicht gestartet)
         start(holder)
 
-        KenjinxNative.graphicsRendererSetSize(
-            width,
-            height
-        )
-
-        if (_isStarted) {
-            KenjinxNative.inputSetClientSize(width, height)
-        }
+        // Größe nicht sofort setzen → Stabilizer übernimmt
+        startStabilizedResize(expectedRotation = null)
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        // no-op
+        // no-op (Renderer lebt in eigenem Thread; schließen via close())
     }
 
     fun close() {
@@ -95,47 +90,42 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
 
         KenjinxNative.uiHandlerSetResponse(false, "")
 
-        _updateThread?.join()
-        _renderingThreadWatcher?.join()
+        try { _updateThread?.join(200) } catch (_: Throwable) {}
+        try { _renderingThreadWatcher?.join(200) } catch (_: Throwable) {}
     }
 
     private fun start(surfaceHolder: SurfaceHolder) {
-        if (_isStarted)
-            return
-
+        if (_isStarted) return
         _isStarted = true
 
         game = if (mainViewModel.isMiiEditorLaunched) null else mainViewModel.gameModel
 
+        // Input initialisieren
         KenjinxNative.inputInitialize(width, height)
 
         val id = mainViewModel.physicalControllerManager?.connect()
         mainViewModel.motionSensorManager?.setControllerId(id ?: -1)
 
-        KenjinxNative.graphicsRendererSetSize(
-            surfaceHolder.surfaceFrame.width(),
-            surfaceHolder.surfaceFrame.height()
-        )
+        // KEIN graphicsRendererSetSize hier – wir setzen über den Stabilizer!
 
         NativeHelpers.instance.setIsInitialOrientationFlipped(mainViewModel.activity.display?.rotation == 3)
 
-        _guestThread = thread(start = true) {
+        _guestThread = thread(start = true, name = "KenjinxGuest") {
             runGame()
         }
 
-        _updateThread = thread(start = true) {
+        _updateThread = thread(start = true, name = "KenjinxInput/Stats") {
             var c = 0
-            val helper = NativeHelpers.instance
             while (_isStarted) {
                 KenjinxNative.inputUpdate()
                 Thread.sleep(1)
                 c++
                 if (c >= 1000) {
-                    if (progressValue?.value == -1f)
+                    if (progressValue?.value == -1f) {
                         progress?.apply {
-                            this.value =
-                                "Loading ${if (mainViewModel.isMiiEditorLaunched) "Mii Editor" else game!!.titleName}"
+                            this.value = "Loading ${if (mainViewModel.isMiiEditorLaunched) "Mii Editor" else game?.titleName ?: ""}"
                         }
+                    }
                     c = 0
                     mainViewModel.updateStats(
                         KenjinxNative.deviceGetGameFifo(),
@@ -149,7 +139,6 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
 
     private fun runGame() {
         KenjinxNative.graphicsRendererRunLoop()
-
         game?.close()
     }
 
@@ -161,17 +150,115 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
         this.showLoading = showLoading
         this.progressValue = progressValue
         this.progress = progress
-
-        showLoading?.apply {
-            showLoading.value = !isProgressHidden
-        }
+        showLoading?.apply { value = !isProgressHidden }
     }
 
     fun hideProgressIndicator() {
         isProgressHidden = true
         showLoading?.apply {
-            if (value == isProgressHidden)
-                value = !isProgressHidden
+            if (value == isProgressHidden) value = !isProgressHidden
         }
+    }
+
+    /**
+     * Sicheres Setzen der Renderer-/Input-Größe.
+     */
+    @Synchronized
+    private fun safeSetSize(w: Int, h: Int) {
+        if (_isClosed) return
+        if (w <= 0 || h <= 0) return
+        try {
+            Log.d("GameHost", "safeSetSize: ${w}x$h (started=$_isStarted)")
+            KenjinxNative.graphicsRendererSetSize(w, h)
+            if (_isStarted) {
+                KenjinxNative.inputSetClientSize(w, h)
+            }
+        } catch (t: Throwable) {
+            Log.e("GameHost", "safeSetSize failed: ${t.message}", t)
+        }
+    }
+
+    /**
+     * Wird von der Activity bei Rotations-/Layoutwechsel aufgerufen.
+     * Reicht die aktuelle Rotation durch, damit wir ggf. Breite/Höhe tauschen können.
+     */
+    fun onOrientationOrSizeChanged(rotation: Int? = null) {
+        if (_isClosed) return
+        startStabilizedResize(rotation)
+    }
+
+    /**
+     * Wartet kurz, bis das Surface seine finalen Maße nach der Drehung hat,
+     * prüft Plausibilität (Portrait/Landscape) und setzt erst dann die Größe.
+     */
+    private fun startStabilizedResize(expectedRotation: Int?) {
+        if (_isClosed) return
+
+        // Neustarten, falls schon aktiv
+        if (stabilizerActive) {
+            stabilizerActive = false
+        }
+        stabilizerActive = true
+
+        var attempts = 0
+        var stableCount = 0
+        var lastW = -1
+        var lastH = -1
+
+        val task = object : Runnable {
+            override fun run() {
+                if (!_isStarted || _isClosed) {
+                    stabilizerActive = false
+                    return
+                }
+
+                // Echte Framegröße bevorzugen
+                var w = holder.surfaceFrame.width()
+                var h = holder.surfaceFrame.height()
+
+                // Fallbacks
+                if (w <= 0 || h <= 0) {
+                    w = width
+                    h = height
+                }
+
+                // Falls Rotation bekannt: Plausibilität erzwingen (Landscape ↔ Portrait)
+                expectedRotation?.let { rot ->
+                    // ROTATION_90 (1) / ROTATION_270 (3) => Landscape
+                    val landscape = (rot == 1 || rot == 3)
+                    if (landscape && h > w) {
+                        val t = w; w = h; h = t
+                    } else if (!landscape && w > h) {
+                        val t = w; w = h; h = t
+                    }
+                }
+
+                // Stabilitätsprüfung
+                if (w == lastW && h == lastH && w > 0 && h > 0) {
+                    stableCount++
+                } else {
+                    stableCount = 0
+                    lastW = w
+                    lastH = h
+                }
+
+                attempts++
+
+                // 2 aufeinanderfolgende identische Messungen ODER 20 Versuche → anwenden
+                if ((stableCount >= 2 || attempts >= 20) && w > 0 && h > 0) {
+                    Log.d("GameHost", "resize stabilized after $attempts ticks → ${w}x$h")
+                    safeSetSize(w, h)
+                    stabilizerActive = false
+                    return
+                }
+
+                // weiter pollen
+                if (stabilizerActive) {
+                    mainHandler.postDelayed(this, 16)
+                }
+            }
+        }
+
+        mainHandler.post(task)
     }
 }

@@ -30,6 +30,7 @@ import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.viewmodels.GameModel
 import org.kenjinx.android.views.MainView
 import java.io.File
+import android.content.res.Configuration
 
 class MainActivity : BaseActivity() {
     private var physicalControllerManager: PhysicalControllerManager =
@@ -53,7 +54,6 @@ class MainActivity : BaseActivity() {
         var AppPath: String = ""
         var StorageHelper: SimpleStorageHelper? = null
 
-        // Einheitliche Extras (wie im ShortcutHelper)
         const val EXTRA_BOOT_PATH = "bootPath"
         const val EXTRA_FORCE_NCE_PPTC = "forceNceAndPptc"
         const val EXTRA_TITLE_ID = "titleId"
@@ -85,47 +85,20 @@ class MainActivity : BaseActivity() {
     private external fun initVm()
 
     private fun initialize() {
-        if (_isInit)
-            return
+        if (_isInit) return
 
         val appPath: String = AppPath
 
         val quickSettings = QuickSettings(this)
-        KenjinxNative.loggingSetEnabled(
-            LogLevel.Info,
-            quickSettings.enableInfoLogs
-        )
-        KenjinxNative.loggingSetEnabled(
-            LogLevel.Stub,
-            quickSettings.enableStubLogs
-        )
-        KenjinxNative.loggingSetEnabled(
-            LogLevel.Warning,
-            quickSettings.enableWarningLogs
-        )
-        KenjinxNative.loggingSetEnabled(
-            LogLevel.Error,
-            quickSettings.enableErrorLogs
-        )
-        KenjinxNative.loggingSetEnabled(
-            LogLevel.AccessLog,
-            quickSettings.enableFsAccessLogs
-        )
-        KenjinxNative.loggingSetEnabled(
-            LogLevel.Guest,
-            quickSettings.enableGuestLogs
-        )
-        KenjinxNative.loggingSetEnabled(
-            LogLevel.Trace,
-            quickSettings.enableTraceLogs
-        )
-        KenjinxNative.loggingSetEnabled(
-            LogLevel.Debug,
-            quickSettings.enableDebugLogs
-        )
-        KenjinxNative.loggingEnabledGraphicsLog(
-            quickSettings.enableGraphicsLogs
-        )
+        KenjinxNative.loggingSetEnabled(LogLevel.Info, quickSettings.enableInfoLogs)
+        KenjinxNative.loggingSetEnabled(LogLevel.Stub, quickSettings.enableStubLogs)
+        KenjinxNative.loggingSetEnabled(LogLevel.Warning, quickSettings.enableWarningLogs)
+        KenjinxNative.loggingSetEnabled(LogLevel.Error, quickSettings.enableErrorLogs)
+        KenjinxNative.loggingSetEnabled(LogLevel.AccessLog, quickSettings.enableFsAccessLogs)
+        KenjinxNative.loggingSetEnabled(LogLevel.Guest, quickSettings.enableGuestLogs)
+        KenjinxNative.loggingSetEnabled(LogLevel.Trace, quickSettings.enableTraceLogs)
+        KenjinxNative.loggingSetEnabled(LogLevel.Debug, quickSettings.enableDebugLogs)
+        KenjinxNative.loggingEnabledGraphicsLog(quickSettings.enableGraphicsLogs)
 
         _isInit = KenjinxNative.javaInitialize(appPath, JNIEnv.CURRENT)
     }
@@ -149,7 +122,7 @@ class MainActivity : BaseActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // --- NEU: Ausrichtung anwenden
+        // Ausrichtung anwenden
         applyOrientationPreference()
 
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
@@ -157,7 +130,6 @@ class MainActivity : BaseActivity() {
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
-        // >>> Wichtig: UI-Handler initialisieren (für Software-Keyboard/Dialog)
         uiHandler = UiHandler()
 
         mainViewModel = MainViewModel(this)
@@ -185,8 +157,8 @@ class MainActivity : BaseActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         storedIntent = intent
-        handleIntent()               // sofort verarbeiten (wichtig bei launchMode=singleTop)
-        storedIntent = Intent()      // „verbrauchen“, damit nichts doppelt läuft
+        handleIntent()
+        storedIntent = Intent()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -202,23 +174,19 @@ class MainActivity : BaseActivity() {
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         event.apply {
-            if (physicalControllerManager.onKeyEvent(this))
-                return true
+            if (physicalControllerManager.onKeyEvent(this)) return true
         }
         return super.dispatchKeyEvent(event)
     }
 
     override fun dispatchGenericMotionEvent(ev: MotionEvent?): Boolean {
-        ev?.apply {
-            physicalControllerManager.onMotionEvent(this)
-        }
+        ev?.apply { physicalControllerManager.onMotionEvent(this) }
         return super.dispatchGenericMotionEvent(ev)
     }
 
     override fun onStop() {
         super.onStop()
         isActive = false
-
         if (isGameRunning) {
             mainViewModel?.performanceManager?.setTurboMode(false)
         }
@@ -226,32 +194,28 @@ class MainActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
-        // --- NEU: Ausrichtung ggf. erneut anwenden
+        // Ausrichtung ggf. erneut anwenden
         applyOrientationPreference()
 
         handler.postDelayed(delayedHandleIntent, 10)
         isActive = true
 
         if (isGameRunning) {
-            if (QuickSettings(this).enableMotion)
-                motionSensorManager.register()
+            if (QuickSettings(this).enableMotion) motionSensorManager.register()
         }
     }
 
     override fun onPause() {
         super.onPause()
         isActive = false
-
         if (isGameRunning) {
             mainViewModel?.performanceManager?.setTurboMode(false)
         }
-
         motionSensorManager.unregister()
     }
 
     private fun handleIntent() {
-        val action = storedIntent.action
-        if (action == null) return
+        val action = storedIntent.action ?: return
 
         when (action) {
             Intent.ACTION_VIEW,
@@ -329,6 +293,25 @@ class MainActivity : BaseActivity() {
         requestedOrientation = pref.value
     }
 
+    // --- Sensor-Rotation: Surface/Viewport sauber nachziehen ---
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+
+        val qs = org.kenjinx.android.viewmodels.QuickSettings(this)
+        val sensorMode = qs.orientationPreference ==
+            org.kenjinx.android.viewmodels.QuickSettings.OrientationPreference.Sensor
+
+        if (sensorMode && isGameRunning) {
+            val rot = this.display?.rotation // 0,1,2,3
+            handler.post {
+                try {
+                    mainViewModel?.gameHost?.onOrientationOrSizeChanged(rot)
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+
     // --- Hilfsfunktionen für Shortcut-Fallback ---
 
     private fun resolveGameByTitleIdOrName(titleIdHex: String?, displayName: String?): DocumentFile? {
@@ -368,7 +351,7 @@ class MainActivity : BaseActivity() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         val legacyPath = prefs.getString("gameFolder", null)
         if (!legacyPath.isNullOrEmpty()) {
-            // Ohne SAF-URI lässt sich der Ordner i.d.R. nicht als Tree listen
+            // Ohne SAF-URI lässt sich der Ordner i. d. R. nicht als Tree listen
         }
         return null
     }
@@ -395,9 +378,7 @@ class MainActivity : BaseActivity() {
         val componentName = intent?.component
         val restartIntent = Intent.makeRestartActivityTask(componentName)
 
-        mainViewModel?.let {
-            it.performanceManager?.setTurboMode(false)
-        }
+        mainViewModel?.let { it.performanceManager?.setTurboMode(false) }
         startActivity(restartIntent)
         Runtime.getRuntime().exit(0)
     }
