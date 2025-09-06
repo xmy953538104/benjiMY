@@ -95,6 +95,7 @@ object ShortcutUtils {
             onCompleted?.invoke()
         }
 
+        //      Old Shortcut Settings, can delete later
         // Touch-Fallback: erster Touch → 2s später
         //val touchListener = View.OnTouchListener { _: View, _: MotionEvent ->
         //    if (!restored && !touchScheduled) {
