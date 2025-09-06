@@ -9,6 +9,7 @@ import android.view.WindowManager
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.net.Uri
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +20,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.documentfile.provider.DocumentFile
+import androidx.preference.PreferenceManager
 import com.anggrayudi.storage.SimpleStorageHelper
 import com.sun.jna.JNIEnv
 import org.kenjinx.android.ui.theme.KenjinxAndroidTheme
@@ -62,7 +64,6 @@ class MainActivity : BaseActivity() {
         // <<< NEU: wird von der Native/Lib-Seite aufgerufen, um den Ladefortschritt zu setzen
         @JvmStatic
         fun updateProgress(info: String, percent: Float) {
-            // direkt über den GameHost routen – der kümmert sich um die Progress-States
             mainViewModel?.gameHost?.setProgress(info, percent)
         }
     }
@@ -239,20 +240,97 @@ class MainActivity : BaseActivity() {
                 val bootPath = storedIntent.getStringExtra("bootPath")
                 val forceNceAndPptc = storedIntent.getBooleanExtra("forceNceAndPptc", false)
 
+                // NEU: Optional mitgeben – hilft beim Fallback, wenn bootPath nicht mehr gilt
+                val extraTitleId = storedIntent.getStringExtra("titleId")?.lowercase()
+                val extraTitleName = storedIntent.getStringExtra("titleName")
+
+                // 1) Normaler Weg: direkter URI
+                var documentFile: DocumentFile? = null
                 if (bootPath != null) {
                     val uri = bootPath.toUri()
-                    val documentFile = DocumentFile.fromSingleUri(this, uri)
+                    documentFile = DocumentFile.fromSingleUri(this, uri)
+                }
 
-                    if (documentFile != null) {
-                        val gameModel = GameModel(documentFile, this)
+                // 2) Fallback: Wenn der URI nicht (mehr) geht, suche per TitleId/Name im Spiele-Ordner
+                if (documentFile == null || !documentFile.exists()) {
+                    documentFile = resolveGameByTitleIdOrName(extraTitleId, extraTitleName)
+                }
 
-                        gameModel.getGameInfo()
-                        mainViewModel?.loadGameModel?.value = gameModel
-                        mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
-                        mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
-                    }
+                if (documentFile != null && documentFile.exists()) {
+                    val gameModel = GameModel(documentFile, this)
+                    gameModel.getGameInfo()
+                    mainViewModel?.loadGameModel?.value = gameModel
+                    mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
+                    mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
                 }
             }
+        }
+    }
+
+    // --- NEU: Hilfsfunktionen für Shortcut-Fallback ---
+
+    private fun resolveGameByTitleIdOrName(titleIdHex: String?, displayName: String?): DocumentFile? {
+        val gamesRoot = getDefaultGamesTree() ?: return null
+        // Flache Suche (Top-Level). Wenn du Unterordner hast, könntest du hier rekursiv werden.
+        for (child in gamesRoot.listFiles()) {
+            if (!child.isFile) continue
+            // Schneller Name-Check
+            if (!displayName.isNullOrBlank()) {
+                val n = child.name ?: ""
+                if (n.contains(displayName, ignoreCase = true)) {
+                    return child
+                }
+            }
+            // Verlässlicher: TitleId auslesen
+            if (!titleIdHex.isNullOrBlank()) {
+                val tid = getTitleIdFast(child)
+                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) {
+                    return child
+                }
+            }
+        }
+        // Zweite Runde: erst TitleId prüfen (falls im ersten Durchlauf keins passte), dann Name
+        if (!titleIdHex.isNullOrBlank()) {
+            for (child in gamesRoot.listFiles()) {
+                if (!child.isFile) continue
+                val tid = getTitleIdFast(child)
+                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) {
+                    return child
+                }
+            }
+        }
+        return null
+    }
+
+    private fun getDefaultGamesTree(): DocumentFile? {
+        // bevorzugt die in den Settings gemerkte SAF-URI
+        val vm = mainViewModel
+        if (vm?.defaultGameFolderUri != null) {
+            return DocumentFile.fromTreeUri(this, vm.defaultGameFolderUri!!)
+        }
+        // Fallback: alter Legacy-Pfad in den Preferences (falls noch gesetzt)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val legacyPath = prefs.getString("gameFolder", null)
+        if (!legacyPath.isNullOrEmpty()) {
+            // Es gibt hier keine direkte Baum-URI – ohne SAF-URI kann Android den Ordner i.d.R. nicht listen
+            // => Gib null zurück, damit wir nicht in eine Sackgasse laufen
+        }
+        return null
+    }
+
+    private fun getTitleIdFast(file: DocumentFile): String? {
+        val name = file.name ?: return null
+        val dot = name.lastIndexOf('.')
+        if (dot <= 0 || dot >= name.length - 1) return null
+        val ext = name.substring(dot + 1).lowercase()
+        return try {
+            contentResolver.openFileDescriptor(file.uri, "r")?.use { pfd ->
+                val info = org.kenjinx.android.viewmodels.GameInfo() // JNA-Struktur (Java)
+                KenjinxNative.deviceGetGameInfo(pfd.fd, ext, info)
+                info.TitleId?.lowercase()
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 
