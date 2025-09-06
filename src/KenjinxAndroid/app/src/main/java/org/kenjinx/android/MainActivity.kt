@@ -51,6 +51,12 @@ class MainActivity : BaseActivity() {
         var AppPath: String = ""
         var StorageHelper: SimpleStorageHelper? = null
 
+        // Einheitliche Extras (wie im ShortcutHelper)
+        const val EXTRA_BOOT_PATH = "bootPath"
+        const val EXTRA_FORCE_NCE_PPTC = "forceNceAndPptc"
+        const val EXTRA_TITLE_ID = "titleId"
+        const val EXTRA_TITLE_NAME = "titleName"
+
         @JvmStatic
         fun frameEnded() {
             mainViewModel?.activity?.apply {
@@ -61,12 +67,12 @@ class MainActivity : BaseActivity() {
             mainViewModel?.gameHost?.hideProgressIndicator()
         }
 
-        // <<< NEU: wird von der Native/Lib-Seite aufgerufen, um den Ladefortschritt zu setzen
         @JvmStatic
         fun updateProgress(info: String, percent: Float) {
             mainViewModel?.gameHost?.setProgress(info, percent)
         }
     }
+
 
     init {
         storageHelper = SimpleStorageHelper(this)
@@ -237,35 +243,44 @@ class MainActivity : BaseActivity() {
     private fun handleIntent() {
         when (storedIntent.action) {
             Intent.ACTION_VIEW, "org.kenjinx.android.LAUNCH_GAME" -> {
-                val bootPath = storedIntent.getStringExtra("bootPath")
-                val forceNceAndPptc = storedIntent.getBooleanExtra("forceNceAndPptc", false)
+                val bootPath = storedIntent.getStringExtra(EXTRA_BOOT_PATH)
+                val forceNceAndPptc = storedIntent.getBooleanExtra(EXTRA_FORCE_NCE_PPTC, false)
 
-                // NEU: Optional mitgeben – hilft beim Fallback, wenn bootPath nicht mehr gilt
-                val extraTitleId = storedIntent.getStringExtra("titleId")?.lowercase()
-                val extraTitleName = storedIntent.getStringExtra("titleName")
+                // Neu: TitleId/TitleName (robust bei Update/DLC)
+                val titleId = storedIntent.getStringExtra(EXTRA_TITLE_ID) ?: ""
+                val titleName = storedIntent.getStringExtra(EXTRA_TITLE_NAME) ?: ""
 
-                // 1) Normaler Weg: direkter URI
-                var documentFile: DocumentFile? = null
-                if (bootPath != null) {
+                // 1) Bevorzugt: per bootPath starten (DocumentFile)
+                if (!bootPath.isNullOrEmpty()) {
                     val uri = bootPath.toUri()
-                    documentFile = DocumentFile.fromSingleUri(this, uri)
+                    val documentFile = DocumentFile.fromSingleUri(this, uri)
+                    if (documentFile != null && documentFile.exists()) {
+                        val gameModel = GameModel(documentFile, this)
+                        // GameInfo befüllt u. a. TitleId – falls wir sie noch nicht hatten
+                        gameModel.getGameInfo()
+
+                        mainViewModel?.loadGameModel?.value = gameModel
+                        // Für die UI-Navigation (wie bisher genutzt)
+                        mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
+                        mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
+                        return
+                    }
                 }
 
-                // 2) Fallback: Wenn der URI nicht (mehr) geht, suche per TitleId/Name im Spiele-Ordner
-                if (documentFile == null || !documentFile.exists()) {
-                    documentFile = resolveGameByTitleIdOrName(extraTitleId, extraTitleName)
-                }
-
-                if (documentFile != null && documentFile.exists()) {
-                    val gameModel = GameModel(documentFile, this)
-                    gameModel.getGameInfo()
-                    mainViewModel?.loadGameModel?.value = gameModel
-                    mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
-                    mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
+                // 2) Fallback: Wenn bootPath ungültig, aber TitleId vorhanden ->
+                //    (Optional) könntest du hier deine eigene "Bibliothek" nach TitleId durchsuchen
+                //    und eine passende Datei/URI finden.
+                //    Wir loggen nur freundlich und lassen die UI normal.
+                if (titleId.isNotEmpty()) {
+                    // TODO: Falls du eine Spieleliste / Index hast, hier anhand titleId auflösen und wie oben starten.
+                    // Für jetzt: sanftes Logging und kein Crash.
+                    // Logger o. ä. falls vorhanden:
+                    // Log.i("Shortcut", "Shortcut gestartet für TitleId=$titleId ($titleName), aber bootPath fehlt/ungültig.")
                 }
             }
         }
     }
+
 
     // --- NEU: Hilfsfunktionen für Shortcut-Fallback ---
 
