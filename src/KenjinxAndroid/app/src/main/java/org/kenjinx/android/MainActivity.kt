@@ -58,6 +58,13 @@ class MainActivity : BaseActivity() {
             }
             mainViewModel?.gameHost?.hideProgressIndicator()
         }
+
+        // <<< NEU: wird von der Native/Lib-Seite aufgerufen, um den Ladefortschritt zu setzen
+        @JvmStatic
+        fun updateProgress(info: String, percent: Float) {
+            // direkt über den GameHost routen – der kümmert sich um die Progress-States
+            mainViewModel?.gameHost?.setProgress(info, percent)
+        }
     }
 
     init {

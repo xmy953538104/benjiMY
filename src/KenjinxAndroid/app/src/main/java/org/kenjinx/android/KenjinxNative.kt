@@ -111,11 +111,11 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
         MainActivity.mainViewModel?.gameHost?.currentWindowHandle ?: -1
 
     @JvmStatic
-    fun updateProgress(infoPtr: Long, progress: Float) =
-        MainActivity.mainViewModel?.gameHost?.setProgress(
-            NativeHelpers.instance.getStringJava(infoPtr),
-            progress
-        )
+    fun updateProgress(infoPtr: Long, progress: Float) {
+        // String aus dem Native-Pointer holen und ins Progress-Overlay schieben
+        val text = NativeHelpers.instance.getStringJava(infoPtr)
+        MainActivity.mainViewModel?.gameHost?.setProgress(text, progress)
+    }
 
     /**
      * Variante A (Pointer → Strings via NativeHelpers).

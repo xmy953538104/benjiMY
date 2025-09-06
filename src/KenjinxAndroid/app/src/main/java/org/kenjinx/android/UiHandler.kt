@@ -51,7 +51,6 @@ class UiHandler {
     var message: String = ""
 
     init {
-        // 2.0.3-kompatibel: keine Parameter
         KenjinxNative.uiHandlerSetup()
     }
 
@@ -65,8 +64,7 @@ class UiHandler {
         newMode: KeyboardMode,
         newSubtitle: String,
         newInitialText: String
-    )
-    {
+    ) {
         title = newTitle
         message = newMessage
         watermark = newWatermark
@@ -87,13 +85,11 @@ class UiHandler {
         val inputListener = remember { inputText }
         val validation = remember { mutableStateOf("") }
 
-        // Fokus & Keyboard-Steuerung, damit das Popup wie in 2.0.3 sofort tippen lässt
         val focusRequester = remember { FocusRequester() }
         val keyboard = LocalSoftwareKeyboardController.current
 
         LaunchedEffect(showMessageListener.value, type) {
             if (showMessageListener.value && type == 2) {
-                // kleines Delay, bis der Dialog gemountet ist
                 delay(100)
                 focusRequester.requestFocus()
                 keyboard?.show()
@@ -120,13 +116,9 @@ class UiHandler {
 
         fun submit() {
             if (type == 2) {
-                if (inputListener.value.length < minLength || inputListener.value.length > maxLength)
-                    return
+                if (inputListener.value.length < minLength || inputListener.value.length > maxLength) return
             }
-            KenjinxNative.uiHandlerSetResponse(
-                true,
-                if (type == 2) inputListener.value else ""
-            )
+            KenjinxNative.uiHandlerSetResponse(true, if (type == 2) inputListener.value else "")
             showMessageListener.value = false
         }
 
