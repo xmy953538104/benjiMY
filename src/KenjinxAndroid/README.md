@@ -13,7 +13,9 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.4.1b – Highlights
+## Version 2.0.4.1c – Highlights
+
+- **HOTFIX** fixed bloating of titleid_map.ndjson.
 
 - **Home-screen shortcuts** from the game’s long-press bottom sheet  
   (choose **Custom icon** or **App icon** – uses the same grid artwork).
