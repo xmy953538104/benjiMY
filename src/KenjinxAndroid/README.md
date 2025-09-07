@@ -1,6 +1,12 @@
+<h1 align="center">
+  <br>
+  <img src="https://git.ryujinx.app/BeZide/kenji-sc/-/raw/libryujinx_bionic/distribution/misc/Logo.png" alt="Benji-SC">
+  <br>
+  <b>Benji-SC</b>
+
 # Benji-SC (Android)
 
-Benji-SC is an Android fork focused on quality-of-life improvements around shortcuts, inputs, and UI.  
+Benji-SC is an Kenji-NX fork focused on quality-of-life improvements around shortcuts, inputs, and UI.  
 Goal: jump into your game faster, with fewer rough edges.
 
 > **Note:** Keys and firmware are **not** included.
@@ -83,7 +89,11 @@ system/
 
 ## Credits
 
-- Kenjinx / Ryujinx and all upstream contributors.
+- Kenji-NX / Ryujinx and all upstream contributors.
+- [LibHac](https://github.com/Thealexbarney/LibHac) is used for our file-system.
+- [AmiiboAPI](https://www.amiiboapi.com) is used in our Amiibo emulation.
+- [ldn_mitm](https://github.com/spacemeowx2/ldn_mitm) is used for one of our available multiplayer modes.
+- [ShellLink](https://github.com/securifybv/ShellLink) is used for Windows shortcut generation.
 - Community testers and feedback.
 
 ---
