@@ -1,48 +1,93 @@
-# Kenji-SC (ShortCut Edition)
+# Benji-SC (Android)
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)  
-[![Platform](https://img.shields.io/badge/platform-Android-blue.svg)](#)  
-[![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](#)
+Benji-SC is an Android fork focused on quality-of-life improvements around shortcuts, inputs, and UI.  
+Goal: jump into your game faster, with fewer rough edges.
 
-**Kenji-SC** is a fork of the Android emulator [Kenji-NX](https://git.ryujinx.app/kenji-nx/ryujinx).  
-This edition introduces integrated **Homescreen Shortcut support** – allowing you to launch your games directly from the Android launcher, just like native apps.
+> **Note:** Keys and firmware are **not** included.
 
 ---
 
-## ✨ Features
+## Version 2.0.4.1b – Highlights
 
-- 🔖 **Shortcut Integration** – Create homescreen shortcuts for your games with custom names and icons.
-- 📂 **Default Game Folder** – Automatically opens your configured game folder when creating a shortcut.
-- 📘 **Shortcut Guide** – Built-in help section in settings to revisit the shortcut setup instructions.
-- 🖼️ **Custom Icons** – Assign your own icon to each shortcut.
-- ⚡ **All Kenji-NX Features** – Full compatibility with the base emulator.
-
----
-
-## 📲 Why “SC”?
-
-The **SC** suffix stands for **ShortCut**, highlighting the key feature of this fork:
-Start your favorite games directly from your homescreen.
+- **Home-screen shortcuts** from the game’s long-press bottom sheet  
+  (choose **Custom icon** or **App icon** – uses the same grid artwork).
+- **On-screen keyboard**: focus/visibility fixes.
+- **Loading screen**: native progress piped to the UI overlay.
+- **L3/R3** support for **physical controllers**.
+- **Virtual controller**: separate **L3** and **R3** buttons.
+- **Language & Region** selection (Settings → System).
+- **Screen orientation** preference (Settings → User Interface):  
+  **Sensor**, **SensorLandscape**, **SensorPortrait**.
+- Save files: groundwork for **item-ID based** mapping.
 
 ---
 
-## 🔗 Original Project
+## Quick Start
 
-Kenji-SC is based on the excellent emulator **[Kenji-NX](https://git.ryujinx.app/kenji-nx/ryujinx)**.  
-All credit for the emulation core and base features goes to the original developers.
-
----
-
-## 📜 License
-
-Kenji-SC is released under the [MIT License](LICENSE).  
-Please review the original Kenji-NX license and respect all upstream attributions.
+1. **Install Keys & Firmware**  
+   *Settings → User Interface → Install Keys / Install Firmware*
+2. **Add Game Folder**  
+   *Settings → User Interface → Add Game Folder*
+3. (Optional) **Create a Home-Screen Shortcut**  
+   Long-press a game → bottom sheet → **Create shortcut** → choose **Custom icon** or **App icon**, edit name, confirm the Android “Add to Home screen” sheet.
 
 ---
 
-## 🙌 Contributing
+## Shortcuts
 
-Pull requests are welcome!  
-If you have ideas for additional shortcut improvements or UI enhancements, feel free to open an issue.
+- Create from the game’s **long-press** bottom sheet.
+- **Custom icon** (pick an image) or **App icon** (uses the grid artwork).
+- **Editable name** before pinning.
+- Deep-link integration: shortcuts start the game directly (no extra picker).
 
+---
 
+## Screen Orientation
+
+- Configure under *Settings → User Interface → Screen Orientation*:
+  - **Sensor** (rotates with device),
+  - **SensorLandscape**,
+  - **SensorPortrait**.
+- In Sensor mode, the app re-queries the surface and resizes safely to avoid stretching.
+
+---
+
+## Import App Data (ZIP)
+
+The ZIP can contain one or more of the following top-level folders:
+
+bis/
+games/
+profiles/
+system/
+
+- Import via *Settings → User Interface → Import App Data*.
+- Save-data mapping by item IDs is prepared; future updates will improve cross-install portability.
+
+---
+
+## Build
+
+- Open in **Android Studio** (recent version recommended).
+- Use the project’s configured Gradle & SDKs.
+- Run on a device (Android 10+ recommended).
+
+---
+
+## Troubleshooting
+
+- If the shortcut only opens the app (not the game), ensure you created it via the in-app **Create shortcut** action (long-press on the game) so deep-linking is embedded correctly.
+- If rotation looks off in **Sensor** mode, verify the orientation setting and try again; the app resizes/re-queries surfaces to prevent stretching.
+
+---
+
+## Credits
+
+- Kenjinx / Ryujinx and all upstream contributors.
+- Community testers and feedback.
+
+---
+
+## License
+
+See the license information in this repository and upstream.

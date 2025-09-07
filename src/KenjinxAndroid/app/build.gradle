@@ -8,11 +8,11 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "org.edizsc.android"
+        applicationId "org.benjisc.android"
         minSdk 30
         targetSdk 34
         versionCode 20004
-        versionName '2.0.4.1a'
+        versionName '2.0.4.1b'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

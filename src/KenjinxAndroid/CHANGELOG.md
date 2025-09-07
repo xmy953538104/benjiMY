@@ -1,37 +1,21 @@
-# 📑 Changelog
+# Changelog
 
-All notable changes to **Kenji-SC** will be documented in this file.  
-This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses semantic versioning.
+## 2.0.4.1b — 2025-09-07
 
----
-
-## [Unreleased]
-- Minor UI refinements
-- Further improvements to shortcut handling
-
----
-
-## [2.0.4] - 2025-09-03
 ### Added
-- Initial fork of **Kenji-NX** → **Kenji-SC** ("ShortCut").
-- Integrated **shortcut creation** directly into the emulator app (no external helper required).
-- Added **"Shortcut Guide"** in the settings menu.
-- Added persistent **"Don’t show again"** option for the shortcut creation dialog.
-- Default game folder is suggested automatically when creating shortcuts.
-
-### Changed
-- App renamed to **Kenji-SC** with unique package name (`org.kenjinxsc.android`) to allow parallel installation with original **Kenji-NX**.
-- UI updated with an extra button on the home screen for shortcut creation.
+- Home-screen **Shortcut creation** directly from the game’s long-press bottom sheet  
+  (choose **Custom icon** or **App icon**; uses the same grid artwork).
+- **Language & Region** selection in Settings → System.
+- **Orientation preference** in Settings → User Interface  
+  (Sensor / SensorLandscape / SensorPortrait).
+- Save data: groundwork for **save files mapped by item IDs**.
 
 ### Fixed
-- Orientation workaround during Android shortcut creation (forces portrait mode temporarily).
-- Shortcut creation now restores orientation properly after confirmation.
+- **On-screen keyboard** focus & visibility handling.
+- **Loading screen**: progress reporting from native side → UI overlay.
+- **L3/R3**: full support on physical controllers.
+- **Virtual controller**: separate buttons for **L3** and **R3**.
 
----
-
-## [1.0.0] - 2025-08-XX
-### Added
-- Standalone **KenjiLauncher** released for creating Android home screen shortcuts for Kenji-NX games.
-- First proof-of-concept before integration into the main emulator app.
-
----
+### Notes
+- Many more updates planned.
+- App renamed to **Benji-SC** (formerly Kenjinx Android fork).
