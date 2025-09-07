@@ -1,10 +1,10 @@
 <h1 align="center">
   <br>
-  <img src="https://git.ryujinx.app/BeZide/kenji-sc/-/raw/libryujinx_bionic/distribution/misc/Logo.png" alt="Benji-SC">
+  <img src="https://git.ryujinx.app/BeZide/kenji-sc/-/raw/libryujinx_bionic/distribution/misc/Logo_benji.png" alt="Benji-SC">
   <br>
-  <b>Benji-SC</b>
 
-# Benji-SC (Android)
+
+# Benji-SC
 
 Benji-SC is an Kenji-NX fork focused on quality-of-life improvements around shortcuts, inputs, and UI.  
 Goal: jump into your game faster, with fewer rough edges.
