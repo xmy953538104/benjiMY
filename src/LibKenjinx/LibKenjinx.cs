@@ -33,8 +33,10 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;               // <--- NEU
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;         // <--- NEU
 using Path = System.IO.Path;
 
 namespace LibKenjinx
@@ -937,7 +939,7 @@ namespace LibKenjinx
             string titleIdHex = titleId.ToString("x16");
             string titleName = TryGetTitleName(ref control) ?? "Unknown";
 
-            // Marker-Datei & Mapping (append-only NDJSON) schreiben
+            // Marker-Datei & Mapping schreiben (jetzt als Upsert, nicht mehr append-only)
             try
             {
                 if (!string.IsNullOrEmpty(createdSaveDirName))
@@ -946,7 +948,7 @@ namespace LibKenjinx
                     File.WriteAllText(markerFile, $"{titleIdHex}\n{titleName}");
                 }
 
-                AppendTitleMapNdjson(savesRoot, titleIdHex, titleName, createdSaveDirName);
+                UpsertTitleMapNdjson(savesRoot, titleIdHex, titleName, createdSaveDirName);
             }
             catch (Exception ex)
             {
@@ -965,17 +967,80 @@ namespace LibKenjinx
         }
 
         /// <summary>
-        /// Schreibt eine Zeile im NDJSON-Format nach .../save/titleid_map.ndjson
+        /// Aktualisiert .../save/titleid_map.ndjson im NDJSON-Format:
+        /// - Liest bestehende Zeilen
+        /// - Ersetzt/fügt Eintrag für titleId
+        /// - Schreibt die Datei vollständig neu (keine unbegrenzte Größenzunahme)
         /// </summary>
-        private static void AppendTitleMapNdjson(string savesRoot, string titleIdHex, string titleName, string createdFolder)
+        private static void UpsertTitleMapNdjson(string savesRoot, string titleIdHex, string titleName, string createdFolder)
         {
             Directory.CreateDirectory(savesRoot);
             string mapPath = Path.Combine(savesRoot, "titleid_map.ndjson");
 
-            string line = $"{{\"titleId\":\"{EscapeJson(titleIdHex)}\",\"name\":\"{EscapeJson(titleName)}\",\"folder\":\"{EscapeJson(createdFolder ?? "")}\",\"timestamp\":\"{DateTime.UtcNow:O}\"}}{Environment.NewLine}";
+            // Map: titleId(lowercase) -> JSON-Line (als String)
+            var byTitleId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            // Append-only, erstellt die Datei falls sie nicht existiert:
-            File.AppendAllText(mapPath, line, Encoding.UTF8);
+            // Bestehende Datei einlesen (falls vorhanden) – UTF-8 sicher
+            try
+            {
+                if (File.Exists(mapPath))
+                {
+                    using var fs = File.OpenRead(mapPath);
+                    using var sr = new StreamReader(fs, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+                    string? line;
+                    while ((line = sr.ReadLine()) != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(line))
+                            continue;
+
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(line);
+                            if (doc.RootElement.TryGetProperty("titleId", out var tidEl))
+                            {
+                                var tid = tidEl.GetString();
+                                if (!string.IsNullOrWhiteSpace(tid))
+                                {
+                                    byTitleId[tid] = line.TrimEnd('\r', '\n');
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Falls eine Zeile korrupt ist, ignorieren
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Wenn Lesen fehlschlägt, starten wir mit leerem Dictionary
+                byTitleId.Clear();
+            }
+
+            // Neue/aktualisierte Zeile für die titleId bauen
+            var nowIso = DateTime.UtcNow.ToString("O");
+            var titleIdLc = (titleIdHex ?? string.Empty).ToLowerInvariant();
+
+            string newLine =
+                $"{{\"titleId\":\"{EscapeJson(titleIdLc)}\",\"name\":\"{EscapeJson(titleName ?? "")}\"," +
+                $"\"folder\":\"{EscapeJson(createdFolder ?? "")}\",\"timestamp\":\"{EscapeJson(nowIso)}\"}}";
+
+            byTitleId[titleIdLc] = newLine;
+
+            // Datei vollständig neu schreiben (stabil: nach titleId sortiert)
+            try
+            {
+                var ordered = byTitleId
+                    .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(kv => kv.Value + Environment.NewLine);
+
+                File.WriteAllText(mapPath, string.Concat(ordered), Encoding.UTF8);
+            }
+            catch
+            {
+                // Schreibfehler stillschweigend ignorieren, um Gameplay nicht zu stören
+            }
         }
 
         /// <summary>

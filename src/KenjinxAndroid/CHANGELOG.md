@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.4.1c — 2025-09-07
+
+### Fixed
+- **Title-IDs** fixed bloating of the titleid_map.ndjson in the save game folder.
+
 ## 2.0.4.1b — 2025-09-07
 
 ### Added
