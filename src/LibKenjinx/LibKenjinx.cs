@@ -38,6 +38,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;         // <--- NEU
 using Path = System.IO.Path;
+using System.Linq;
+
 
 namespace LibKenjinx
 {
@@ -966,82 +968,157 @@ namespace LibKenjinx
                 .Replace("\n", "\\n");
         }
 
-        /// <summary>
-        /// Aktualisiert .../save/titleid_map.ndjson im NDJSON-Format:
-        /// - Liest bestehende Zeilen
-        /// - Ersetzt/fügt Eintrag für titleId
-        /// - Schreibt die Datei vollständig neu (keine unbegrenzte Größenzunahme)
-        /// </summary>
-        private static void UpsertTitleMapNdjson(string savesRoot, string titleIdHex, string titleName, string createdFolder)
+/// <summary>
+/// Aktualisiert .../save/titleid_map.ndjson im NDJSON-Format:
+/// - Liest bestehende Zeilen
+/// - Ersetzt/fügt Eintrag für titleId
+/// - Schreibt die Datei vollständig neu (keine unbegrenzte Größenzunahme)
+/// - Überschreibt den Ordner NIE mit leerem Wert; versucht, ihn über Marker zu ermitteln
+/// </summary>
+private static void UpsertTitleMapNdjson(string savesRoot, string titleIdHex, string titleName, string createdFolder)
+{
+    Directory.CreateDirectory(savesRoot);
+    string mapPath = Path.Combine(savesRoot, "titleid_map.ndjson");
+
+    // titleId (lowercase) -> (Name, Folder, Timestamp)
+    var byTitleId = new Dictionary<string, (string Name, string Folder, string Timestamp)>(StringComparer.OrdinalIgnoreCase);
+
+    // Bestehende Datei einlesen
+    try
+    {
+        if (File.Exists(mapPath))
         {
-            Directory.CreateDirectory(savesRoot);
-            string mapPath = Path.Combine(savesRoot, "titleid_map.ndjson");
+            foreach (var line in File.ReadLines(mapPath, Encoding.UTF8))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
 
-            // Map: titleId(lowercase) -> JSON-Line (als String)
-            var byTitleId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                try
+                {
+                    using var doc = JsonDocument.Parse(line);
+                    var root = doc.RootElement;
 
-            // Bestehende Datei einlesen (falls vorhanden) – UTF-8 sicher
+                    string tid = root.TryGetProperty("titleId", out var tidEl) ? (tidEl.GetString() ?? "").Trim() : "";
+                    if (string.IsNullOrEmpty(tid)) continue;
+
+                    string name    = root.TryGetProperty("name", out var nameEl)       ? (nameEl.GetString()    ?? "") : "";
+                    string folder  = root.TryGetProperty("folder", out var folderEl)   ? (folderEl.GetString()  ?? "") : "";
+                    string ts      = root.TryGetProperty("timestamp", out var tsEl)    ? (tsEl.GetString()      ?? "") : "";
+
+                    byTitleId[tid.ToLowerInvariant()] = (name, folder, ts);
+                }
+                catch
+                {
+                    // Korrupten Eintrag ignorieren
+                }
+            }
+        }
+    }
+    catch
+    {
+        byTitleId.Clear();
+    }
+
+    var nowIso   = DateTime.UtcNow.ToString("O");
+    var titleIdLc = (titleIdHex ?? string.Empty).ToLowerInvariant();
+
+    // 1) Bestimme den "bestehenden" Ordner aus der Map (falls vorhanden)
+    byTitleId.TryGetValue(titleIdLc, out var existing);
+    string existingFolder = existing.Folder ?? "";
+
+    // 2) Versuche, einen sinnvollen Ordner zu bestimmen:
+    //    a) frisch erstellter Ordnername
+    //    b) per Markerdatei in den Saves ermitteln
+    //    c) bisherigen (nicht-leeren) Wert beibehalten
+    string effectiveFolder = createdFolder;
+    if (string.IsNullOrWhiteSpace(effectiveFolder))
+    {
+        effectiveFolder = ResolveSaveFolderByMarker(savesRoot, titleIdLc);
+    }
+    if (string.IsNullOrWhiteSpace(effectiveFolder) && !string.IsNullOrWhiteSpace(existingFolder))
+    {
+        effectiveFolder = existingFolder;
+    }
+
+    // 3) Markerdatei sicherstellen, falls Ordner ermittelt
+    try
+    {
+        if (!string.IsNullOrWhiteSpace(effectiveFolder))
+        {
+            string markerPath = Path.Combine(savesRoot, effectiveFolder, "TITLEID.txt");
+            if (!File.Exists(markerPath))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
+                File.WriteAllText(markerPath, $"{titleIdLc}\n{titleName ?? "Unknown"}");
+            }
+        }
+    }
+    catch
+    {
+        // Marker-Erstellung darf das Gameplay nicht stören
+    }
+
+    // 4) Upsert: niemals mit leerem Folder überschreiben
+    string finalName   = string.IsNullOrWhiteSpace(titleName) ? (existing.Name ?? "") : titleName;
+    string finalFolder = string.IsNullOrWhiteSpace(effectiveFolder) ? (existing.Folder ?? "") : effectiveFolder;
+    string finalTs     = nowIso;
+
+    byTitleId[titleIdLc] = (finalName ?? "", finalFolder ?? "", finalTs);
+
+    // 5) Datei vollständig neu schreiben (stabil: nach titleId sortiert)
+    try
+    {
+        var ordered = byTitleId
+            .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(kv =>
+                $"{{\"titleId\":\"{EscapeJson(kv.Key)}\",\"name\":\"{EscapeJson(kv.Value.Name)}\"," +
+                $"\"folder\":\"{EscapeJson(kv.Value.Folder)}\",\"timestamp\":\"{EscapeJson(kv.Value.Timestamp)}\"}}{Environment.NewLine}"
+            );
+
+        File.WriteAllText(mapPath, string.Concat(ordered), Encoding.UTF8);
+    }
+    catch
+    {
+        // Schreibfehler stillschweigend ignorieren
+    }
+}
+
+/// <summary>
+/// Durchsucht alle Save-Ordner nach einer TITLEID.txt, deren erste Zeile der titleId entspricht.
+/// Gibt den Ordnernamen (z.B. "00000012") zurück oder null.
+/// </summary>
+private static string ResolveSaveFolderByMarker(string savesRoot, string titleIdLc)
+{
+    try
+    {
+        if (!Directory.Exists(savesRoot)) return null;
+
+        foreach (var dir in Directory.GetDirectories(savesRoot))
+        {
+            string marker = Path.Combine(dir, "TITLEID.txt");
+            if (!File.Exists(marker)) continue;
+
             try
             {
-                if (File.Exists(mapPath))
+                using var sr = new StreamReader(marker, Encoding.UTF8, true);
+                string first = sr.ReadLine()?.Trim()?.ToLowerInvariant();
+                if (first == titleIdLc)
                 {
-                    using var fs = File.OpenRead(mapPath);
-                    using var sr = new StreamReader(fs, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-                    string? line;
-                    while ((line = sr.ReadLine()) != null)
-                    {
-                        if (string.IsNullOrWhiteSpace(line))
-                            continue;
-
-                        try
-                        {
-                            using var doc = JsonDocument.Parse(line);
-                            if (doc.RootElement.TryGetProperty("titleId", out var tidEl))
-                            {
-                                var tid = tidEl.GetString();
-                                if (!string.IsNullOrWhiteSpace(tid))
-                                {
-                                    byTitleId[tid] = line.TrimEnd('\r', '\n');
-                                }
-                            }
-                        }
-                        catch
-                        {
-                            // Falls eine Zeile korrupt ist, ignorieren
-                        }
-                    }
+                    return Path.GetFileName(dir);
                 }
             }
             catch
             {
-                // Wenn Lesen fehlschlägt, starten wir mit leerem Dictionary
-                byTitleId.Clear();
-            }
-
-            // Neue/aktualisierte Zeile für die titleId bauen
-            var nowIso = DateTime.UtcNow.ToString("O");
-            var titleIdLc = (titleIdHex ?? string.Empty).ToLowerInvariant();
-
-            string newLine =
-                $"{{\"titleId\":\"{EscapeJson(titleIdLc)}\",\"name\":\"{EscapeJson(titleName ?? "")}\"," +
-                $"\"folder\":\"{EscapeJson(createdFolder ?? "")}\",\"timestamp\":\"{EscapeJson(nowIso)}\"}}";
-
-            byTitleId[titleIdLc] = newLine;
-
-            // Datei vollständig neu schreiben (stabil: nach titleId sortiert)
-            try
-            {
-                var ordered = byTitleId
-                    .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select(kv => kv.Value + Environment.NewLine);
-
-                File.WriteAllText(mapPath, string.Concat(ordered), Encoding.UTF8);
-            }
-            catch
-            {
-                // Schreibfehler stillschweigend ignorieren, um Gameplay nicht zu stören
+                // ignorieren und weiter
             }
         }
+    }
+    catch
+    {
+        // ignorieren
+    }
+    return null;
+}
+
 
         /// <summary>
         /// Holt den (bevorzugt amerikanischen) Titel aus dem NACP, als Fallback den ersten nicht-leeren.
