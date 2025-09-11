@@ -33,6 +33,10 @@ import org.kenjinx.android.viewmodels.QuickSettings
 typealias GamePad = RadialGamePad
 typealias GamePadConfig = RadialGamePadConfig
 
+// --- Dummy-IDs, um Legacy-L3/R3 (Stick-Doppeltipp/-Tap) abzuklemmen ---
+private const val DUMMY_LEFT_STICK_PRESS_ID  = 10001
+private const val DUMMY_RIGHT_STICK_PRESS_ID = 10002
+
 class GameController(var activity: Activity) {
 
     companion object {
@@ -41,14 +45,14 @@ class GameController(var activity: Activity) {
             val view = inflater.inflate(R.layout.game_layout, null)
             view.findViewById<FrameLayout>(R.id.leftcontainer)!!.addView(controller.leftGamePad)
             view.findViewById<FrameLayout>(R.id.rightcontainer)!!.addView(controller.rightGamePad)
-
             return view
         }
 
         @Composable
         fun Compose(viewModel: MainViewModel): Unit {
             AndroidView(
-                modifier = Modifier.fillMaxSize(), factory = { context ->
+                modifier = Modifier.fillMaxSize(),
+                factory = { context ->
                     val controller = GameController(viewModel.activity)
                     val c = init(context, controller)
                     viewModel.activity.lifecycleScope.apply {
@@ -56,8 +60,7 @@ class GameController(var activity: Activity) {
                             val events = merge(
                                 controller.leftGamePad.events(),
                                 controller.rightGamePad.events()
-                            )
-                                .shareIn(viewModel.activity.lifecycleScope, SharingStarted.Lazily)
+                            ).shareIn(viewModel.activity.lifecycleScope, SharingStarted.Lazily)
                             events.safeCollect {
                                 controller.handleEvent(it)
                             }
@@ -67,7 +70,8 @@ class GameController(var activity: Activity) {
                     viewModel.setGameController(controller)
                     controller.setVisible(QuickSettings(viewModel.activity).useVirtualController)
                     c
-                })
+                }
+            )
         }
     }
 
@@ -76,13 +80,7 @@ class GameController(var activity: Activity) {
     var rightGamePad: GamePad
     var controllerId: Int = -1
     val isVisible: Boolean
-        get() {
-            controllerView?.apply {
-                return this.isVisible
-            }
-
-            return false
-        }
+        get() = controllerView?.isVisible ?: false
 
     init {
         leftGamePad = GamePad(generateConfig(true), 16f, activity)
@@ -100,9 +98,7 @@ class GameController(var activity: Activity) {
     fun setVisible(isVisible: Boolean) {
         controllerView?.apply {
             this.isVisible = isVisible
-
-            if (isVisible)
-                connect()
+            if (isVisible) connect()
         }
     }
 
@@ -118,78 +114,40 @@ class GameController(var activity: Activity) {
         controllerId.apply {
             when (ev) {
                 is Event.Button -> {
-                    val action = ev.action
-                    when (action) {
-                        KeyEvent.ACTION_UP -> {
-                            KenjinxNative.inputSetButtonReleased(ev.id, this)
-                        }
-
-                        KeyEvent.ACTION_DOWN -> {
-                            KenjinxNative.inputSetButtonPressed(ev.id, this)
-                        }
+                    // Legacy-L3/R3 via Stick-Press (Doppeltipp) ignorieren
+                    if (ev.id == DUMMY_LEFT_STICK_PRESS_ID || ev.id == DUMMY_RIGHT_STICK_PRESS_ID) {
+                        return
+                    }
+                    when (ev.action) {
+                        KeyEvent.ACTION_UP   -> KenjinxNative.inputSetButtonReleased(ev.id, this)
+                        KeyEvent.ACTION_DOWN -> KenjinxNative.inputSetButtonPressed(ev.id, this)
                     }
                 }
 
                 is Event.Direction -> {
-                    val direction = ev.id
-
-                    when (direction) {
+                    when (ev.id) {
                         GamePadButtonInputId.DpadUp.ordinal -> {
+                            // Horizontal
                             if (ev.xAxis > 0) {
-                                KenjinxNative.inputSetButtonPressed(
-                                    GamePadButtonInputId.DpadRight.ordinal,
-                                    this
-                                )
-                                KenjinxNative.inputSetButtonReleased(
-                                    GamePadButtonInputId.DpadLeft.ordinal,
-                                    this
-                                )
+                                KenjinxNative.inputSetButtonPressed(GamePadButtonInputId.DpadRight.ordinal, this)
+                                KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadLeft.ordinal, this)
                             } else if (ev.xAxis < 0) {
-                                KenjinxNative.inputSetButtonPressed(
-                                    GamePadButtonInputId.DpadLeft.ordinal,
-                                    this
-                                )
-                                KenjinxNative.inputSetButtonReleased(
-                                    GamePadButtonInputId.DpadRight.ordinal,
-                                    this
-                                )
+                                KenjinxNative.inputSetButtonPressed(GamePadButtonInputId.DpadLeft.ordinal, this)
+                                KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadRight.ordinal, this)
                             } else {
-                                KenjinxNative.inputSetButtonReleased(
-                                    GamePadButtonInputId.DpadLeft.ordinal,
-                                    this
-                                )
-                                KenjinxNative.inputSetButtonReleased(
-                                    GamePadButtonInputId.DpadRight.ordinal,
-                                    this
-                                )
+                                KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadLeft.ordinal, this)
+                                KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadRight.ordinal, this)
                             }
+                            // Vertikal
                             if (ev.yAxis < 0) {
-                                KenjinxNative.inputSetButtonPressed(
-                                    GamePadButtonInputId.DpadUp.ordinal,
-                                    this
-                                )
-                                KenjinxNative.inputSetButtonReleased(
-                                    GamePadButtonInputId.DpadDown.ordinal,
-                                    this
-                                )
+                                KenjinxNative.inputSetButtonPressed(GamePadButtonInputId.DpadUp.ordinal, this)
+                                KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadDown.ordinal, this)
                             } else if (ev.yAxis > 0) {
-                                KenjinxNative.inputSetButtonPressed(
-                                    GamePadButtonInputId.DpadDown.ordinal,
-                                    this
-                                )
-                                KenjinxNative.inputSetButtonReleased(
-                                    GamePadButtonInputId.DpadUp.ordinal,
-                                    this
-                                )
+                                KenjinxNative.inputSetButtonPressed(GamePadButtonInputId.DpadDown.ordinal, this)
+                                KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadUp.ordinal, this)
                             } else {
-                                KenjinxNative.inputSetButtonReleased(
-                                    GamePadButtonInputId.DpadDown.ordinal,
-                                    this
-                                )
-                                KenjinxNative.inputSetButtonReleased(
-                                    GamePadButtonInputId.DpadUp.ordinal,
-                                    this
-                                )
+                                KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadDown.ordinal, this)
+                                KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadUp.ordinal, this)
                             }
                         }
 
@@ -197,24 +155,14 @@ class GameController(var activity: Activity) {
                             val setting = QuickSettings(activity)
                             val x = MathUtils.clamp(ev.xAxis * setting.controllerStickSensitivity, -1f, 1f)
                             val y = MathUtils.clamp(ev.yAxis * setting.controllerStickSensitivity, -1f, 1f)
-                            KenjinxNative.inputSetStickAxis(
-                                1,
-                                x,
-                                -y,
-                                this
-                            )
+                            KenjinxNative.inputSetStickAxis(1, x, -y, this)
                         }
 
                         GamePadButtonInputId.RightStick.ordinal -> {
                             val setting = QuickSettings(activity)
                             val x = MathUtils.clamp(ev.xAxis * setting.controllerStickSensitivity, -1f, 1f)
                             val y = MathUtils.clamp(ev.yAxis * setting.controllerStickSensitivity, -1f, 1f)
-                            KenjinxNative.inputSetStickAxis(
-                                2,
-                                x,
-                                -y,
-                                this
-                            )
+                            KenjinxNative.inputSetStickAxis(2, x, -y, this)
                         }
                     }
                 }
@@ -223,13 +171,9 @@ class GameController(var activity: Activity) {
     }
 }
 
-suspend fun <T> Flow<T>.safeCollect(
-    block: suspend (T) -> Unit
-) {
-    this.catch {}
-        .collect {
-            block(it)
-        }
+suspend fun <T> Flow<T>.safeCollect(block: suspend (T) -> Unit) {
+    this.catch { }
+        .collect { block(it) }
 }
 
 private fun generateConfig(isLeft: Boolean): GamePadConfig {
@@ -239,15 +183,17 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
     if (isLeft) {
         return GamePadConfig(
             /* ringSegments = */ 12,
-            /* Primary (Stick)  */ PrimaryDialConfig.Stick(
+            /* Primary (Stick)  */
+            // WICHTIG: pressButtonId -> DUMMY_LEFT_STICK_PRESS_ID, damit Doppeltipp nicht L3 auslöst
+            PrimaryDialConfig.Stick(
                 GamePadButtonInputId.LeftStick.ordinal,
-                GamePadButtonInputId.LeftStickButton.ordinal,
+                DUMMY_LEFT_STICK_PRESS_ID,
                 setOf(),
                 "LeftStick",
                 null
             ),
             listOf(
-                // D-Pad (unverändert)
+                // D-Pad
                 SecondaryDialConfig.Cross(
                     /* sector */ 10,
                     /* size   */ 3,
@@ -265,7 +211,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // Minus (unverändert)
+                // Minus
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 1,
                     buttonScale,
@@ -284,7 +230,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // L-Bumper (unverändert, DoubleButton bedeutet breiteres Target)
+                // L-Bumper
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 2,
                     distance,
@@ -302,7 +248,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // ZL-Trigger (unverändert)
+                // ZL-Trigger
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 9,
                     buttonScale,
@@ -321,7 +267,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // *** NEU: L3 als eigener Button (oben am linken Pad) ***
+                // NEU (bleibt): L3 als eigener Button
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 1,
                     buttonScale,
@@ -344,47 +290,20 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
     } else {
         return GamePadConfig(
             /* ringSegments = */ 12,
-            /* Primary (ABXY) */ PrimaryDialConfig.PrimaryButtons(
+            /* Primary (ABXY) */
+            PrimaryDialConfig.PrimaryButtons(
                 listOf(
                     ButtonConfig(
-                        GamePadButtonInputId.A.ordinal,
-                        "A",
-                        true,
-                        null,
-                        "A",
-                        setOf(),
-                        true,
-                        null
+                        GamePadButtonInputId.A.ordinal, "A", true, null, "A", setOf(), true, null
                     ),
                     ButtonConfig(
-                        GamePadButtonInputId.X.ordinal,
-                        "X",
-                        true,
-                        null,
-                        "X",
-                        setOf(),
-                        true,
-                        null
+                        GamePadButtonInputId.X.ordinal, "X", true, null, "X", setOf(), true, null
                     ),
                     ButtonConfig(
-                        GamePadButtonInputId.Y.ordinal,
-                        "Y",
-                        true,
-                        null,
-                        "Y",
-                        setOf(),
-                        true,
-                        null
+                        GamePadButtonInputId.Y.ordinal, "Y", true, null, "Y", setOf(), true, null
                     ),
                     ButtonConfig(
-                        GamePadButtonInputId.B.ordinal,
-                        "B",
-                        true,
-                        null,
-                        "B",
-                        setOf(),
-                        true,
-                        null
+                        GamePadButtonInputId.B.ordinal, "B", true, null, "B", setOf(), true, null
                     )
                 ),
                 null,
@@ -393,21 +312,22 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                 null
             ),
             listOf(
-                // Rechter Stick (unverändert)
+                // Rechter Stick
+                // WICHTIG: pressButtonId -> DUMMY_RIGHT_STICK_PRESS_ID, damit Doppeltipp nicht R3 auslöst
                 SecondaryDialConfig.Stick(
                     /* sector */ 7,
                     /* size   */ 2,
                     /* gap    */ 2f,
                     distance,
                     GamePadButtonInputId.RightStick.ordinal,
-                    GamePadButtonInputId.RightStickButton.ordinal,
+                    DUMMY_RIGHT_STICK_PRESS_ID,
                     null,
                     setOf(),
                     "RightStick",
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // Plus (unverändert)
+                // Plus
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 6,
                     buttonScale,
@@ -426,7 +346,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // R-Bumper (unverändert)
+                // R-Bumper
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 3,
                     distance,
@@ -444,7 +364,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // ZR-Trigger (unverändert)
+                // ZR-Trigger
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 9,
                     buttonScale,
@@ -463,7 +383,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // *** NEU: R3 als eigener Button (oben am rechten Pad) ***
+                // NEU (bleibt): R3 als eigener Button
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 5,
                     buttonScale,
@@ -485,4 +405,3 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
         )
     }
 }
-
