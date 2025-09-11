@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.4.1d — 2025-09-11
+
+### Added
+- x075 Resolution setting
+
+### Fixed
+- **Virtual controller**: removed old implementation of **L3** and **R3** (doubletab+hold of the stick).
+
 ## 2.0.4.1c — 2025-09-07
 
 ### Fixed
