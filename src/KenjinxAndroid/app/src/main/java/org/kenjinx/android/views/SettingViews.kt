@@ -1563,6 +1563,7 @@ class SettingViews {
         ) {
             val scaleOptions = listOf(
                 0.5f to "0.5x (360p/540p)",
+                0.75f to "0.75x (540p/810p)",
                 1f to "1.0x (720p/1080p)",
                 2f to "2.0x (1440p/2160p)",
                 3f to "3.0x (2160p/3240p)",
