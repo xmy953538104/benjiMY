@@ -13,16 +13,15 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.4.1c – Highlights
+## Version 2.0.4.1d – Highlights
 
-- **HOTFIX** fixed bloating of titleid_map.ndjson.
-
+- **Settings** added x0.75 Resolution setting.
 - **Home-screen shortcuts** from the game’s long-press bottom sheet  
   (choose **Custom icon** or **App icon** – uses the same grid artwork).
 - **On-screen keyboard**: focus/visibility fixes.
 - **Loading screen**: native progress piped to the UI overlay.
 - **L3/R3** support for **physical controllers**.
-- **Virtual controller**: separate **L3** and **R3** buttons.
+- **Virtual controller**: separate **L3** and **R3** buttons. Removed old implementation of **L3** and **R3** (doubletab+hold of the stick).
 - **Language & Region** selection (Settings → System).
 - **Screen orientation** preference (Settings → User Interface):  
   **Sensor**, **SensorLandscape**, **SensorPortrait**.
