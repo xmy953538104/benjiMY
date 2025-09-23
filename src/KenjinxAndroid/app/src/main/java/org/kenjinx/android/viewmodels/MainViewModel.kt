@@ -24,6 +24,7 @@ import org.kenjinx.android.PerformanceMonitor
 import org.kenjinx.android.SystemLanguage
 import org.kenjinx.android.UiHandler
 import java.io.File
+import java.util.TimeZone
 
 @SuppressLint("WrongConstant")
 class MainViewModel(val activity: MainActivity) {
@@ -203,6 +204,7 @@ class MainViewModel(val activity: MainActivity) {
             semaphore.acquire()
             launchOnUiThread {
                 // We are only able to initialize the emulation context on the main thread
+                val tzId = TimeZone.getDefault().id
                 success = KenjinxNative.deviceInitialize(
                     settings.memoryManagerMode.ordinal,
                     settings.useNce,
@@ -219,7 +221,7 @@ class MainViewModel(val activity: MainActivity) {
                     false,
                     settings.enableFsIntegrityChecks,
                     settings.fsGlobalAccessLogMode,
-                    "UTC",
+                    tzId, // <<< Android-Gerätezeitzone durchreichen
                     settings.ignoreMissingServices
                 )
 
@@ -313,6 +315,7 @@ class MainViewModel(val activity: MainActivity) {
             semaphore.acquire()
             launchOnUiThread {
                 // We are only able to initialize the emulation context on the main thread
+                val tzId = TimeZone.getDefault().id
                 success = KenjinxNative.deviceInitialize(
                     settings.memoryManagerMode.ordinal,
                     settings.useNce,
@@ -329,7 +332,7 @@ class MainViewModel(val activity: MainActivity) {
                     false,
                     settings.enableFsIntegrityChecks,
                     settings.fsGlobalAccessLogMode,
-                    "UTC",
+                    tzId, // <<< Android-Gerätezeitzone durchreichen
                     settings.ignoreMissingServices
                 )
 
@@ -372,19 +375,6 @@ class MainViewModel(val activity: MainActivity) {
     fun purgeShaderCache(titleId: String) {
         if (titleId.isNotEmpty()) {
             val basePath = MainActivity.AppPath + "/games/$titleId/cache/shader"
-            if (File(basePath).exists()) {
-                var caches = mutableListOf<String>()
-                File(basePath).listFiles()?.forEach {
-                    if (!it.isFile)
-                        it.delete()
-                    else {
-                        if (it.name.endsWith(".toc") || it.name.endsWith(".data"))
-                            caches.add(it.absolutePath)
-                    }
-                }
-                for (path in caches)
-                    File(path).delete()
-            }
         }
     }
 
