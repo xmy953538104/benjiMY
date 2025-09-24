@@ -5,6 +5,7 @@ import com.sun.jna.Library
 import com.sun.jna.Native
 import org.kenjinx.android.viewmodels.GameInfo
 import java.util.Collections
+import android.view.Surface
 
 interface KenjinxNativeJna : Library {
     fun deviceInitialize(
@@ -87,6 +88,12 @@ interface KenjinxNativeJna : Library {
     fun userGetAllUsers(): Array<String>
     fun deviceGetDlcContentList(path: String, titleId: Long): Array<String>
     fun loggingEnabledGraphicsLog(enabled: Boolean)
+    // NEW: Surface-Rotation (0/90/180/270 Grad)
+    fun deviceSetSurfaceRotation(degrees: Int)
+    // NEW (optional alias): kompakter Resize-Shortcut
+    fun deviceResize(width: Int, height: Int)
+    // NEW: Window-Handle nach jedem Requery setzen
+    fun deviceSetWindowHandle(handle: Long)
 }
 
 val jnaInstance: KenjinxNativeJna = Native.load(
@@ -112,14 +119,34 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
 
     @JvmStatic
     fun updateProgress(infoPtr: Long, progress: Float) {
-        // String aus dem Native-Pointer holen und ins Progress-Overlay schieben
         val text = NativeHelpers.instance.getStringJava(infoPtr)
         MainActivity.mainViewModel?.gameHost?.setProgress(text, progress)
     }
+
     @JvmStatic
     fun onSurfaceSizeChanged(width: Int, height: Int) {
-        // No-Op: Platzhalter. Wenn du in C#/C++ einen Hook hast (Swapchain/Viewport neu),
-        // kannst du den hier ausrufen.
+        // No-Op: Platzhalter – Hook, falls benötigt.
+    }
+
+    @JvmStatic
+    fun setSurfaceRotationByAndroidRotation(androidRotation: Int?) {
+        val degrees = when (androidRotation) {
+            Surface.ROTATION_0   -> 0
+            Surface.ROTATION_90  -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            else -> 0
+        }
+        try { deviceSetSurfaceRotation(degrees) } catch (_: Throwable) {}
+    }
+
+    @JvmStatic
+    fun resizeRendererAndInput(width: Int, height: Int) {
+        try {
+            // Alternativ: deviceResize(width, height)
+            graphicsRendererSetSize(width, height)
+            inputSetClientSize(width, height)
+        } catch (_: Throwable) {}
     }
 
     /**
@@ -160,7 +187,6 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
 
     /**
      * Variante B (Strings direkt). Wird von neueren JNI/Interop-Pfaden benutzt.
-     * Signatur entspricht exakt dem C#-Aufruf in AndroidUIHandler.cs / Interop.UpdateUiHandler(...).
      */
     @JvmStatic
     fun uiHandlerUpdate(

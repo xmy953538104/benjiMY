@@ -24,6 +24,14 @@ namespace LibKenjinx
         private static long _surfacePtr;
         private static long _window = 0;
 
+        // Merkt sich die zuletzt gesetzte Renderer-Größe (für den Jiggle)
+        private static int _lastRenderWidth = 0;
+        private static int _lastRenderHeight = 0;
+
+        // NEW: Rotation-Debounce + Pending-Puffer
+        private static int _lastRotationDegrees = -1;
+        private static int _pendingRotationDegrees = -1;
+
         public static VulkanLoader? VulkanLoader { get; private set; }
 
         [DllImport("libkenjinxjni")]
@@ -310,6 +318,30 @@ namespace LibKenjinx
 
                     var result = surfaceExtension.CreateAndroidSurface(new Instance(instance), createInfo, null, out var surface);
 
+                    // NEW: Falls schon vor Surface-Erstellung eine Rotation kam → jetzt anwenden
+                    if (_window != 0 && _pendingRotationDegrees != -1)
+                    {
+                        try
+                        {
+                            int t = _pendingRotationDegrees switch
+                            {
+                                0   => 0, // IDENTITY
+                                90  => 4, // ROTATE_90
+                                180 => 3, // ROTATE_180 (H|V mirror)
+                                270 => 7, // ROTATE_270 (ROT_90 | H|V)
+                                _   => 0,
+                            };
+                            setCurrentTransform(_window, t);
+                            Logger.Trace?.Print(LogClass.Application, $"[JNI] Apply pending SurfaceTransform {_pendingRotationDegrees}° (t={t}, window=0x{_window:x})");
+                            _lastRotationDegrees = _pendingRotationDegrees;
+                            _pendingRotationDegrees = -1;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Warning?.Print(LogClass.Application, $"Apply pending transform failed: {ex}");
+                        }
+                    }
+
                     return (nint)surface.Handle;
                 }
 
@@ -322,7 +354,9 @@ namespace LibKenjinx
         [UnmanagedCallersOnly(EntryPoint = "graphicsRendererSetSize")]
         public static void JnaSetRendererSizeNative(int width, int height)
         {
-            Logger.Trace?.Print(LogClass.Application, "Jni Function Call");
+            Logger.Trace?.Print(LogClass.Application, $"graphicsRendererSetSize -> {width}x{height}");
+            _lastRenderWidth  = width;
+            _lastRenderHeight = height;
             Renderer?.Window?.SetSize(width, height);
         }
 
@@ -559,6 +593,100 @@ namespace LibKenjinx
             var userId = Marshal.PtrToStringAnsi(userIdPtr) ?? "";
 
             CloseUser(userId);
+        }
+
+        // --- Window-Handle Update (Android) ---
+        [UnmanagedCallersOnly(EntryPoint = "deviceSetWindowHandle")]
+        public static void JniSetWindowHandle(long handle)
+        {
+            _window = handle;
+            Logger.Trace?.Print(Ryujinx.Common.Logging.LogClass.Application,
+                $"Window handle updated: 0x{handle:X}");
+        }
+
+        // --- Surface Rotation Bridge (Android) ---
+        [UnmanagedCallersOnly(EntryPoint = "deviceSetSurfaceRotation")]
+        public static void JniDeviceSetSurfaceRotation(int degrees)
+        {
+            try
+            {
+                // Normieren
+                degrees = degrees switch { 0 => 0, 90 => 90, 180 => 180, 270 => 270, _ => 0 };
+
+                if (degrees == _lastRotationDegrees)
+                {
+                    Logger.Trace?.Print(LogClass.Application, $"[JNI] SurfaceTransform unchanged ({degrees}°), skip");
+                    return;
+                }
+
+                // KORREKTES Bitmask-Mapping laut NDK:
+                // 0 -> 0 (IDENTITY)
+                // 90 -> 4 (ROTATE_90)
+                // 180 -> 3 (H|V mirror == 180°)
+                // 270 -> 7 (ROTATE_270 == ROT_90 | H|V)
+                int transform = degrees switch
+                {
+                    0   => 0,
+                    90  => 4,
+                    180 => 3,
+                    270 => 7,
+                    _   => 0
+                };
+
+                if (_window != 0)
+                {
+                    setCurrentTransform(_window, transform);
+                    _lastRotationDegrees = degrees;
+                    Logger.Trace?.Print(LogClass.Application, $"[JNI] SurfaceTransform -> {degrees}° (t={transform}, window=0x{_window:x})");
+                }
+                else
+                {
+                    _pendingRotationDegrees = degrees; // später anwenden (siehe createSurfaceFunc)
+                    Logger.Warning?.Print(LogClass.Application, $"[JNI] deviceSetSurfaceRotation: _window == 0 (pending {degrees}°)");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning?.Print(LogClass.Application, $"deviceSetSurfaceRotation failed: {ex}");
+            }
+        }
+
+        // --- Vulkan/GL: Swapchain-/Surface-Neukonfiguration per Size-Jiggle ---
+        [UnmanagedCallersOnly(EntryPoint = "deviceRecreateSwapchain")]
+        public static void JniDeviceRecreateSwapchain()
+        {
+            try
+            {
+                if (Renderer?.Window == null)
+                {
+                    Logger.Warning?.Print(LogClass.Application, "[JNI] deviceRecreateSwapchain: Renderer.Window == null");
+                    return;
+                }
+
+                int w = _lastRenderWidth;
+                int h = _lastRenderHeight;
+
+                if (w > 0 && h > 0)
+                {
+                    int jiggleW = w;
+                    int jiggleH = h;
+                    if (w <= h) jiggleW = Math.Max(1, w - 1); else jiggleH = Math.Max(1, h - 1);
+
+                    Logger.Trace?.Print(LogClass.Application, $"[JNI] deviceRecreateSwapchain: jiggle {jiggleW}x{jiggleH} -> {w}x{h}");
+                    Renderer.Window.SetSize(jiggleW, jiggleH);
+                    Renderer.Window.SetSize(w, h);
+                }
+                else
+                {
+                    Logger.Trace?.Print(LogClass.Application, "[JNI] deviceRecreateSwapchain: unknown last size -> 1x1 -> 2x2 jiggle");
+                    Renderer.Window.SetSize(1, 1);
+                    Renderer.Window.SetSize(2, 2);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error?.Print(LogClass.Application, $"deviceRecreateSwapchain failed: {ex}");
+            }
         }
     }
 

@@ -285,11 +285,17 @@ class SettingViews {
                                 selectedOrientation = orientationPref.value,
                                 onOrientationSelected = { sel ->
                                     orientationPref.value = sel
-                                    // sofort speichern und anwenden
                                     val qs = QuickSettings(mainViewModel.activity)
                                     qs.orientationPreference = sel
                                     qs.save()
-                                    mainViewModel.activity.requestedOrientation = sel.value
+
+                                    // 1) Activity-Ausrichtung setzen
+                                    val act = mainViewModel.activity
+                                    act.requestedOrientation = sel.value
+
+                                    // 2) Rotation/Größe sofort ins Rendering nachreichen
+                                    val rot = act.display?.rotation
+                                    mainViewModel.gameHost?.onOrientationOrSizeChanged(rot)
                                 }
                             )
 

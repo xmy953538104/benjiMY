@@ -51,7 +51,8 @@
             android:name=".MainActivity"
             android:launchMode="singleTop"
             android:exported="true"
-            android:screenOrientation="sensor"
+            android:screenOrientation="unspecified"
+            android:resizeableActivity="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
             android:hardwareAccelerated="true"
             android:theme="@style/Theme.KenjinxAndroid">

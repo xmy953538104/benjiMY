@@ -31,6 +31,10 @@ import org.kenjinx.android.viewmodels.GameModel
 import org.kenjinx.android.views.MainView
 import java.io.File
 import android.content.res.Configuration
+import android.content.Context
+import android.content.pm.ActivityInfo
+import android.hardware.display.DisplayManager
+import android.view.Surface
 
 class MainActivity : BaseActivity() {
     private var physicalControllerManager: PhysicalControllerManager =
@@ -38,16 +42,91 @@ class MainActivity : BaseActivity() {
     private lateinit var motionSensorManager: MotionSensorManager
     private var _isInit: Boolean = false
     private val handler = Handler(Looper.getMainLooper())
-    private val delayedHandleIntent = object : Runnable {
-        override fun run() {
-            handleIntent()
-        }
-    }
+    private val delayedHandleIntent = object : Runnable { override fun run() { handleIntent() } }
     var storedIntent: Intent = Intent()
     var isGameRunning = false
     var isActive = false
     var storageHelper: SimpleStorageHelper? = null
     lateinit var uiHandler: UiHandler
+
+    // Display-Rotation + Orientation-Handling
+    private lateinit var displayManager: DisplayManager
+    private var lastKnownRotation: Int? = null
+    private var pulsingOrientation = false
+
+    private val TAG_ROT = "RotationDebug"
+
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+        override fun onDisplayRemoved(displayId: Int) {}
+        override fun onDisplayChanged(displayId: Int) {
+            if (display?.displayId != displayId) return
+            val rot = display?.rotation
+            if (rot == lastKnownRotation) return
+
+            Log.d(TAG_ROT, "onDisplayChanged: display.rotation=$rot → ${deg(rot)}°")
+
+            val pref = QuickSettings(this@MainActivity).orientationPreference
+            val old = lastKnownRotation
+            lastKnownRotation = rot
+
+            // 1) Native/Renderer informieren
+            try { KenjinxNative.setSurfaceRotationByAndroidRotation(rot) } catch (_: Throwable) {}
+
+            // 2) Host-Resize anstoßen
+            if (isGameRunning) {
+                handler.post {
+                    try { mainViewModel?.gameHost?.onOrientationOrSizeChanged(rot) } catch (_: Throwable) {}
+                }
+            }
+
+            // 3) Bei SENSOR_LANDSCAPE evtl. Pulse, wenn 90↔270 Flip
+            if (pref == QuickSettings.OrientationPreference.SensorLandscape && old != null && rot != null) {
+                val isSideFlip = (old == Surface.ROTATION_90 && rot == Surface.ROTATION_270) ||
+                    (old == Surface.ROTATION_270 && rot == Surface.ROTATION_90)
+                if (isSideFlip) doOrientationPulse(rot)
+            }
+        }
+    }
+
+    private fun deg(r: Int?): Int = when (r) {
+        Surface.ROTATION_0 -> 0
+        Surface.ROTATION_90 -> 90
+        Surface.ROTATION_180 -> 180
+        Surface.ROTATION_270 -> 270
+        else -> -1
+    }
+
+    private fun doOrientationPulse(currentRot: Int) {
+        if (pulsingOrientation) return
+        pulsingOrientation = true
+
+        // Kurzer Lock auf die Ziel-Seite (anstatt Portrait-Zwischenschritt; verhindert Flackern)
+        val lock = if (currentRot == Surface.ROTATION_90)
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        else
+            ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+
+        try { requestedOrientation = lock } catch (_: Throwable) {}
+        handler.post {
+            if (isGameRunning) {
+                try { KenjinxNative.setSurfaceRotationByAndroidRotation(currentRot) } catch (_: Throwable) {}
+                try { mainViewModel?.gameHost?.onOrientationOrSizeChanged(currentRot) } catch (_: Throwable) {}
+            }
+        }
+
+        // Nach kurzer Zeit zurück auf SENSOR_LANDSCAPE
+        handler.postDelayed({
+            try { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE } catch (_: Throwable) {}
+            handler.post {
+                if (isGameRunning) {
+                    try { KenjinxNative.setSurfaceRotationByAndroidRotation(display?.rotation) } catch (_: Throwable) {}
+                    try { mainViewModel?.gameHost?.onOrientationOrSizeChanged(display?.rotation) } catch (_: Throwable) {}
+                }
+            }
+            pulsingOrientation = false
+        }, 250)
+    }
 
     companion object {
         var mainViewModel: MainViewModel? = null
@@ -86,7 +165,6 @@ class MainActivity : BaseActivity() {
 
     private fun initialize() {
         if (_isInit) return
-
         val appPath: String = AppPath
 
         val quickSettings = QuickSettings(this)
@@ -114,7 +192,6 @@ class MainActivity : BaseActivity() {
         }
 
         AppPath = this.getExternalFilesDir(null)!!.absolutePath
-
         initialize()
 
         window.attributes.layoutInDisplayCutoutMode =
@@ -127,15 +204,16 @@ class MainActivity : BaseActivity() {
 
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
             controller.hide(WindowInsetsCompat.Type.systemBars())
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
         uiHandler = UiHandler()
+        displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
 
         mainViewModel = MainViewModel(this)
         mainViewModel!!.physicalControllerManager = physicalControllerManager
         mainViewModel!!.motionSensorManager = motionSensorManager
-
         mainViewModel!!.refreshFirmwareVersion()
 
         mainViewModel?.apply {
@@ -152,6 +230,7 @@ class MainActivity : BaseActivity() {
         }
 
         storedIntent = intent
+        Log.d(TAG_ROT, "onCreate: initial display.rotation=${display?.rotation} → ${deg(display?.rotation)}°")
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -173,9 +252,7 @@ class MainActivity : BaseActivity() {
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        event.apply {
-            if (physicalControllerManager.onKeyEvent(this)) return true
-        }
+        event.apply { if (physicalControllerManager.onKeyEvent(this)) return true }
         return super.dispatchKeyEvent(event)
     }
 
@@ -187,9 +264,7 @@ class MainActivity : BaseActivity() {
     override fun onStop() {
         super.onStop()
         isActive = false
-        if (isGameRunning) {
-            mainViewModel?.performanceManager?.setTurboMode(false)
-        }
+        if (isGameRunning) mainViewModel?.performanceManager?.setTurboMode(false)
     }
 
     override fun onResume() {
@@ -197,26 +272,26 @@ class MainActivity : BaseActivity() {
         // Ausrichtung ggf. erneut anwenden
         applyOrientationPreference()
 
+        // Display-Listener aktivieren
+        lastKnownRotation = display?.rotation
+        Log.d(TAG_ROT, "onResume: display.rotation=${display?.rotation} → ${deg(display?.rotation)}°")
+        try { displayManager.registerDisplayListener(displayListener, handler) } catch (_: Throwable) {}
+
         handler.postDelayed(delayedHandleIntent, 10)
         isActive = true
-
-        if (isGameRunning) {
-            if (QuickSettings(this).enableMotion) motionSensorManager.register()
-        }
+        if (isGameRunning && QuickSettings(this).enableMotion) motionSensorManager.register()
     }
 
     override fun onPause() {
         super.onPause()
         isActive = false
-        if (isGameRunning) {
-            mainViewModel?.performanceManager?.setTurboMode(false)
-        }
+        if (isGameRunning) mainViewModel?.performanceManager?.setTurboMode(false)
         motionSensorManager.unregister()
+        try { displayManager.unregisterDisplayListener(displayListener) } catch (_: Throwable) {}
     }
 
     private fun handleIntent() {
         val action = storedIntent.action ?: return
-
         when (action) {
             Intent.ACTION_VIEW,
             "org.kenjinx.android.LAUNCH_GAME",
@@ -242,28 +317,19 @@ class MainActivity : BaseActivity() {
                 if (chosenUri != null) {
                     val doc = when (chosenUri.scheme?.lowercase()) {
                         "content" -> DocumentFile.fromSingleUri(this, chosenUri)
-                        "file" -> {
-                            val f = chosenUri.path?.let { File(it) }
-                            if (f != null) DocumentFile.fromFile(f) else null
-                        }
+                        "file" -> chosenUri.path?.let { File(it) }?.let { DocumentFile.fromFile(it) }
                         else -> {
-                            val asFile = chosenUri.path?.let { File(it) }
-                            if (asFile != null && asFile.exists()) {
-                                DocumentFile.fromFile(asFile)
-                            } else {
-                                DocumentFile.fromSingleUri(this, chosenUri)
-                            }
+                            chosenUri.path?.let { File(it) }?.takeIf { it.exists() }?.let { DocumentFile.fromFile(it) }
+                                ?: DocumentFile.fromSingleUri(this, chosenUri)
                         }
                     }
 
                     if (doc != null && doc.exists()) {
                         val gameModel = GameModel(doc, this)
                         gameModel.getGameInfo()
-
                         mainViewModel?.loadGameModel?.value = gameModel
                         mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
                         mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
-
                         storedIntent = Intent()
                         return
                     } else {
@@ -275,11 +341,9 @@ class MainActivity : BaseActivity() {
                     resolveGameByTitleIdOrName(titleId, titleName)?.let { doc ->
                         val gameModel = GameModel(doc, this)
                         gameModel.getGameInfo()
-
                         mainViewModel?.loadGameModel?.value = gameModel
                         mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
                         mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
-
                         storedIntent = Intent()
                         return
                     }
@@ -291,53 +355,57 @@ class MainActivity : BaseActivity() {
     private fun applyOrientationPreference() {
         val pref = QuickSettings(this).orientationPreference
         requestedOrientation = pref.value
+        val rot = this.display?.rotation
+        Log.d(TAG_ROT, "applyOrientationPreference: rot=$rot → ${deg(rot)}°, pref=${pref.name}")
+        try { KenjinxNative.setSurfaceRotationByAndroidRotation(rot) } catch (_: Throwable) {}
     }
-
-    // --- Sensor-Rotation: Surface/Viewport sauber nachziehen ---
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        val rot = this.display?.rotation
+        val old = lastKnownRotation
+        lastKnownRotation = rot
 
-        val qs = org.kenjinx.android.viewmodels.QuickSettings(this)
-        val sensorMode = qs.orientationPreference ==
-            org.kenjinx.android.viewmodels.QuickSettings.OrientationPreference.Sensor
+        Log.d(TAG_ROT, "onConfigurationChanged: display.rotation=$rot → ${deg(rot)}°")
 
-        if (sensorMode && isGameRunning) {
-            val rot = this.display?.rotation // 0,1,2,3
-            handler.post {
-                try {
-                    mainViewModel?.gameHost?.onOrientationOrSizeChanged(rot)
-                } catch (_: Throwable) {}
-            }
+        try { KenjinxNative.setSurfaceRotationByAndroidRotation(rot) } catch (_: Throwable) {}
+
+        val pref = QuickSettings(this).orientationPreference
+        val shouldPropagate =
+            pref == QuickSettings.OrientationPreference.Sensor ||
+                pref == QuickSettings.OrientationPreference.SensorLandscape
+
+        if (shouldPropagate && isGameRunning) {
+            handler.post { try { mainViewModel?.gameHost?.onOrientationOrSizeChanged(rot) } catch (_: Throwable) {} }
+        }
+
+        // Pulse bei 90↔270, falls SensorLandscape
+        if (pref == QuickSettings.OrientationPreference.SensorLandscape && old != null && rot != null) {
+            val isSideFlip = (old == Surface.ROTATION_90 && rot == Surface.ROTATION_270) ||
+                (old == Surface.ROTATION_270 && rot == Surface.ROTATION_90)
+            if (isSideFlip) doOrientationPulse(rot)
         }
     }
 
     // --- Hilfsfunktionen für Shortcut-Fallback ---
-
     private fun resolveGameByTitleIdOrName(titleIdHex: String?, displayName: String?): DocumentFile? {
         val gamesRoot = getDefaultGamesTree() ?: return null
         for (child in gamesRoot.listFiles()) {
             if (!child.isFile) continue
             if (!displayName.isNullOrBlank()) {
                 val n = child.name ?: ""
-                if (n.contains(displayName, ignoreCase = true)) {
-                    return child
-                }
+                if (n.contains(displayName, ignoreCase = true)) return child
             }
             if (!titleIdHex.isNullOrBlank()) {
                 val tid = getTitleIdFast(child)
-                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) {
-                    return child
-                }
+                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) return child
             }
         }
         if (!titleIdHex.isNullOrBlank()) {
             for (child in gamesRoot.listFiles()) {
                 if (!child.isFile) continue
                 val tid = getTitleIdFast(child)
-                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) {
-                    return child
-                }
+                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) return child
             }
         }
         return null
@@ -351,7 +419,7 @@ class MainActivity : BaseActivity() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         val legacyPath = prefs.getString("gameFolder", null)
         if (!legacyPath.isNullOrEmpty()) {
-            // Ohne SAF-URI lässt sich der Ordner i. d. R. nicht als Tree listen
+            // Ohne SAF-URI kein Tree-Listing möglich
         }
         return null
     }
@@ -367,9 +435,7 @@ class MainActivity : BaseActivity() {
                 KenjinxNative.deviceGetGameInfo(pfd.fd, ext, info)
                 info.TitleId?.lowercase()
             }
-        } catch (_: Exception) {
-            null
-        }
+        } catch (_: Exception) { null }
     }
 
     fun shutdownAndRestart() {
@@ -377,7 +443,6 @@ class MainActivity : BaseActivity() {
         val intent = packageManager.getLaunchIntentForPackage(packageName)
         val componentName = intent?.component
         val restartIntent = Intent.makeRestartActivityTask(componentName)
-
         mainViewModel?.let { it.performanceManager?.setTurboMode(false) }
         startActivity(restartIntent)
         Runtime.getRuntime().exit(0)
