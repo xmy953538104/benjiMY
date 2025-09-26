@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.4.1e — 2025-09-26
+
+### Added
+- **Amiibo** Support:
+    - On Homescreen press the folder button on the bottom right to load 5 Amiibo files on Quickslots 1-5.
+    - Press the Overlay button in-Game and use the Quickslots 1-5 to load the Amiibo file in-Game.
+- **Timezone**: The Android-Device Timezone is now used instead of a fixed UTC
+
+### Fixed
+- **Orientation preference**: fixed an issue where SensorLandscape doesn't work
+
 ## 2.0.4.1d — 2025-09-11
 
 ### Added

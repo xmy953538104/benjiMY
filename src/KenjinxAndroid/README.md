@@ -13,8 +13,12 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.4.1d – Highlights
+## Version 2.0.4.1e – Highlights
 
+- **Amiibo** support
+    - On Homescreen press the folder button on the bottom right to load 5 Amiibo files on Quickslots 1-5.
+    - Press the Overlay button in-Game and use the Quickslots 1-5 to load the Amiibo file in-Game.
+- **Timezone** games are using the Android-Device Timezone instead of UTC
 - **Settings** added x0.75 Resolution setting.
 - **Home-screen shortcuts** from the game’s long-press bottom sheet  
   (choose **Custom icon** or **App icon** – uses the same grid artwork).
