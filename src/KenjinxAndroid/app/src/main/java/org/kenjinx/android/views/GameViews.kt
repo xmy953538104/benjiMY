@@ -46,6 +46,10 @@ import org.kenjinx.android.viewmodels.VSyncMode
 import org.kenjinx.android.widgets.SimpleAlertDialog
 import kotlin.math.roundToInt
 
+// MINIMAL ADD:
+import android.net.Uri
+import android.widget.Toast
+
 class GameViews {
     companion object {
         @Composable
@@ -99,6 +103,10 @@ class GameViews {
                 val progress = remember {
                     mutableStateOf("Loading")
                 }
+
+                // helper: slot label
+                fun qsLabel(name: String?, slot: Int): String =
+                    if (name.isNullOrBlank()) "Slot $slot" else name
 
                 if (showStats.value) {
                     GameStats(mainViewModel)
@@ -238,6 +246,110 @@ class GameViews {
                                                 tint = if (showStats.value) Color.Green else Color.Red,
                                                 contentDescription = "Toggle Game Stats"
                                             )
+                                        }
+                                    }
+
+                                    // MINIMAL ADD: Amiibo slot buttons
+                                    Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                                        Text(text = "Amiibo Slots")
+
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo1Uri
+                                                val name = qs.amiibo1Name ?: "Slot 1"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 1 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo1Name, 1)) }
+
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo2Uri
+                                                val name = qs.amiibo2Name ?: "Slot 2"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 2 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo2Name, 2)) }
+
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo3Uri
+                                                val name = qs.amiibo3Name ?: "Slot 3"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 3 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo3Name, 3)) }
+                                        }
+
+                                        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo4Uri
+                                                val name = qs.amiibo4Name ?: "Slot 4"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 4 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo4Name, 4)) }
+
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo5Uri
+                                                val name = qs.amiibo5Name ?: "Slot 5"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 5 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo5Name, 5)) }
+
+                                            androidx.compose.material3.OutlinedButton(onClick = {
+                                                KenjinxNative.amiiboClear()
+                                                Toast.makeText(mainViewModel.activity, "Amiibo cleared", Toast.LENGTH_SHORT).show()
+                                            }) { androidx.compose.material3.Text("Clear") }
                                         }
                                     }
                                 }

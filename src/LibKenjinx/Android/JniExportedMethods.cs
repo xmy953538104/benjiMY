@@ -688,6 +688,31 @@ namespace LibKenjinx
                 Logger.Error?.Print(LogClass.Application, $"deviceRecreateSwapchain failed: {ex}");
             }
         }
+
+        // ===== Amiibo JNI Exports =====
+        [UnmanagedCallersOnly(EntryPoint = "amiiboLoadBin")]
+        public static bool JniAmiiboLoadBin(IntPtr dataPtr, int length)
+        {
+            if (dataPtr == IntPtr.Zero || length <= 0) return false;
+            try
+            {
+                byte[] buf = new byte[length];
+                Marshal.Copy(dataPtr, buf, 0, length);
+                return AmiiboLoadFromBytes(buf);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "amiiboClear")]
+        public static void JniAmiiboClear()
+        {
+            AmiiboClear();
+        }
+        // ===== End Amiibo JNI Exports =====
+
     }
 
     internal static partial class Logcat

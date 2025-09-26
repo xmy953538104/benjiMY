@@ -97,6 +97,10 @@ import org.kenjinx.android.viewmodels.HomeViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.widgets.SimpleAlertDialog
 
+// NEW
+import android.widget.Toast
+import androidx.documentfile.provider.DocumentFile
+
 class HomeViews {
     companion object {
         const val ListImageSize = 150
@@ -146,12 +150,41 @@ class HomeViews {
             var isFabVisible by remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
 
+            // NEW: Amiibo slot picker state
+            val showAmiiboSlotDialog = remember { mutableStateOf(false) }
+            val pendingSlot = remember { mutableStateOf(1) }
+
             // Shortcut-Dialog-State
             val showShortcutDialog = remember { mutableStateOf(false) }
             val shortcutName = remember { mutableStateOf("") }
 
             val context = LocalContext.current
             val activity = LocalContext.current as? Activity
+
+            // NEW: Launcher für Amiibo (OpenDocument)
+            val pickAmiiboLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                if (uri != null && activity != null) {
+                    try {
+                        activity.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) {}
+                    val name = DocumentFile.fromSingleUri(activity, uri)?.name ?: "amiibo.bin"
+                    val qs = QuickSettings(activity)
+                    when (pendingSlot.value) {
+                        1 -> { qs.amiibo1Uri = uri.toString(); qs.amiibo1Name = name }
+                        2 -> { qs.amiibo2Uri = uri.toString(); qs.amiibo2Name = name }
+                        3 -> { qs.amiibo3Uri = uri.toString(); qs.amiibo3Name = name }
+                        4 -> { qs.amiibo4Uri = uri.toString(); qs.amiibo4Name = name }
+                        5 -> { qs.amiibo5Uri = uri.toString(); qs.amiibo5Name = name }
+                    }
+                    qs.save()
+                    Toast.makeText(activity, "Amiibo saved to slot ${pendingSlot.value}", Toast.LENGTH_SHORT).show()
+                }
+            }
 
             // Launcher für "Custom icon" (OpenDocument)
             val pickImageLauncher = rememberLauncherForActivityResult(
@@ -340,15 +373,27 @@ class HomeViews {
                     },
                     floatingActionButton = {
                         AnimatedVisibility(visible = isFabVisible) {
-                            FloatingActionButton(
-                                onClick = {
-                                    viewModel.requestReload()
-                                    viewModel.ensureReloadIfNecessary()
-                                },
-                                shape = MaterialTheme.shapes.small,
-                                containerColor = MaterialTheme.colorScheme.tertiary
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = "refresh")
+                            // NEW: two FABs in a row: Refresh + Import Amiibo
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                FloatingActionButton(
+                                    onClick = {
+                                        viewModel.requestReload()
+                                        viewModel.ensureReloadIfNecessary()
+                                    },
+                                    shape = MaterialTheme.shapes.small,
+                                    containerColor = MaterialTheme.colorScheme.tertiary
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "refresh")
+                                }
+                                FloatingActionButton(
+                                    onClick = { showAmiiboSlotDialog.value = true },
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    Icon(
+                                        org.kenjinx.android.Icons.folderOpen(MaterialTheme.colorScheme.onSurface),
+                                        contentDescription = "Import Amiibo"
+                                    )
+                                }
                             }
                         }
                     },
@@ -446,6 +491,51 @@ class HomeViews {
                         val titleId = viewModel.mainViewModel?.selected?.titleId ?: ""
                         val name = viewModel.mainViewModel?.selected?.titleName ?: ""
                         DlcViews.Main(titleId, name, openDlcDialog, canClose)
+                    }
+
+                    // NEW: Amiibo slot chooser dialog (outside of game)
+                    if (showAmiiboSlotDialog.value) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { showAmiiboSlotDialog.value = false },
+                            title = { Text("Import Amiibo") },
+                            text = {
+                                Column {
+                                    Text("Choose a slot to save this Amiibo:", modifier = Modifier.padding(bottom = 8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 1
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 1") }
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 2
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 2") }
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 3
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 3") }
+                                    }
+                                    Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 4
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 4") }
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 5
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 5") }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showAmiiboSlotDialog.value = false }) { Text("Close") }
+                            }
+                        )
                     }
                 }
 

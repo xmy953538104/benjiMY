@@ -1,4 +1,5 @@
 package org.kenjinx.android
+import androidx.activity.result.contract.ActivityResultContracts
 
 import android.annotation.SuppressLint
 import android.os.Bundle
@@ -456,4 +457,6 @@ class MainActivity : BaseActivity() {
         startActivity(restartIntent)
         Runtime.getRuntime().exit(0)
     }
+
+
 }
