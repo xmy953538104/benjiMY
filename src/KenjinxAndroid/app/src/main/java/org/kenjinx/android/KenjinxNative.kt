@@ -53,6 +53,7 @@ interface KenjinxNativeJna : Library {
     fun graphicsRendererSetSize(width: Int, height: Int)
     fun graphicsRendererSetVsync(vSyncMode: Int)
     fun graphicsRendererRunLoop()
+    fun graphicsSetFullscreenStretch(enable: Boolean)
     fun deviceReloadFilesystem()
     fun inputInitialize(width: Int, height: Int)
     fun inputSetClientSize(width: Int, height: Int)
@@ -123,10 +124,10 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
 
     @JvmStatic
     fun updateProgress(infoPtr: Long, progress: Float) {
+        // String aus dem Native-Pointer holen und ins Progress-Overlay schieben
         val text = NativeHelpers.instance.getStringJava(infoPtr)
         MainActivity.mainViewModel?.gameHost?.setProgress(text, progress)
     }
-
     @JvmStatic
     fun onSurfaceSizeChanged(width: Int, height: Int) {
         // No-Op: Platzhalter – Hook, falls benötigt.
@@ -191,6 +192,7 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
 
     /**
      * Variante B (Strings direkt). Wird von neueren JNI/Interop-Pfaden benutzt.
+     * Signatur entspricht exakt dem C#-Aufruf in AndroidUIHandler.cs / Interop.UpdateUiHandler(...).
      */
     @JvmStatic
     fun uiHandlerUpdate(

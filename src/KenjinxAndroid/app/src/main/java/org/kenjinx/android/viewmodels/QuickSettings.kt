@@ -47,6 +47,7 @@ class QuickSettings(val activity: Activity) {
     var enableShaderCache: Boolean
     var enableTextureRecompression: Boolean
     var enableMacroHLE: Boolean
+    var stretchToFullscreen: Boolean
     var resScale: Float
     var maxAnisotropy: Float
     var isGrid: Boolean
@@ -98,6 +99,7 @@ class QuickSettings(val activity: Activity) {
         enableShaderCache = sharedPref.getBoolean("enableShaderCache", true)
         enableTextureRecompression = sharedPref.getBoolean("enableTextureRecompression", false)
         enableMacroHLE = sharedPref.getBoolean("enableMacroHLE", true)
+        stretchToFullscreen = sharedPref.getBoolean("stretchToFullscreen", false)
         resScale = sharedPref.getFloat("resScale", 1f)
         maxAnisotropy = sharedPref.getFloat("maxAnisotropy", 0f)
         useVirtualController = sharedPref.getBoolean("useVirtualController", true)
@@ -148,6 +150,7 @@ class QuickSettings(val activity: Activity) {
             putBoolean("enableShaderCache", enableShaderCache)
             putBoolean("enableTextureRecompression", enableTextureRecompression)
             putBoolean("enableMacroHLE", enableMacroHLE)
+            putBoolean("stretchToFullscreen", stretchToFullscreen)
             putFloat("resScale", resScale)
             putFloat("maxAnisotropy", maxAnisotropy)
             putBoolean("useVirtualController", useVirtualController)

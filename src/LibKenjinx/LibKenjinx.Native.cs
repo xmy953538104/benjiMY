@@ -132,7 +132,6 @@ namespace LibKenjinx
             }
 
             List<string> extensions = [];
-            var size = Marshal.SizeOf<IntPtr>();
             var extPtr = (IntPtr*)nativeGraphicsInterop.VkRequiredExtensions;
             for (int i = 0; i < nativeGraphicsInterop.VkRequiredExtensionsCount; i++)
             {
@@ -274,6 +273,7 @@ namespace LibKenjinx
 
             return stats;
         }
+
         [UnmanagedCallersOnly(EntryPoint = "device_launch_mii_editor")]
         public static bool LaunchMiiEditAppletNative()
         {
@@ -467,6 +467,35 @@ namespace LibKenjinx
             var userId = Marshal.PtrToStringAnsi(userIdPtr) ?? "";
 
             CloseUser(userId);
+        }
+
+        // ----------------------
+        // Stretch: Helper + Exports
+        // ----------------------
+
+        // zentrale Logik (managed)
+        private static void ApplyFullscreenStretch(bool enable)
+        {
+            var ar = enable ? AspectRatio.Stretched : AspectRatio.Fixed16x9;
+
+            // struct zurückholen, ändern, zurückschreiben
+            var cfg = GraphicsConfiguration;
+            cfg.AspectRatio = ar;
+            GraphicsConfiguration = cfg;
+
+            // Hot-Apply für laufende Emulation
+            var dev = SwitchDevice?.EmulationContext;
+            if (dev != null)
+            {
+                try { dev.Configuration.AspectRatio = ar; } catch { }
+            }
+        }
+
+        // CamelCase Export (JNA ruft den hier auf)
+        [UnmanagedCallersOnly(EntryPoint = "graphicsSetFullscreenStretch")]
+        public static void GraphicsSetFullscreenStretchNativeAlias(bool enable)
+        {
+            ApplyFullscreenStretch(enable);
         }
     }
 }

@@ -134,6 +134,7 @@ class SettingViews {
             val enableShaderCache = remember { mutableStateOf(false) }
             val enableTextureRecompression = remember { mutableStateOf(false) }
             val enableMacroHLE = remember { mutableStateOf(false) }
+            val stretchToFullscreen = remember { mutableStateOf(false) }
             val resScale = remember { mutableFloatStateOf(1f) }
             val maxAnisotropy = remember { mutableFloatStateOf(0f) }
             val useVirtualController = remember { mutableStateOf(true) }
@@ -189,6 +190,7 @@ class SettingViews {
                     enableShaderCache,
                     enableTextureRecompression,
                     enableMacroHLE,
+                    stretchToFullscreen,
                     resScale,
                     maxAnisotropy,
                     useVirtualController,
@@ -235,6 +237,7 @@ class SettingViews {
                                     enableShaderCache,
                                     enableTextureRecompression,
                                     enableMacroHLE,
+                                    stretchToFullscreen,
                                     resScale,
                                     maxAnisotropy,
                                     useVirtualController,
@@ -285,6 +288,7 @@ class SettingViews {
                                 selectedOrientation = orientationPref.value,
                                 onOrientationSelected = { sel ->
                                     orientationPref.value = sel
+                                    // sofort speichern und anwenden
                                     val qs = QuickSettings(mainViewModel.activity)
                                     qs.orientationPreference = sel
                                     qs.save()
@@ -1319,6 +1323,7 @@ class SettingViews {
                             enableShaderCache.SwitchSelector(label = "Shader Cache")
                             enableTextureRecompression.SwitchSelector(label = "Texture Recompression")
                             enableMacroHLE.SwitchSelector(label = "Macro HLE")
+                            stretchToFullscreen.SwitchSelector(label = "Stretch to Fullscreen")
                             ResolutionScaleDropdown(
                                 selectedScale = resScale.floatValue,
                                 onScaleSelected = { scale ->

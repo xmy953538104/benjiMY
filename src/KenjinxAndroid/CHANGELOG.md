@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.4.1f — 2025-09-28
+
+### Added
+- **Stretch to Fullscreen** toggle in Graphics Settings
+
 ## 2.0.4.1e — 2025-09-26
 
 ### Added

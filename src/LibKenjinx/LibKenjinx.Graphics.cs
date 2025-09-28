@@ -221,19 +221,29 @@ namespace LibKenjinx
     [StructLayout(LayoutKind.Sequential)]
     public struct GraphicsConfiguration
     {
-        public float ResScale = 1f;
-        public float MaxAnisotropy = -1;
-        public bool FastGpuTime = true;
-        public bool Fast2DCopy = true;
-        public bool EnableMacroJit = false;
-        public bool EnableMacroHLE = true;
-        public bool EnableShaderCache = true;
-        public bool EnableTextureRecompression = false;
-        public BackendThreading BackendThreading = BackendThreading.Auto;
-        public AspectRatio AspectRatio = AspectRatio.Fixed16x9;
+        public float ResScale;
+        public float MaxAnisotropy;
+        public bool FastGpuTime;
+        public bool Fast2DCopy;
+        public bool EnableMacroJit;
+        public bool EnableMacroHLE;
+        public bool EnableShaderCache;
+        public bool EnableTextureRecompression;
+        public BackendThreading BackendThreading;
+        public AspectRatio AspectRatio; // <- important
 
         public GraphicsConfiguration()
         {
+            ResScale = 1f;
+            MaxAnisotropy = -1;
+            FastGpuTime = true;
+            Fast2DCopy = true;
+            EnableMacroJit = false;
+            EnableMacroHLE = true;
+            EnableShaderCache = true;
+            EnableTextureRecompression = false;
+            BackendThreading = BackendThreading.Auto;
+            AspectRatio = AspectRatio.Fixed16x9;
         }
     }
 
