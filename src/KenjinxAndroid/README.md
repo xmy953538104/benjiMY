@@ -13,9 +13,10 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.4.1f – Highlights
+## Version 2.0.4.1g – Highlights
 
-- **Stretch to Fullscreen** toggle in Graphics Settings
+- **Overlay-Menu-Button** Position Dropdown and Opacity Slider (Settings → User Interface)
+- **Stretch to Fullscreen** toggle (Settings → Graphics)
 - **Amiibo** support
     - On Homescreen press the folder button on the bottom right to load 5 Amiibo files on Quickslots 1-5.
     - Press the Overlay button in-Game and use the Quickslots 1-5 to load the Amiibo file in-Game.

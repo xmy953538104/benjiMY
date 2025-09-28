@@ -19,7 +19,16 @@ class QuickSettings(val activity: Activity) {
         }
     }
 
+    // --- NEU: Overlay-Position
+    enum class OverlayMenuPosition {
+        BottomMiddle, BottomLeft, BottomRight, TopMiddle, TopLeft, TopRight
+    }
+
     var orientationPreference: OrientationPreference
+
+    // --- NEU: Overlay Settings
+    var overlayMenuPosition: OverlayMenuPosition
+    var overlayMenuOpacity: Float
 
     var ignoreMissingServices: Boolean
     var enablePptc: Boolean
@@ -85,6 +94,12 @@ class QuickSettings(val activity: Activity) {
         val oriValue = sharedPref.getInt("orientationPreference", ActivityInfo.SCREEN_ORIENTATION_SENSOR)
         orientationPreference = OrientationPreference.fromValue(oriValue)
 
+        // --- NEU: Overlay Settings laden
+        overlayMenuPosition = OverlayMenuPosition.entries[
+            sharedPref.getInt("overlayMenuPosition", OverlayMenuPosition.BottomMiddle.ordinal)
+        ]
+        overlayMenuOpacity = sharedPref.getFloat("overlayMenuOpacity", 1f).coerceIn(0f, 1f)
+
         memoryManagerMode = MemoryManagerMode.entries.toTypedArray()[sharedPref.getInt("memoryManagerMode", MemoryManagerMode.HostMappedUnsafe.ordinal)]
         useNce = sharedPref.getBoolean("useNce", false)
         memoryConfiguration = MemoryConfiguration.entries.toTypedArray()[sharedPref.getInt("memoryConfiguration", MemoryConfiguration.MemoryConfiguration4GiB.ordinal)]
@@ -135,6 +150,10 @@ class QuickSettings(val activity: Activity) {
 
             // --- NEU: Ausrichtung speichern
             putInt("orientationPreference", orientationPreference.value)
+
+            // --- NEU: Overlay Settings speichern
+            putInt("overlayMenuPosition", overlayMenuPosition.ordinal)
+            putFloat("overlayMenuOpacity", overlayMenuOpacity.coerceIn(0f, 1f))
 
             putInt("memoryManagerMode", memoryManagerMode.ordinal)
             putBoolean("useNce", useNce)
