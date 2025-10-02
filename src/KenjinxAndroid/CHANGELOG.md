@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.4.1g — 2025-09-28
+## 2.0.4.1g — 2025-10-02
 
 ### Added
 - **Overlay-Menu-Button** Position Dropdown and Opacity Slider (Settings → User Interface)
