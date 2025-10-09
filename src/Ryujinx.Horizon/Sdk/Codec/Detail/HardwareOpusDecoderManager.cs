@@ -112,12 +112,8 @@ namespace Ryujinx.Horizon.Sdk.Codec.Detail
                 return CodecResult.InvalidChannelCount;
             }
 
-            if (!IsValidSampleRate(parameter.SampleRate))
-            {
-                return CodecResult.InvalidSampleRate;
-            }
-
-            if (!IsValidNumberOfStreams(parameter.NumberOfStreams, parameter.NumberOfStereoStreams, parameter.ChannelsCount))
+            if (!IsValidSampleRate(parameter.SampleRate)
+                || !IsValidNumberOfStreams(parameter.NumberOfStreams, parameter.NumberOfStereoStreams, parameter.ChannelsCount))
             {
                 return CodecResult.InvalidSampleRate;
             }
@@ -262,12 +258,8 @@ namespace Ryujinx.Horizon.Sdk.Codec.Detail
                 return CodecResult.InvalidChannelCount;
             }
 
-            if (!IsValidSampleRate(parameter.SampleRate))
-            {
-                return CodecResult.InvalidSampleRate;
-            }
-
-            if (!IsValidNumberOfStreams(parameter.NumberOfStreams, parameter.NumberOfStereoStreams, parameter.ChannelsCount))
+            if (!IsValidSampleRate(parameter.SampleRate)
+                || !IsValidNumberOfStreams(parameter.NumberOfStreams, parameter.NumberOfStereoStreams, parameter.ChannelsCount))
             {
                 return CodecResult.InvalidSampleRate;
             }
@@ -305,7 +297,7 @@ namespace Ryujinx.Horizon.Sdk.Codec.Detail
         {
             const int SilkDecoderSize = 0x2160;
 
-            if (channelsCount < 1 || channelsCount > 2)
+            if (channelsCount is < 1 or > 2)
             {
                 return 0;
             }

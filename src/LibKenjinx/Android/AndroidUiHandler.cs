@@ -13,7 +13,7 @@ namespace LibKenjinx.Android
         private bool _isDisposed;
         private bool _isOkPressed;
         private string? _input;
-        private ManualResetEvent _resetEvent = new ManualResetEvent(false);
+        private ManualResetEvent _resetEvent = new(false);
 
         public IHostUITheme HostUITheme => throw new NotImplementedException();
 

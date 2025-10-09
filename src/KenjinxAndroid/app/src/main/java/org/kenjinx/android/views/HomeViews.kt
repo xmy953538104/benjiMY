@@ -1,13 +1,7 @@
 package org.kenjinx.android.views
 
-import android.app.Activity
-import android.content.Intent
 import android.content.res.Resources
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -39,7 +33,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -51,23 +44,23 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -89,24 +82,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.kenjinx.android.R
-import org.kenjinx.android.ShortcutUtils
-import org.kenjinx.android.ShortcutWizardActivity
 import org.kenjinx.android.viewmodels.FileType
 import org.kenjinx.android.viewmodels.GameModel
 import org.kenjinx.android.viewmodels.HomeViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.widgets.SimpleAlertDialog
 
-// NEW
-import android.widget.Toast
-import androidx.documentfile.provider.DocumentFile
-
 class HomeViews {
     companion object {
         const val ListImageSize = 150
         const val GridImageSize = 300
 
-        // --- Versions-Badge unten links
+        // --- small version badge bottom left
         @Composable
         private fun VersionBadge(modifier: Modifier = Modifier) {
             Text(
@@ -115,19 +102,6 @@ class HomeViews {
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 modifier = modifier.padding(8.dp)
             )
-        }
-
-        // -- Hilfen für Shortcut-Flow (direkt aus ausgewähltem Game)
-        private fun resolveGameUri(gm: GameModel): Uri? = gm.file.uri
-
-        private fun decodeGameIcon(gm: GameModel): Bitmap? {
-            return try {
-                val b64 = gm.icon ?: return null
-                val bytes = Base64.getDecoder().decode(b64)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            } catch (_: Throwable) {
-                null
-            }
         }
 
         @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -150,72 +124,7 @@ class HomeViews {
             var isFabVisible by remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
 
-            // NEW: Amiibo slot picker state
-            val showAmiiboSlotDialog = remember { mutableStateOf(false) }
-            val pendingSlot = remember { mutableStateOf(1) }
-
-            // Shortcut-Dialog-State
-            val showShortcutDialog = remember { mutableStateOf(false) }
-            val shortcutName = remember { mutableStateOf("") }
-
             val context = LocalContext.current
-            val activity = LocalContext.current as? Activity
-
-            // NEW: Launcher für Amiibo (OpenDocument)
-            val pickAmiiboLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.OpenDocument()
-            ) { uri: Uri? ->
-                if (uri != null && activity != null) {
-                    try {
-                        activity.contentResolver.takePersistableUriPermission(
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                    } catch (_: Exception) {}
-                    val name = DocumentFile.fromSingleUri(activity, uri)?.name ?: "amiibo.bin"
-                    val qs = QuickSettings(activity)
-                    when (pendingSlot.value) {
-                        1 -> { qs.amiibo1Uri = uri.toString(); qs.amiibo1Name = name }
-                        2 -> { qs.amiibo2Uri = uri.toString(); qs.amiibo2Name = name }
-                        3 -> { qs.amiibo3Uri = uri.toString(); qs.amiibo3Name = name }
-                        4 -> { qs.amiibo4Uri = uri.toString(); qs.amiibo4Name = name }
-                        5 -> { qs.amiibo5Uri = uri.toString(); qs.amiibo5Name = name }
-                    }
-                    qs.save()
-                    Toast.makeText(activity, "Amiibo saved to slot ${pendingSlot.value}", Toast.LENGTH_SHORT).show()
-                }
-            }
-
-            // Launcher für "Custom icon" (OpenDocument)
-            val pickImageLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.OpenDocument()
-            ) { uri: Uri? ->
-                val gm = viewModel.mainViewModel?.selected
-                if (uri != null && gm != null && activity != null) {
-                    // Bitmap laden
-                    val bmp = runCatching {
-                        context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) }
-                    }.getOrNull()
-
-                    val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
-                    val gameUri = resolveGameUri(gm)
-                    if (gameUri != null) {
-                        // Persistente Rechte für die Spieldatei (wichtig für Shortcut)
-                        ShortcutUtils.persistReadWrite(activity, gameUri)
-
-                        ShortcutUtils.pinShortcutForGame(
-                            activity = activity,
-                            gameUri = gameUri,
-                            label = label,
-                            iconBitmap = bmp
-                        ) {
-                            // optionaler Callback nach System-Dialog
-                        }
-                    } else {
-                        showError.value = "Shortcut failed (no game URI found)."
-                    }
-                }
-            }
 
             val nestedScrollConnection = remember {
                 object : NestedScrollConnection {
@@ -227,7 +136,7 @@ class HomeViews {
                 }
             }
 
-            // --- Box um Scaffold, damit wir das Badge overlayen können
+            // --- Box around scaffold so we can overlay the badge
             Box(Modifier.fillMaxSize()) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -332,25 +241,7 @@ class HomeViews {
                                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                                 }
 
-                                // Shortcut-Wizard (allgemein)
-                                IconButton(
-                                    onClick = {
-                                        context.startActivity(
-                                            Intent(context, ShortcutWizardActivity::class.java)
-                                        )
-                                    },
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .border(
-                                            width = 1.dp,
-                                            color = MaterialTheme.colorScheme.outline,
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                ) {
-                                    Icon(Icons.Filled.Add, contentDescription = "Add Shortcut")
-                                }
-                            }
+                        }
 
                             OutlinedTextField(
                                 value = query.value,
@@ -364,36 +255,28 @@ class HomeViews {
                                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
                                 singleLine = true,
                                 shape = RoundedCornerShape(8.dp),
-                                colors = TextFieldDefaults.outlinedTextFieldColors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                                )
+                                colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        disabledContainerColor = Color.Transparent,
+                                        errorContainerColor = Color.Transparent,
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                    )
                             )
                         }
                     },
                     floatingActionButton = {
                         AnimatedVisibility(visible = isFabVisible) {
-                            // NEW: two FABs in a row: Refresh + Import Amiibo
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                FloatingActionButton(
-                                    onClick = {
-                                        viewModel.requestReload()
-                                        viewModel.ensureReloadIfNecessary()
-                                    },
-                                    shape = MaterialTheme.shapes.small,
-                                    containerColor = MaterialTheme.colorScheme.tertiary
-                                ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = "refresh")
-                                }
-                                FloatingActionButton(
-                                    onClick = { showAmiiboSlotDialog.value = true },
-                                    shape = MaterialTheme.shapes.small
-                                ) {
-                                    Icon(
-                                        org.kenjinx.android.Icons.folderOpen(MaterialTheme.colorScheme.onSurface),
-                                        contentDescription = "Import Amiibo"
-                                    )
-                                }
+                            FloatingActionButton(
+                                onClick = {
+                                    viewModel.requestReload()
+                                    viewModel.ensureReloadIfNecessary()
+                                },
+                                shape = MaterialTheme.shapes.small,
+                                containerColor = MaterialTheme.colorScheme.tertiary
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = "refresh")
                             }
                         }
                     },
@@ -453,7 +336,7 @@ class HomeViews {
                                                     if (this.isNotEmpty() && (query.value.trim()
                                                             .isEmpty() || this.lowercase(Locale.getDefault())
                                                             .contains(query.value))) {
-                                                        Box(modifier = Modifier.animateItemPlacement()) {
+                                                        Box(modifier = Modifier.animateItem()) {
                                                             ListGameItem(
                                                                 it,
                                                                 viewModel,
@@ -477,7 +360,7 @@ class HomeViews {
                     SimpleAlertDialog.Custom(
                         showDialog = openTitleUpdateDialog,
                         onDismissRequest = { openTitleUpdateDialog.value = false },
-                        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+                        properties = DialogProperties(usePlatformDefaultWidth = false)
                     ) {
                         val titleId = viewModel.mainViewModel?.selected?.titleId ?: ""
                         val name = viewModel.mainViewModel?.selected?.titleName ?: ""
@@ -486,56 +369,11 @@ class HomeViews {
                     SimpleAlertDialog.Custom(
                         showDialog = openDlcDialog,
                         onDismissRequest = { openDlcDialog.value = false },
-                        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+                        properties = DialogProperties(usePlatformDefaultWidth = false)
                     ) {
                         val titleId = viewModel.mainViewModel?.selected?.titleId ?: ""
                         val name = viewModel.mainViewModel?.selected?.titleName ?: ""
                         DlcViews.Main(titleId, name, openDlcDialog, canClose)
-                    }
-
-                    // NEW: Amiibo slot chooser dialog (outside of game)
-                    if (showAmiiboSlotDialog.value) {
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = { showAmiiboSlotDialog.value = false },
-                            title = { Text("Import Amiibo") },
-                            text = {
-                                Column {
-                                    Text("Choose a slot to save this Amiibo:", modifier = Modifier.padding(bottom = 8.dp))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        TextButton(onClick = {
-                                            pendingSlot.value = 1
-                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
-                                            showAmiiboSlotDialog.value = false
-                                        }) { Text("Slot 1") }
-                                        TextButton(onClick = {
-                                            pendingSlot.value = 2
-                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
-                                            showAmiiboSlotDialog.value = false
-                                        }) { Text("Slot 2") }
-                                        TextButton(onClick = {
-                                            pendingSlot.value = 3
-                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
-                                            showAmiiboSlotDialog.value = false
-                                        }) { Text("Slot 3") }
-                                    }
-                                    Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        TextButton(onClick = {
-                                            pendingSlot.value = 4
-                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
-                                            showAmiiboSlotDialog.value = false
-                                        }) { Text("Slot 4") }
-                                        TextButton(onClick = {
-                                            pendingSlot.value = 5
-                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
-                                            showAmiiboSlotDialog.value = false
-                                        }) { Text("Slot 5") }
-                                    }
-                                }
-                            },
-                            confirmButton = {
-                                TextButton(onClick = { showAmiiboSlotDialog.value = false }) { Text("Close") }
-                            }
-                        )
                     }
                 }
 
@@ -552,7 +390,7 @@ class HomeViews {
                                     viewModel.mainViewModel.loadGameModel.value!!,
                                     true,
                                     viewModel.mainViewModel.forceNceAndPptc.value
-                                ) ?: false
+                                )
                                 if (success == 1) {
                                     launchOnUiThread {
                                         viewModel.mainViewModel.navigateToGame()
@@ -575,7 +413,6 @@ class HomeViews {
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
                                 if (showAppActions.value) {
-                                    // Start (Play)
                                     IconButton(onClick = {
                                         if (viewModel.mainViewModel?.selected != null) {
                                             thread {
@@ -602,22 +439,6 @@ class HomeViews {
                                             contentDescription = "Run"
                                         )
                                     }
-
-                                    // Shortcut erstellen (direkt fürs ausgewählte Spiel)
-                                    IconButton(onClick = {
-                                        val gm = viewModel.mainViewModel?.selected
-                                        if (gm != null) {
-                                            shortcutName.value = gm.titleName ?: ""
-                                            showShortcutDialog.value = true
-                                        }
-                                    }) {
-                                        Icon(
-                                            Icons.Filled.Add,
-                                            contentDescription = "Create Shortcut"
-                                        )
-                                    }
-
-                                    // Menü
                                     val showAppMenu = remember { mutableStateOf(false) }
                                     Box {
                                         IconButton(onClick = { showAppMenu.value = true }) {
@@ -679,77 +500,11 @@ class HomeViews {
                         }
                     )
 
-                // --- Shortcut-Dialog: Name + Icon-Quelle
-                if (showShortcutDialog.value) {
-                    val gm = viewModel.mainViewModel?.selected
-                    AlertDialog(
-                        onDismissRequest = { showShortcutDialog.value = false },
-                        title = { Text("Create shortcut") },
-                        text = {
-                            Column {
-                                OutlinedTextField(
-                                    value = shortcutName.value,
-                                    onValueChange = { shortcutName.value = it },
-                                    label = { Text("Name") },
-                                    singleLine = true
-                                )
-                                Text(
-                                    text = "Choose icon:",
-                                    modifier = Modifier.padding(top = 12.dp)
-                                )
-                                Row(
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp)
-                                ) {
-                                    TextButton(onClick = {
-                                        // App icon (Grid image)
-                                        if (gm != null && activity != null) {
-                                            val gameUri = resolveGameUri(gm)
-                                            if (gameUri != null) {
-                                                // persist rights for the game file
-                                                ShortcutUtils.persistReadWrite(activity, gameUri)
-
-                                                val bmp = decodeGameIcon(gm)
-                                                val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
-
-                                                ShortcutUtils.pinShortcutForGame(
-                                                    activity = activity,
-                                                    gameUri = gameUri,
-                                                    label = label,
-                                                    iconBitmap = bmp
-                                                ) { }
-                                                showShortcutDialog.value = false
-                                            } else {
-                                                showShortcutDialog.value = false
-                                            }
-                                        } else {
-                                            showShortcutDialog.value = false
-                                        }
-                                    }) { Text("App icon") }
-
-                                    TextButton(onClick = {
-                                        // Custom icon: open picker
-                                        pickImageLauncher.launch(arrayOf("image/*"))
-                                        showShortcutDialog.value = false
-                                    }) { Text("Custom icon") }
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showShortcutDialog.value = false }) {
-                                Text("Close")
-                            }
-                        }
-                    )
-                }
-
-                // --- Version-Badge unten links
+                // --- Version badge bottom left above the entire content
                 VersionBadge(
                     modifier = Modifier.align(Alignment.BottomStart)
                 )
-            } // Box
+            } // End of box
         }
 
         @OptIn(ExperimentalFoundationApi::class)
@@ -837,7 +592,7 @@ class HomeViews {
                     }
                     Column {
                         Text(text = gameModel.version ?: "")
-                        Text(text = String.format("%.3f", gameModel.fileSize))
+                        Text(text = String.format(Locale.getDefault(), "%.3f", gameModel.fileSize))
                     }
                 }
             }
@@ -869,7 +624,7 @@ class HomeViews {
                             if (viewModel.mainViewModel?.selected != null) {
                                 showAppActions.value = false
                                 viewModel.mainViewModel.apply { selected = null }
-                                selectedModel.value = gameModel
+                                selectedModel.value = null
                             } else if (gameModel.titleId.isNullOrEmpty()
                                 || gameModel.titleId != "0000000000000000"
                                 || gameModel.type == FileType.Nro

@@ -40,7 +40,7 @@ namespace Ryujinx.Headless
             Task.Run(Updater.CleanupUpdate);
 
             // Hook unhandled exception and process exit events.
-            AppDomain.CurrentDomain.UnhandledException += (sender, e) 
+            AppDomain.CurrentDomain.UnhandledException += (_, e) 
                 => Program.ProcessUnhandledException(e.ExceptionObject as Exception, e.IsTerminating);
             AppDomain.CurrentDomain.ProcessExit += (_, _) => Program.Exit();
 
@@ -96,7 +96,7 @@ namespace Ryujinx.Headless
 
             InputConfig config;
 
-            if (inputProfileName == null || inputProfileName.Equals("default"))
+            if (inputProfileName is null or "default")
             {
                 if (isKeyboard)
                 {
@@ -175,8 +175,8 @@ namespace Ryujinx.Headless
                             ButtonMinus = ConfigGamepadInputId.Minus,
                             ButtonL = ConfigGamepadInputId.LeftShoulder,
                             ButtonZl = ConfigGamepadInputId.LeftTrigger,
-                            ButtonSl = ConfigGamepadInputId.Unbound,
-                            ButtonSr = ConfigGamepadInputId.Unbound,
+                            ButtonSl = ConfigGamepadInputId.SingleLeftTrigger0,
+                            ButtonSr = ConfigGamepadInputId.SingleRightTrigger0,
                         },
 
                         LeftJoyconStick = new JoyconConfigControllerStick<ConfigGamepadInputId, ConfigStickInputId>
@@ -197,8 +197,8 @@ namespace Ryujinx.Headless
                             ButtonPlus = ConfigGamepadInputId.Plus,
                             ButtonR = ConfigGamepadInputId.RightShoulder,
                             ButtonZr = ConfigGamepadInputId.RightTrigger,
-                            ButtonSl = ConfigGamepadInputId.Unbound,
-                            ButtonSr = ConfigGamepadInputId.Unbound,
+                            ButtonSl = ConfigGamepadInputId.SingleLeftTrigger1,
+                            ButtonSr = ConfigGamepadInputId.SingleRightTrigger1,
                         },
 
                         RightJoyconStick = new JoyconConfigControllerStick<ConfigGamepadInputId, ConfigStickInputId>
@@ -306,7 +306,7 @@ namespace Ryujinx.Headless
 
                 return new VulkanRenderer(
                     api,
-                    (instance, vk) => new SurfaceKHR((ulong)(vulkanWindow.CreateWindowSurface(instance.Handle))),
+                    (instance, _) => new SurfaceKHR((ulong)(vulkanWindow.CreateWindowSurface(instance.Handle))),
                     vulkanWindow.GetRequiredInstanceExtensions,
                     preferredGpuId);
             }

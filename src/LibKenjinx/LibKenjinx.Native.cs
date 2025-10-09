@@ -473,17 +473,17 @@ namespace LibKenjinx
         // Stretch: Helper + Exports
         // ----------------------
 
-        // zentrale Logik (managed)
+        // central logic (managed)
         private static void ApplyFullscreenStretch(bool enable)
         {
             var ar = enable ? AspectRatio.Stretched : AspectRatio.Fixed16x9;
 
-            // struct zurückholen, ändern, zurückschreiben
+            // Retrieve, modify, write back struct
             var cfg = GraphicsConfiguration;
             cfg.AspectRatio = ar;
             GraphicsConfiguration = cfg;
 
-            // Hot-Apply für laufende Emulation
+            // Hot-Apply for running emulation
             var dev = SwitchDevice?.EmulationContext;
             if (dev != null)
             {
@@ -491,7 +491,7 @@ namespace LibKenjinx
             }
         }
 
-        // CamelCase Export (JNA ruft den hier auf)
+        // CamelCase Export (JNA calls it here)
         [UnmanagedCallersOnly(EntryPoint = "graphicsSetFullscreenStretch")]
         public static void GraphicsSetFullscreenStretchNativeAlias(bool enable)
         {

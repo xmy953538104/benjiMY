@@ -535,12 +535,8 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
 
             ulong copySize = (ulong)((long)handlesCount * 4);
 
-            if (!currentProcess.MemoryManager.InsideAddrSpace(handlesPtr, copySize))
-            {
-                return KernelResult.UserCopyFailed;
-            }
-
-            if (handlesPtr + copySize < handlesPtr)
+            if (!currentProcess.MemoryManager.InsideAddrSpace(handlesPtr, copySize) ||
+                handlesPtr + copySize < handlesPtr)
             {
                 return KernelResult.UserCopyFailed;
             }
@@ -647,12 +643,8 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
 
             ulong copySize = (ulong)((long)handlesCount * 4);
 
-            if (!currentProcess.MemoryManager.InsideAddrSpace(handlesPtr, copySize))
-            {
-                return KernelResult.UserCopyFailed;
-            }
-
-            if (handlesPtr + copySize < handlesPtr)
+            if (!currentProcess.MemoryManager.InsideAddrSpace(handlesPtr, copySize) ||
+                handlesPtr + copySize < handlesPtr)
             {
                 return KernelResult.UserCopyFailed;
             }
@@ -1199,7 +1191,7 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
                 return KernelResult.InvalidMemState;
             }
 
-            if (permission > KMemoryPermission.ReadAndWrite || permission == KMemoryPermission.Write)
+            if (permission is > KMemoryPermission.ReadAndWrite or KMemoryPermission.Write)
             {
                 return KernelResult.InvalidPermission;
             }
@@ -1261,7 +1253,7 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
                 return KernelResult.InvalidMemState;
             }
 
-            if (permission > KMemoryPermission.ReadAndWrite || permission == KMemoryPermission.Write)
+            if (permission is > KMemoryPermission.ReadAndWrite or KMemoryPermission.Write)
             {
                 return KernelResult.InvalidPermission;
             }
@@ -2134,7 +2126,7 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
 
                 case InfoType.ThreadTickCount:
                     {
-                        if (subId < -1 || subId > 3)
+                        if (subId is < -1 or > 3)
                         {
                             return KernelResult.InvalidCombination;
                         }
@@ -2268,12 +2260,8 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
 
                 ulong copySize = (ulong)maxCount * 8;
 
-                if (address + copySize <= address)
-                {
-                    return KernelResult.InvalidMemState;
-                }
-
-                if (currentProcess.MemoryManager.OutsideAddrSpace(address, copySize))
+                if (address + copySize <= address ||
+                    currentProcess.MemoryManager.OutsideAddrSpace(address, copySize))
                 {
                     return KernelResult.InvalidMemState;
                 }
@@ -2742,12 +2730,7 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
 
             KThread thread = process.HandleTable.GetObject<KThread>(handle);
 
-            if (thread == null)
-            {
-                return KernelResult.InvalidHandle;
-            }
-
-            if (thread.Owner != process)
+            if (thread == null || thread.Owner != process)
             {
                 return KernelResult.InvalidHandle;
             }
@@ -2768,12 +2751,7 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
 
             KThread thread = currentProcess.HandleTable.GetObject<KThread>(handle);
 
-            if (thread == null)
-            {
-                return KernelResult.InvalidHandle;
-            }
-
-            if (thread.Owner != currentProcess)
+            if (thread == null || thread.Owner != currentProcess)
             {
                 return KernelResult.InvalidHandle;
             }
@@ -2820,12 +2798,8 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
 
                 long handlesSize = handlesCount * 4;
 
-                if (handlesPtr + (ulong)handlesSize <= handlesPtr)
-                {
-                    return KernelResult.UserCopyFailed;
-                }
-
-                if (handlesPtr + (ulong)handlesSize - 1 > currentProcess.MemoryManager.AddressSpaceEnd - 1)
+                if (handlesPtr + (ulong)handlesSize <= handlesPtr ||
+                    handlesPtr + (ulong)handlesSize - 1 > currentProcess.MemoryManager.AddressSpaceEnd - 1)
                 {
                     return KernelResult.UserCopyFailed;
                 }

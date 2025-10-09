@@ -258,7 +258,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
 
             RecordStorageAlignment(_cpStorageBuffers, index, gpuVa);
 
-            gpuVa = BitUtils.AlignDown<ulong>(gpuVa, (ulong)_context.Capabilities.StorageBufferOffsetAlignment);
+            gpuVa = BitUtils.AlignDown(gpuVa, (ulong)_context.Capabilities.StorageBufferOffsetAlignment);
 
             MultiRange range = _channel.MemoryManager.Physical.BufferCache.TranslateAndCreateMultiBuffers(_channel.MemoryManager, gpuVa, size, BufferStageUtils.ComputeStorage(flags));
 
@@ -282,7 +282,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
 
             RecordStorageAlignment(buffers, index, gpuVa);
 
-            gpuVa = BitUtils.AlignDown<ulong>(gpuVa, (ulong)_context.Capabilities.StorageBufferOffsetAlignment);
+            gpuVa = BitUtils.AlignDown(gpuVa, (ulong)_context.Capabilities.StorageBufferOffsetAlignment);
 
             MultiRange range = _channel.MemoryManager.Physical.BufferCache.TranslateAndCreateMultiBuffers(_channel.MemoryManager, gpuVa, size, BufferStageUtils.GraphicsStorage(stage, flags));
 
@@ -761,7 +761,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
 
                     if (!bounds.IsUnmapped)
                     {
-                        var isWrite = bounds.Flags.HasFlag(BufferUsageFlags.Write);
+                        var isWrite = (bounds.Flags & BufferUsageFlags.Write) == BufferUsageFlags.Write;
                         var range = isStorage
                             ? bufferCache.GetBufferRangeAligned(bounds.Range, bufferStage | BufferStageUtils.FromUsage(bounds.Flags), isWrite)
                             : bufferCache.GetBufferRange(bounds.Range, bufferStage);
@@ -798,7 +798,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
 
                 if (!bounds.IsUnmapped)
                 {
-                    var isWrite = bounds.Flags.HasFlag(BufferUsageFlags.Write);
+                    var isWrite = (bounds.Flags & BufferUsageFlags.Write) == BufferUsageFlags.Write;
                     var range = isStorage
                         ? bufferCache.GetBufferRangeAligned(bounds.Range, BufferStageUtils.ComputeStorage(bounds.Flags), isWrite)
                         : bufferCache.GetBufferRange(bounds.Range, BufferStage.Compute);
@@ -817,7 +817,6 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// Bind respective buffer bindings on the host API.
         /// </summary>
         /// <param name="ranges">Host buffers to bind, with their offsets and sizes</param>
-        /// <param name="first">First binding point</param>
         /// <param name="count">Number of bindings</param>
         /// <param name="isStorage">Indicates if the buffers are storage or uniform buffers</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -866,7 +865,6 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <param name="texture">Buffer texture</param>
         /// <param name="range">Physical ranges of memory where the buffer texture data is located</param>
         /// <param name="bindingInfo">Binding info for the buffer texture</param>
-        /// <param name="format">Format of the buffer texture</param>
         /// <param name="isImage">Whether the binding is for an image or a sampler</param>
         public void SetBufferTextureStorage(
             ShaderStage stage,
@@ -889,7 +887,6 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <param name="range">Physical ranges of memory where the buffer texture data is located</param>
         /// <param name="bindingInfo">Binding info for the buffer texture</param>
         /// <param name="index">Index of the binding on the array</param>
-        /// <param name="format">Format of the buffer texture</param>
         public void SetBufferTextureStorage(
             ShaderStage stage,
             ITextureArray array,
@@ -912,7 +909,6 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <param name="range">Physical ranges of memory where the buffer texture data is located</param>
         /// <param name="bindingInfo">Binding info for the buffer texture</param>
         /// <param name="index">Index of the binding on the array</param>
-        /// <param name="format">Format of the buffer texture</param>
         public void SetBufferTextureStorage(
             ShaderStage stage,
             IImageArray array,

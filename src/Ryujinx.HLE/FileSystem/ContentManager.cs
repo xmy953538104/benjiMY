@@ -485,7 +485,7 @@ namespace Ryujinx.HLE.FileSystem
 
             if (!isXci)
             {
-                using ZipArchive archive = new ZipArchive(stream);
+                using ZipArchive archive = new(stream);
                 InstallFromZip(archive, temporaryDirectory);
             }
             else
@@ -728,7 +728,7 @@ namespace Ryujinx.HLE.FileSystem
         {
             if (!isXci)
             {
-                using ZipArchive archive = new ZipArchive(file, ZipArchiveMode.Read);
+                using ZipArchive archive = new(file, ZipArchiveMode.Read);
                 return VerifyAndGetVersionZip(archive);
             }
             else

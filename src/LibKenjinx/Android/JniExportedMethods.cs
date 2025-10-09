@@ -24,11 +24,11 @@ namespace LibKenjinx
         private static long _surfacePtr;
         private static long _window = 0;
 
-        // Merkt sich die zuletzt gesetzte Renderer-Größe (für den Jiggle)
+        // Remembers the last set renderer size (for the jiggle)
         private static int _lastRenderWidth = 0;
         private static int _lastRenderHeight = 0;
 
-        // NEW: Rotation-Debounce + Pending-Puffer
+        // NEW: Rotation Debounce + Pending Buffer
         private static int _lastRotationDegrees = -1;
         private static int _pendingRotationDegrees = -1;
 
@@ -318,7 +318,7 @@ namespace LibKenjinx
 
                     var result = surfaceExtension.CreateAndroidSurface(new Instance(instance), createInfo, null, out var surface);
 
-                    // NEW: Falls schon vor Surface-Erstellung eine Rotation kam → jetzt anwenden
+                    // If a rotation was applied before the surface was created → apply it now
                     if (_window != 0 && _pendingRotationDegrees != -1)
                     {
                         try
@@ -595,7 +595,7 @@ namespace LibKenjinx
             CloseUser(userId);
         }
 
-        // --- Window-Handle Update (Android) ---
+        // --- Window Handle Update (Android) ---
         [UnmanagedCallersOnly(EntryPoint = "deviceSetWindowHandle")]
         public static void JniSetWindowHandle(long handle)
         {
@@ -610,7 +610,7 @@ namespace LibKenjinx
         {
             try
             {
-                // Normieren
+                // Normalize
                 degrees = degrees switch { 0 => 0, 90 => 90, 180 => 180, 270 => 270, _ => 0 };
 
                 if (degrees == _lastRotationDegrees)
@@ -619,7 +619,7 @@ namespace LibKenjinx
                     return;
                 }
 
-                // KORREKTES Bitmask-Mapping laut NDK:
+                // CORRECT bitmask mapping according to NDK:
                 // 0 -> 0 (IDENTITY)
                 // 90 -> 4 (ROTATE_90)
                 // 180 -> 3 (H|V mirror == 180°)
@@ -641,7 +641,7 @@ namespace LibKenjinx
                 }
                 else
                 {
-                    _pendingRotationDegrees = degrees; // später anwenden (siehe createSurfaceFunc)
+                    _pendingRotationDegrees = degrees; // apply later (see createSurfaceFunc)
                     Logger.Warning?.Print(LogClass.Application, $"[JNI] deviceSetSurfaceRotation: _window == 0 (pending {degrees}°)");
                 }
             }
@@ -651,7 +651,7 @@ namespace LibKenjinx
             }
         }
 
-        // --- Vulkan/GL: Swapchain-/Surface-Neukonfiguration per Size-Jiggle ---
+        // --- Vulkan/GL: Swapchain/Surface Reconfiguration via Size Jiggle ---
         [UnmanagedCallersOnly(EntryPoint = "deviceRecreateSwapchain")]
         public static void JniDeviceRecreateSwapchain()
         {
@@ -688,31 +688,6 @@ namespace LibKenjinx
                 Logger.Error?.Print(LogClass.Application, $"deviceRecreateSwapchain failed: {ex}");
             }
         }
-
-        // ===== Amiibo JNI Exports =====
-        [UnmanagedCallersOnly(EntryPoint = "amiiboLoadBin")]
-        public static bool JniAmiiboLoadBin(IntPtr dataPtr, int length)
-        {
-            if (dataPtr == IntPtr.Zero || length <= 0) return false;
-            try
-            {
-                byte[] buf = new byte[length];
-                Marshal.Copy(dataPtr, buf, 0, length);
-                return AmiiboLoadFromBytes(buf);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        [UnmanagedCallersOnly(EntryPoint = "amiiboClear")]
-        public static void JniAmiiboClear()
-        {
-            AmiiboClear();
-        }
-        // ===== End Amiibo JNI Exports =====
-
     }
 
     internal static partial class Logcat

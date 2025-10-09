@@ -63,6 +63,7 @@ namespace Ryujinx.Ava.UI.ViewModels
         private int _multiplayerModeIndex;
         private string _ldnPassphrase;
         private string _LdnServer;
+        private bool _matchSystemTime;
 
         public int ResolutionScale
         {
@@ -162,9 +163,7 @@ namespace Ryujinx.Ava.UI.ViewModels
             get => _vSyncMode;
             set
             {
-                if (value == VSyncMode.Custom ||
-                    value == VSyncMode.Switch ||
-                    value == VSyncMode.Unbounded)
+                if (value is VSyncMode.Custom or VSyncMode.Switch or VSyncMode.Unbounded)
                 {
                     _vSyncMode = value;
                     OnPropertyChanged();
@@ -333,7 +332,16 @@ namespace Ryujinx.Ava.UI.ViewModels
         //private DateTimeOffset _currentDate;
         //private TimeSpan _currentTime;
 
-        public bool MatchSystemTime { get; set; }
+        public bool MatchSystemTime
+        {
+            get => _matchSystemTime;
+            set
+            {
+                _matchSystemTime = value;
+
+                OnPropertyChanged();
+            }
+        }
 
         public DateTimeOffset CurrentDate { get; set; }
 

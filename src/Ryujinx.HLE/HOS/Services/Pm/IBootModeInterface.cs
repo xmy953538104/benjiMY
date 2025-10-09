@@ -1,4 +1,3 @@
-using Ryujinx.Common.Logging;
 using Ryujinx.HLE.HOS.Services.Pm.Types;
 
 namespace Ryujinx.HLE.HOS.Services.Pm

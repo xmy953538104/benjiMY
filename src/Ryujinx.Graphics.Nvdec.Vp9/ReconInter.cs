@@ -163,7 +163,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
         }
 
         public static void SetupDstPlanes(
-            ref Array3<MacroBlockDPlane> planes,
+            Span<MacroBlockDPlane> planes,
             ref Surface src,
             int miRow,
             int miCol)
@@ -204,9 +204,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 strides[1] = src.UvStride;
                 strides[2] = src.UvStride;
 
+                Span<MacroBlockDPlane> planeSpan = xd.Plane.AsSpan();
+
                 for (int i = 0; i < Constants.MaxMbPlane; ++i)
                 {
-                    ref MacroBlockDPlane pd = ref xd.Plane[i];
+                    ref MacroBlockDPlane pd = ref planeSpan[i];
                     SetupPredPlanes(ref pd.Pre[idx], buffers[i], strides[i], miRow, miCol, sf, pd.SubsamplingX,
                         pd.SubsamplingY);
                 }

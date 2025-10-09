@@ -61,7 +61,7 @@ namespace LibKenjinx
             }
             else if (graphicsBackend == GraphicsBackend.Vulkan)
             {
-                Renderer = new VulkanRenderer(Vk.GetApi(), (instance, vk) => new SurfaceKHR(createSurfaceFunc == null ? null : (ulong?)createSurfaceFunc(instance.Handle)),
+                Renderer = new VulkanRenderer(Vk.GetApi(), (instance, _) => new SurfaceKHR(createSurfaceFunc == null ? null : (ulong?)createSurfaceFunc(instance.Handle)),
                     () => requiredExtensions,
                     null);
             }

@@ -19,7 +19,7 @@ namespace LibKenjinx.Android
         internal const string BaseClassName = "org/kenjinx/android/KenjinxNative";
 
         private static JGlobalRef? _classId;
-        private static ConcurrentDictionary<(string method, string descriptor), JMethodId> _methodCache = new ConcurrentDictionary<(string method, string descriptor), JMethodId>();
+        private static ConcurrentDictionary<(string method, string descriptor), JMethodId> _methodCache = new();
         private static (string name, string descriptor)[] _methods =
         [
             ("test", "()V"),

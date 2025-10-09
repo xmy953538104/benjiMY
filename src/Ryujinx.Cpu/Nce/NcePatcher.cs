@@ -471,8 +471,8 @@ namespace Ryujinx.Cpu.Nce
 
         private static void WriteInManagedLockAcquire(Assembler asm, Operand ctx, Operand tmp, Operand tmp2)
         {
-            Operand tmpUint = new Operand(tmp.GetRegister().Index, RegisterType.Integer, OperandType.I32);
-            Operand tmp2Uint = new Operand(tmp2.GetRegister().Index, RegisterType.Integer, OperandType.I32);
+            Operand tmpUint = new(tmp.GetRegister().Index, RegisterType.Integer, OperandType.I32);
+            Operand tmp2Uint = new(tmp2.GetRegister().Index, RegisterType.Integer, OperandType.I32);
 
             Operand lblLoop = asm.CreateLabel();
 
@@ -499,8 +499,8 @@ namespace Ryujinx.Cpu.Nce
 
         private static void WriteInManagedLockRelease(Assembler asm, Operand ctx, Operand tmp, Operand tmp2, ThreadExitMethod exitMethod, Operand lblQuit = default)
         {
-            Operand tmpUint = new Operand(tmp.GetRegister().Index, RegisterType.Integer, OperandType.I32);
-            Operand tmp2Uint = new Operand(tmp2.GetRegister().Index, RegisterType.Integer, OperandType.I32);
+            Operand tmpUint = new(tmp.GetRegister().Index, RegisterType.Integer, OperandType.I32);
+            Operand tmp2Uint = new(tmp2.GetRegister().Index, RegisterType.Integer, OperandType.I32);
 
             Operand lblLoop = asm.CreateLabel();
             Operand lblInterrupt = asm.CreateLabel();
@@ -562,8 +562,8 @@ namespace Ryujinx.Cpu.Nce
 
         private static void WriteInManagedLockReleaseForSuspendHandler(Assembler asm, Operand ctx, Operand tmp, Operand tmp2, Operand lblAgain)
         {
-            Operand tmpUint = new Operand(tmp.GetRegister().Index, RegisterType.Integer, OperandType.I32);
-            Operand tmp2Uint = new Operand(tmp2.GetRegister().Index, RegisterType.Integer, OperandType.I32);
+            Operand tmpUint = new(tmp.GetRegister().Index, RegisterType.Integer, OperandType.I32);
+            Operand tmp2Uint = new(tmp2.GetRegister().Index, RegisterType.Integer, OperandType.I32);
 
             Operand lblLoop = asm.CreateLabel();
             Operand lblInterrupt = asm.CreateLabel();

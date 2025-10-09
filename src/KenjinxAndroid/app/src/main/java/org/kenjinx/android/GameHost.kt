@@ -2,6 +2,7 @@ package org.kenjinx.android
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -36,10 +37,10 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
     // Stabilizer-State
     private var stabilizerActive = false
 
-    // letzte bekannte Android-Rotation (0,1,2,3)
+    // last known Android rotation (0,1,2,3)
     private var lastRotation: Int? = null
 
-    // Debounce für Resize-Kick
+    // Debounce for resize kick
     private var lastKickAt = 0L
 
     var currentSurface: Long = -1
@@ -76,7 +77,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
         val sizeChanged = (_width != width || _height != height)
 
         if (sizeChanged) {
-            // Surface / Window-Handle neu abfragen und an C# melden
+            // Requery Surface / Window handle and report to C#
             currentSurface = _nativeWindow.requeryWindowHandle()
             _nativeWindow.swapInterval = 0
             try { KenjinxNative.deviceSetWindowHandle(currentWindowHandle) } catch (_: Throwable) {}
@@ -85,15 +86,15 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
         _width = width
         _height = height
 
-        // Renderer starten (falls noch nicht gestartet)
+        // Start renderer (if not already started)
         start(holder)
 
-        // Größe nicht sofort setzen → Stabilizer übernimmt
+        // Do not set size immediately → Stabilizer takes over
         startStabilizedResize(expectedRotation = lastRotation)
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        // no-op (Renderer lebt in eigenem Thread; schließen via close())
+        // no-op (renderer lives in its own thread; close via close())
     }
 
     fun close() {
@@ -113,20 +114,24 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
 
         game = if (mainViewModel.isMiiEditorLaunched) null else mainViewModel.gameModel
 
-        // Input initialisieren
+        // Initialize input
         KenjinxNative.inputInitialize(width, height)
 
         val id = mainViewModel.physicalControllerManager?.connect()
         mainViewModel.motionSensorManager?.setControllerId(id ?: -1)
 
-        // Kein initialer "flip"-Sonderfall: wir geben die echte Rotation nach unten
-        val currentRot = mainViewModel.activity.display?.rotation
+        // No initial "flip" special case: we give the real rotation downwards
+        val currentRot = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            mainViewModel.activity.display?.rotation
+        } else {
+            TODO("VERSION.SDK_INT < R")
+        }
         lastRotation = currentRot
         try {
             KenjinxNative.setSurfaceRotationByAndroidRotation(currentRot)
-            // Window-Handle sicherheitshalber durchreichen (falls Surface gerade frisch wurde)
+            // Pass the window handle for safety reasons (if Surface has just been refreshed)
             try { KenjinxNative.deviceSetWindowHandle(currentWindowHandle) } catch (_: Throwable) {}
-            // sanfter Kick: identische Größe nochmal setzen
+            // gentle kick: set identical size again
             if (width > 0 && height > 0) {
                 try { KenjinxNative.resizeRendererAndInput(width, height) } catch (_: Throwable) {}
             }
@@ -205,8 +210,8 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
     }
 
     /**
-     * Von der Activity bei Rotations-/Layoutwechsel aufgerufen.
-     * Erkenne 90°↔270° und erzwinge (debounced) ein Requery/Resize.
+     * Called by the activity when the rotation/layout changes.
+     * Detects 90°↔270° and forces (debounces) a requery/resize.
      */
     fun onOrientationOrSizeChanged(rotation: Int? = null) {
         if (_isClosed) return
@@ -217,17 +222,17 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
         val isSideFlip = (old == 1 && rotation == 3) || (old == 3 && rotation == 1)
 
         if (isSideFlip) {
-            // 1) NativeRotation melden
+            // 1) Report NativeRotation
             try { KenjinxNative.setSurfaceRotationByAndroidRotation(rotation) } catch (_: Throwable) {}
 
-            // 2) NativeWindow sofort neu abfragen (erzwingt echten Rebind) + Window-Handle an C#
+            // 2) Requery NativeWindow immediately (forces real rebind) + window handle to C#
             try {
                 currentSurface = _nativeWindow.requeryWindowHandle()
                 _nativeWindow.swapInterval = 0
                 try { KenjinxNative.deviceSetWindowHandle(currentWindowHandle) } catch (_: Throwable) {}
             } catch (_: Throwable) {}
 
-            // 3) Debounced Kick der identischen Größe (Swapchain/Viewport aktualisieren)
+            // 3) Debounced kick of identical size (update swap chain/viewport)
             val now = android.os.SystemClock.uptimeMillis()
             if (now - lastKickAt >= 300L) {
                 lastKickAt = now
@@ -243,13 +248,13 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
     }
 
     /**
-     * Wartet kurz, bis das Surface seine finalen Maße nach der Drehung hat,
-     * prüft Plausibilität (Portrait/Landscape) und setzt erst dann die Größe.
+     * Wait a moment until the surface has its final dimensions after rotation,
+     * checks plausibility (portrait/landscape) and only then sets the size.
      */
     private fun startStabilizedResize(expectedRotation: Int?) {
         if (_isClosed) return
 
-        // Neustarten, falls schon aktiv
+        // Restart if already active
         if (stabilizerActive) {
             stabilizerActive = false
         }
@@ -267,7 +272,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
                     return
                 }
 
-                // Echte Framegröße bevorzugen
+                // Prefer real frame size
                 var w = holder.surfaceFrame.width()
                 var h = holder.surfaceFrame.height()
 
@@ -277,7 +282,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
                     h = height
                 }
 
-                // Falls Rotation bekannt: Plausibilität erzwingen (Landscape ↔ Portrait)
+                // If rotation is known: Force plausibility (Landscape ↔ Portrait)
                 expectedRotation?.let { rot ->
                     // ROTATION_90 (1) / ROTATION_270 (3) => Landscape
                     val landscape = (rot == 1 || rot == 3)
@@ -288,7 +293,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
                     }
                 }
 
-                // Stabilitätsprüfung
+                // Stability test
                 if (w == lastW && h == lastH && w > 0 && h > 0) {
                     stableCount++
                 } else {
@@ -299,7 +304,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
 
                 attempts++
 
-                // leicht gestrafft: 1 stabiler Tick oder max. 12 Versuche
+                // slightly tightened: 1 stable tick or max. 12 attempts
                 if ((stableCount >= 1 || attempts >= 12) && w > 0 && h > 0) {
                     ghLog("resize stabilized after $attempts ticks → ${w}x$h")
                     safeSetSize(w, h)
@@ -307,7 +312,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
                     return
                 }
 
-                // weiter pollen
+                // continue to pollen
                 if (stabilizerActive) {
                     mainHandler.postDelayed(this, 16)
                 }

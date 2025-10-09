@@ -33,7 +33,7 @@ import org.kenjinx.android.viewmodels.QuickSettings
 typealias GamePad = RadialGamePad
 typealias GamePadConfig = RadialGamePadConfig
 
-// --- Dummy-IDs, um Legacy-L3/R3 (Stick-Doppeltipp/-Tap) abzuklemmen ---
+// --- Dummy IDs to disconnect legacy L3/R3 (stick double tap/tap) ---
 private const val DUMMY_LEFT_STICK_PRESS_ID  = 10001
 private const val DUMMY_RIGHT_STICK_PRESS_ID = 10002
 
@@ -42,14 +42,15 @@ class GameController(var activity: Activity) {
     companion object {
         private fun init(context: Context, controller: GameController): View {
             val inflater = LayoutInflater.from(context)
-            val view = inflater.inflate(R.layout.game_layout, null)
+            val parent = FrameLayout(context)
+            val view = inflater.inflate(R.layout.game_layout, parent, false)
             view.findViewById<FrameLayout>(R.id.leftcontainer)!!.addView(controller.leftGamePad)
             view.findViewById<FrameLayout>(R.id.rightcontainer)!!.addView(controller.rightGamePad)
             return view
         }
 
         @Composable
-        fun Compose(viewModel: MainViewModel): Unit {
+        fun Compose(viewModel: MainViewModel) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
@@ -114,7 +115,7 @@ class GameController(var activity: Activity) {
         controllerId.apply {
             when (ev) {
                 is Event.Button -> {
-                    // Legacy-L3/R3 via Stick-Press (Doppeltipp) ignorieren
+                    // Ignore legacy L3/R3 via stick press (double tap)
                     if (ev.id == DUMMY_LEFT_STICK_PRESS_ID || ev.id == DUMMY_RIGHT_STICK_PRESS_ID) {
                         return
                     }
@@ -138,7 +139,7 @@ class GameController(var activity: Activity) {
                                 KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadLeft.ordinal, this)
                                 KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadRight.ordinal, this)
                             }
-                            // Vertikal
+                            // Vertical
                             if (ev.yAxis < 0) {
                                 KenjinxNative.inputSetButtonPressed(GamePadButtonInputId.DpadUp.ordinal, this)
                                 KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadDown.ordinal, this)
@@ -184,7 +185,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
         return GamePadConfig(
             /* ringSegments = */ 12,
             /* Primary (Stick)  */
-            // WICHTIG: pressButtonId -> DUMMY_LEFT_STICK_PRESS_ID, damit Doppeltipp nicht L3 auslöst
+            // IMPORTANT: pressButtonId -> DUMMY_LEFT_STICK_PRESS_ID, so that double tap does not trigger L3
             PrimaryDialConfig.Stick(
                 GamePadButtonInputId.LeftStick.ordinal,
                 DUMMY_LEFT_STICK_PRESS_ID,
@@ -267,7 +268,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // NEU (bleibt): L3 als eigener Button
+                // NEW (remains): L3 as a separate button
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 1,
                     buttonScale,
@@ -312,8 +313,8 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                 null
             ),
             listOf(
-                // Rechter Stick
-                // WICHTIG: pressButtonId -> DUMMY_RIGHT_STICK_PRESS_ID, damit Doppeltipp nicht R3 auslöst
+                // Right stick (unchanged)
+                // IMPORTANT: pressButtonId -> DUMMY_RIGHT_STICK_PRESS_ID, so that double tap does not trigger R3
                 SecondaryDialConfig.Stick(
                     /* sector */ 7,
                     /* size   */ 2,
@@ -383,7 +384,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // NEU (bleibt): R3 als eigener Button
+                // NEW (remains): R3 as a separate button
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 5,
                     buttonScale,

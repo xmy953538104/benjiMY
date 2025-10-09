@@ -5,6 +5,7 @@ using Ryujinx.HLE.HOS.Services.Hid.Types.SharedMemory.Keyboard;
 using Ryujinx.HLE.HOS.Services.Hid.Types.SharedMemory.Mouse;
 using Ryujinx.HLE.HOS.Services.Hid.Types.SharedMemory.Npad;
 using Ryujinx.HLE.HOS.Services.Hid.Types.SharedMemory.TouchScreen;
+using System;
 using System.Runtime.InteropServices;
 
 namespace Ryujinx.HLE.HOS.Services.Hid.Types.SharedMemory
@@ -54,10 +55,12 @@ namespace Ryujinx.HLE.HOS.Services.Hid.Types.SharedMemory
                 Mouse = RingLifo<MouseState>.Create(),
                 Keyboard = RingLifo<KeyboardState>.Create(),
             };
+            
+            Span<NpadState> npadsSpan = result.Npads.AsSpan();
 
-            for (int i = 0; i < result.Npads.Length; i++)
+            for (int i = 0; i < npadsSpan.Length; i++)
             {
-                result.Npads[i] = NpadState.Create();
+                npadsSpan[i] = NpadState.Create();
             }
 
             return result;

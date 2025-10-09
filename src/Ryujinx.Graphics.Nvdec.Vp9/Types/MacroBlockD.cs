@@ -1,6 +1,7 @@
 ﻿using Ryujinx.Common.Memory;
 using Ryujinx.Graphics.Nvdec.Vp9.Common;
 using Ryujinx.Graphics.Video;
+using System;
 
 namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 {
@@ -147,10 +148,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
         public void SetupBlockPlanes(int ssX, int ssY)
         {
+            Span<MacroBlockDPlane> planeSpan = Plane.AsSpan();
+            
             for (int i = 0; i < Constants.MaxMbPlane; i++)
             {
-                Plane[i].SubsamplingX = i != 0 ? ssX : 0;
-                Plane[i].SubsamplingY = i != 0 ? ssY : 0;
+                planeSpan[i].SubsamplingX = i != 0 ? ssX : 0;
+                planeSpan[i].SubsamplingY = i != 0 ? ssY : 0;
             }
         }
 
@@ -158,12 +161,16 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
         {
             int aboveIdx = miCol * 2;
             int leftIdx = (miRow * 2) & 15;
+            
+            Span<MacroBlockDPlane> planeSpan = Plane.AsSpan();
+            Span<ArrayPtr<sbyte>> aboveContextSpan = AboveContext.AsSpan();
+            Span<Array16<sbyte>> leftContextSpan = LeftContext.AsSpan();
 
             for (int i = 0; i < Constants.MaxMbPlane; ++i)
             {
-                ref MacroBlockDPlane pd = ref Plane[i];
-                pd.AboveContext = AboveContext[i].Slice(aboveIdx >> pd.SubsamplingX);
-                pd.LeftContext = new ArrayPtr<sbyte>(ref LeftContext[i][leftIdx >> pd.SubsamplingY],
+                ref MacroBlockDPlane pd = ref planeSpan[i];
+                pd.AboveContext = aboveContextSpan[i].Slice(aboveIdx >> pd.SubsamplingX);
+                pd.LeftContext = new ArrayPtr<sbyte>(ref leftContextSpan[i][leftIdx >> pd.SubsamplingY],
                     16 - (leftIdx >> pd.SubsamplingY));
             }
         }
@@ -182,9 +189,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
         public unsafe void DecResetSkipContext()
         {
+            Span<MacroBlockDPlane> planeSpan = Plane.AsSpan();
+            
             for (int i = 0; i < Constants.MaxMbPlane; i++)
             {
-                ref MacroBlockDPlane pd = ref Plane[i];
+                ref MacroBlockDPlane pd = ref planeSpan[i];
                 MemoryUtil.Fill(pd.AboveContext.ToPointer(), (sbyte)0, pd.N4W);
                 MemoryUtil.Fill(pd.LeftContext.ToPointer(), (sbyte)0, pd.N4H);
             }

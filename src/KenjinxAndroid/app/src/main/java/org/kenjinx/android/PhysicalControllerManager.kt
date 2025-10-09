@@ -9,7 +9,7 @@ class PhysicalControllerManager(val activity: MainActivity) {
     private var controllerId: Int = -1
 
     fun onKeyEvent(event: KeyEvent): Boolean {
-        // Stelle sicher, dass wir verbunden sind
+        // Make sure we are connected
         if (controllerId == -1) {
             controllerId = KenjinxNative.inputConnectGamepad(0)
         }
@@ -17,7 +17,7 @@ class PhysicalControllerManager(val activity: MainActivity) {
         val id = getGamePadButtonInputId(event.keyCode)
         if (id != GamePadButtonInputId.None) {
             val isNotFallback = (event.flags and KeyEvent.FLAG_FALLBACK) == 0
-            // Viele Gamepads schicken Fallback-Events zusätzlich – wir unterdrücken die.
+            // Many gamepads send additional fallback events – we suppress them.
             if (isNotFallback) {
                 when (event.action) {
                     KeyEvent.ACTION_UP -> {
@@ -50,7 +50,7 @@ class PhysicalControllerManager(val activity: MainActivity) {
 
             ev.device?.apply {
                 if (sources and InputDevice.SOURCE_DPAD != InputDevice.SOURCE_DPAD) {
-                    // Controller nutzt HAT statt „echtem“ DPAD
+                    // Controller uses HAT instead of “real” DPAD
                     val dPadHor = ev.getAxisValue(MotionEvent.AXIS_HAT_X)
                     val dPadVert = ev.getAxisValue(MotionEvent.AXIS_HAT_Y)
 
@@ -97,25 +97,25 @@ class PhysicalControllerManager(val activity: MainActivity) {
     private fun getGamePadButtonInputId(keycode: Int): GamePadButtonInputId {
         val quickSettings = QuickSettings(activity)
         return when (keycode) {
-            // ABXY (Switch/Xbox-Layout Umschaltbar)
+            // ABXY (Switch/Xbox layout switchable)
             KeyEvent.KEYCODE_BUTTON_A -> if (!quickSettings.useSwitchLayout) GamePadButtonInputId.A else GamePadButtonInputId.B
             KeyEvent.KEYCODE_BUTTON_B -> if (!quickSettings.useSwitchLayout) GamePadButtonInputId.B else GamePadButtonInputId.A
             KeyEvent.KEYCODE_BUTTON_X -> if (!quickSettings.useSwitchLayout) GamePadButtonInputId.X else GamePadButtonInputId.Y
             KeyEvent.KEYCODE_BUTTON_Y -> if (!quickSettings.useSwitchLayout) GamePadButtonInputId.Y else GamePadButtonInputId.X
 
-            // Schultertasten
+            // Shoulder buttons
             KeyEvent.KEYCODE_BUTTON_L1 -> GamePadButtonInputId.LeftShoulder
             KeyEvent.KEYCODE_BUTTON_L2 -> GamePadButtonInputId.LeftTrigger
             KeyEvent.KEYCODE_BUTTON_R1 -> GamePadButtonInputId.RightShoulder
             KeyEvent.KEYCODE_BUTTON_R2 -> GamePadButtonInputId.RightTrigger
 
-            // **L3 / R3 (Stick-Click) – KORREKT: *_Button**
+            // **L3 / R3 (Stick-Click) – CORRECT: *_Button**
             KeyEvent.KEYCODE_BUTTON_THUMBL -> GamePadButtonInputId.LeftStickButton
             KeyEvent.KEYCODE_BUTTON_THUMBR -> GamePadButtonInputId.RightStickButton
 
-            // Zusätzliche Fallback-Keycodes mancher Pads (optional)
-            KeyEvent.KEYCODE_BUTTON_11 -> GamePadButtonInputId.LeftStickButton   // vereinzelt L3
-            KeyEvent.KEYCODE_BUTTON_12 -> GamePadButtonInputId.RightStickButton  // vereinzelt R3
+            // Additional fallback keycodes for some pads (optional)
+            KeyEvent.KEYCODE_BUTTON_11 -> GamePadButtonInputId.LeftStickButton   // isolated L3
+            KeyEvent.KEYCODE_BUTTON_12 -> GamePadButtonInputId.RightStickButton  // isolated R3
 
             // D-Pad
             KeyEvent.KEYCODE_DPAD_UP -> GamePadButtonInputId.DpadUp

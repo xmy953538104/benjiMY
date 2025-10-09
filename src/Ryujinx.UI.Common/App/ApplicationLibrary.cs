@@ -43,7 +43,7 @@ namespace Ryujinx.UI.App.Common
 {
     public class ApplicationLibrary
     {
-        public static string DefaultLanPlayWebHost = "ryuldnweb.vudjun.com";
+        public static string DefaultLanPlayWebHost = "ldn.ryujinx.app";
         public Language DesiredLanguage { get; set; }
         public event EventHandler<ApplicationCountUpdatedEventArgs> ApplicationCountUpdated;
         public event EventHandler<LdnGameDataReceivedEventArgs> LdnGameDataReceived;
@@ -799,7 +799,7 @@ namespace Ryujinx.UI.App.Common
                     {
                         ldnWebHost = DefaultLanPlayWebHost;
                     }
-                    using HttpClient httpClient = new HttpClient();
+                    using HttpClient httpClient = new();
                     string ldnGameDataArrayString = await httpClient.GetStringAsync($"https://{ldnWebHost}/api/public_games");
                     IEnumerable<LdnGameData> ldnGameDataArray = JsonHelper.Deserialize(ldnGameDataArrayString, _ldnDataSerializerContext.IEnumerableLdnGameData);
                     var evt = new LdnGameDataReceivedEventArgs
@@ -1184,7 +1184,7 @@ namespace Ryujinx.UI.App.Common
 
                     using FileStream file = new(applicationPath ?? string.Empty, FileMode.Open, FileAccess.Read);
 
-                    if (extension == ".nsp" || extension == ".pfs0" || extension == ".xci")
+                    if (extension is ".nsp" or ".pfs0" or ".xci")
                     {
                         try
                         {

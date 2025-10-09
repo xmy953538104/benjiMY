@@ -2,20 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Android 11+ Package Visibility: was diese App sehen/ansprechen darf -->
-    <queries>
-        <!-- Falls andere Flavors/Starter beteiligt sind, hier sichtbar machen -->
-        <package android:name="org.kenjinx.android"/>
-        <package android:name="org.kenjinxsc.android"/>
-
-        <!-- Allgemein: LAUNCHER-Activities und ACTION_VIEW-Dateien auflösbar machen -->
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-    </queries>
-
-    <!-- Hardware / Permissions -->
     <uses-feature
         android:name="android.hardware.audio.output"
         android:required="true" />
@@ -24,8 +10,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-
-    <!-- Storage (bestehende App nutzt MANAGE_/READ_/WRITE_ EXTERNAL_STORAGE) -->
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
@@ -44,9 +28,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KenjinxAndroid"
         android:largeHeap="true"
+        android:requestLegacyExternalStorage="true"
         tools:targetApi="31">
-
-        <!-- Launcher / Main -->
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"
@@ -56,58 +39,37 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
             android:hardwareAccelerated="true"
             android:theme="@style/Theme.KenjinxAndroid">
-
-            <!-- Launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
-
-            <!-- Kompatibel: alter und neuer LAUNCH_GAME-Action-Name -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="org.kenjinx.android.LAUNCH_GAME" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="org.kenjisc.android.LAUNCH_GAME" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
         </activity>
-
-        <!-- Shortcut-Wizard Activity (transparent, frei drehbar) -->
-        <activity
-            android:name=".ShortcutWizardActivity"
-            android:exported="false"
-            android:theme="@style/Theme.KenjinxAndroid.Transparent"
-            android:screenOrientation="unspecified"
-            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
-
-        <!-- Bridge-Aktivität: transparent, nur für den Picker -->
-        <activity
-            android:name=".OrientationBridgeActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:screenOrientation="unspecified"
-            android:resizeableActivity="true"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
-            android:theme="@style/Theme.KenjinxAndroid.Transparent" />
-
-        <!-- FileProvider (unverändert, app-spezifische Authority) -->
+        <!--
+        <intent-filter>
+            <action android:name="org.kenji.android.action.CREATE_SHORTCUT" />
+            <category android:name="android.intent.category.DEFAULT" />
+        </intent-filter>
+        -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
+            android:authorities="org.kenjinx.android.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
-
-        <!-- DocumentProvider: Authority auf *.documents vereinheitlicht -->
         <provider
             android:name=".providers.DocumentProvider"
-            android:authorities="${applicationId}.documents"
+            android:authorities="${applicationId}.providers"
             android:exported="true"
             android:grantUriPermissions="true"
             android:permission="android.permission.MANAGE_DOCUMENTS">

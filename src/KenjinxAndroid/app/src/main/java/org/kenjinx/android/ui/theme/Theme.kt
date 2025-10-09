@@ -45,11 +45,12 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Gray10,
 )
 
+@Suppress("DEPRECATION")
 @Composable
 fun KenjinxAndroidTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = false,  // Cambiato da true a false per usare i nostri colori personalizzati
+    dynamicColor: Boolean = false,  // Changed from true to false to use our custom colors
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

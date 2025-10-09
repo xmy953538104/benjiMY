@@ -1,7 +1,6 @@
 package org.kenjinx.android.viewmodels
 
 import android.annotation.SuppressLint
-import android.net.Uri
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavHostController
@@ -34,9 +33,9 @@ class MainViewModel(val activity: MainActivity) {
     var controller: GameController? = null
     var performanceManager: PerformanceManager? = null
     var selected: GameModel? = null
-    val loadGameModel: MutableState<GameModel?> = mutableStateOf<GameModel?>(null)
-    val bootPath: MutableState<String?> = mutableStateOf<String?>(null)
-    val forceNceAndPptc: MutableState<Boolean> = mutableStateOf<Boolean>(false)
+    val loadGameModel: MutableState<GameModel?> = mutableStateOf(null)
+    val bootPath: MutableState<String?> = mutableStateOf(null)
+    val forceNceAndPptc: MutableState<Boolean> = mutableStateOf(false)
     var isMiiEditorLaunched = false
     val userViewModel = UserViewModel()
     val logging = Logging(this)
@@ -52,15 +51,6 @@ class MainViewModel(val activity: MainActivity) {
     private var showLoading: MutableState<Boolean>? = null
     private var refreshUser: MutableState<Boolean>? = null
 
-    // Default Game Folder (für den Initial-Ordner im SAF)
-    var defaultGameFolderUri: Uri? = null
-        set(value) {
-            field = value
-            // direkt persistieren
-            val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
-            prefs.edit().putString("defaultGameFolderUri", value?.toString() ?: "").apply()
-        }
-
     var gameHost: GameHost? = null
         set(value) {
             field = value
@@ -72,14 +62,6 @@ class MainViewModel(val activity: MainActivity) {
 
     init {
         performanceManager = PerformanceManager(activity)
-
-        // gespeicherten Default-Ordner laden
-        val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
-        val saved = prefs.getString("defaultGameFolderUri", "") ?: ""
-        if (saved.isNotEmpty()) {
-            // nutzt den Setter -> speichert den gleichen Wert wieder, was ok ist (idempotent)
-            defaultGameFolderUri = Uri.parse(saved)
-        }
     }
 
     fun refreshFirmwareVersion() {
@@ -95,7 +77,7 @@ class MainViewModel(val activity: MainActivity) {
         motionSensorManager?.setControllerId(-1)
     }
 
-    // ---- NEU: Sprache/Region aus Preferences laden (Defaults: AmericanEnglish/USA) ----
+    // ---- Load language/region from Preferences (Defaults: AmericanEnglish/USA) ----
     private fun loadSystemLanguage(): SystemLanguage {
         val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
         val stored = prefs.getString("system_language", "AmericanEnglish") ?: "AmericanEnglish"
@@ -132,7 +114,7 @@ class MainViewModel(val activity: MainActivity) {
 
         if(overrideSettings == true)
         {
-            settings.overrideSettings(forceNceAndPptc);
+            settings.overrideSettings(forceNceAndPptc)
         }
 
         var success = KenjinxNative.graphicsInitialize(
@@ -209,9 +191,9 @@ class MainViewModel(val activity: MainActivity) {
                     settings.memoryManagerMode.ordinal,
                     settings.useNce,
                     settings.memoryConfiguration.ordinal,
-                    /* ALT: war fest -> SystemLanguage.AmericanEnglish.ordinal */
+                    /* OLD: was fixed -> SystemLanguage.AmericanEnglish.ordinal */
                     loadSystemLanguage().ordinal,
-                    /* ALT: war fest -> RegionCode.USA.ordinal */
+                    /* OLD: was fixed -> RegionCode.USA.ordinal */
                     loadRegionCode().ordinal,
                     settings.vSyncMode.ordinal,
                     settings.enableDocked,
@@ -221,7 +203,7 @@ class MainViewModel(val activity: MainActivity) {
                     false,
                     settings.enableFsIntegrityChecks,
                     settings.fsGlobalAccessLogMode,
-                    tzId, // <<< Android-Gerätezeitzone durchreichen
+                    tzId, // <<< Pass through Android device time zone
                     settings.ignoreMissingServices
                 )
 
@@ -320,9 +302,9 @@ class MainViewModel(val activity: MainActivity) {
                     settings.memoryManagerMode.ordinal,
                     settings.useNce,
                     settings.memoryConfiguration.ordinal,
-                    /* ALT: war fest -> SystemLanguage.AmericanEnglish.ordinal */
+                    /* OLD: was fixed -> SystemLanguage.AmericanEnglish.ordinal */
                     loadSystemLanguage().ordinal,
-                    /* ALT: war fest -> RegionCode.USA.ordinal */
+                    /* OLD: was fixed -> RegionCode.USA.ordinal */
                     loadRegionCode().ordinal,
                     settings.vSyncMode.ordinal,
                     settings.enableDocked,
@@ -332,7 +314,7 @@ class MainViewModel(val activity: MainActivity) {
                     false,
                     settings.enableFsIntegrityChecks,
                     settings.fsGlobalAccessLogMode,
-                    tzId, // <<< Android-Gerätezeitzone durchreichen
+                    tzId, // <<< Pass through Android device time zone
                     settings.ignoreMissingServices
                 )
 

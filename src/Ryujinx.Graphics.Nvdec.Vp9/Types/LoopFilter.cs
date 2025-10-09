@@ -1,4 +1,5 @@
 using Ryujinx.Common.Memory;
+using System;
 
 namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 {
@@ -28,13 +29,16 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
         {
             ModeRefDeltaEnabled = true;
             ModeRefDeltaUpdate = true;
+            
+            Span<sbyte> refDeltasSpan = RefDeltas.AsSpan();
+            Span<sbyte> modeDeltasSpan = ModeDeltas.AsSpan();
 
-            RefDeltas[Constants.IntraFrame] = 1;
-            RefDeltas[Constants.LastFrame] = 0;
-            RefDeltas[Constants.GoldenFrame] = -1;
-            RefDeltas[Constants.AltRefFrame] = -1;
-            ModeDeltas[0] = 0;
-            ModeDeltas[1] = 0;
+            refDeltasSpan[Constants.IntraFrame] = 1;
+            refDeltasSpan[Constants.LastFrame] = 0;
+            refDeltasSpan[Constants.GoldenFrame] = -1;
+            refDeltasSpan[Constants.AltRefFrame] = -1;
+            modeDeltasSpan[0] = 0;
+            modeDeltasSpan[1] = 0;
         }
     }
 }

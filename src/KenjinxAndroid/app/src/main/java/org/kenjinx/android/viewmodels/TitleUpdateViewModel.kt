@@ -46,7 +46,7 @@ class TitleUpdateViewModel(val titleId: String) {
                         uri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
-                } catch (securityException: SecurityException) {
+                } catch (_: SecurityException) {
                 }
             }
 

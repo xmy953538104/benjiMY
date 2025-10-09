@@ -34,8 +34,8 @@ namespace Ryujinx.HLE.HOS.Services.Nv.NvDrvServices.NvHostAsGpu
 
         private static readonly VmRegion[] _vmRegions =
         [
-            new VmRegion((ulong)BigPageSize << 16, SmallRegionLimit),
-            new VmRegion(SmallRegionLimit, DefaultUserSize)
+            new((ulong)BigPageSize << 16, SmallRegionLimit),
+            new(SmallRegionLimit, DefaultUserSize)
         ];
 
         private readonly AddressSpaceContext _asContext;
@@ -335,9 +335,11 @@ namespace Ryujinx.HLE.HOS.Services.Nv.NvDrvServices.NvHostAsGpu
                 writeEntries = (uint)_pageSizes.Length;
             }
 
+            Span<VaRegion> regionsSpan = arguments.Regions.AsSpan();
+
             for (uint i = 0; i < writeEntries; i++)
             {
-                ref var region = ref arguments.Regions[(int)i];
+                ref var region = ref regionsSpan[(int)i];
 
                 var vmRegion = _vmRegions[i];
                 uint pageSize = _pageSizes[i];

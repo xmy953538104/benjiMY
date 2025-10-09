@@ -56,7 +56,7 @@ namespace Ryujinx.Cpu
             {
                 try
                 {
-                    MemoryBlock baseMemory = new MemoryBlock(addressSpaceSize, AsFlags);
+                    MemoryBlock baseMemory = new(addressSpaceSize, AsFlags);
                     addressSpace = baseMemory;
 
                     break;

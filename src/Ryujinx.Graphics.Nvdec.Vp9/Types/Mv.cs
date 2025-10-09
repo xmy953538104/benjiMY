@@ -52,12 +52,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
 
         public static bool JointVertical(MvJointType type)
         {
-            return type == MvJointType.Hzvnz || type == MvJointType.Hnzvnz;
+            return type is MvJointType.Hzvnz or MvJointType.Hnzvnz;
         }
 
         public static bool JointHorizontal(MvJointType type)
         {
-            return type == MvJointType.Hnzvz || type == MvJointType.Hnzvnz;
+            return type is MvJointType.Hnzvz or MvJointType.Hnzvnz;
         }
 
         private static int ClassBase(MvClassType c)
@@ -99,10 +99,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9.Types
             }
             else
             {
+                Span<Array2<uint>> bitsSpan = counts.Bits[comp].AsSpan();
+                
                 int b = c + Constants.Class0Bits - 1; // Number of bits
                 for (int i = 0; i < b; ++i)
                 {
-                    counts.Bits[comp][i][(d >> i) & 1] += (uint)incr;
+                    bitsSpan[i][(d >> i) & 1] += (uint)incr;
                 }
 
                 counts.Fp[comp][f] += (uint)incr;

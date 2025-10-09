@@ -21,49 +21,67 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
         private static void ReadTxModeProbs(ref Vp9EntropyProbs txProbs, ref Reader r)
         {
+            Span<Array1<byte>> tx8x8ProbSpan1 = txProbs.Tx8x8Prob.AsSpan();
+            Span<Array2<byte>> tx16x16ProbSpan1 = txProbs.Tx16x16Prob.AsSpan();
+            Span<Array3<byte>> tx32x32ProbSpan1 = txProbs.Tx32x32Prob.AsSpan();
+            
             for (int i = 0; i < EntropyMode.TxSizeContexts; ++i)
             {
+                Span<byte> tx8x8ProbSpan2 = tx8x8ProbSpan1[i].AsSpan();
+                
                 for (int j = 0; j < (int)TxSize.TxSizes - 3; ++j)
                 {
-                    r.DiffUpdateProb(ref txProbs.Tx8x8Prob[i][j]);
+                    r.DiffUpdateProb(ref tx8x8ProbSpan2[j]);
                 }
             }
 
             for (int i = 0; i < EntropyMode.TxSizeContexts; ++i)
             {
+                Span<byte> tx16x16ProbSpan2 = tx16x16ProbSpan1[i].AsSpan();
+                
                 for (int j = 0; j < (int)TxSize.TxSizes - 2; ++j)
                 {
-                    r.DiffUpdateProb(ref txProbs.Tx16x16Prob[i][j]);
+                    r.DiffUpdateProb(ref tx16x16ProbSpan2[j]);
                 }
             }
 
             for (int i = 0; i < EntropyMode.TxSizeContexts; ++i)
             {
+                Span<byte> tx32x32ProbSpan2 = tx32x32ProbSpan1[i].AsSpan();
+                
                 for (int j = 0; j < (int)TxSize.TxSizes - 1; ++j)
                 {
-                    r.DiffUpdateProb(ref txProbs.Tx32x32Prob[i][j]);
+                    r.DiffUpdateProb(ref tx32x32ProbSpan2[j]);
                 }
             }
         }
 
         private static void ReadSwitchableInterpProbs(ref Vp9EntropyProbs fc, ref Reader r)
         {
-            for (int j = 0; j < Constants.SwitchableFilterContexts; ++j)
+            Span<Array2<byte>> switchableInterpProbSpan1 = fc.SwitchableInterpProb.AsSpan();
+            
+            for (int i = 0; i < Constants.SwitchableFilterContexts; ++i)
             {
-                for (int i = 0; i < Constants.SwitchableFilters - 1; ++i)
+                Span<byte> switchableInterpProbSpan2 = switchableInterpProbSpan1[i].AsSpan();
+                
+                for (int j = 0; j < Constants.SwitchableFilters - 1; ++j)
                 {
-                    r.DiffUpdateProb(ref fc.SwitchableInterpProb[j][i]);
+                    r.DiffUpdateProb(ref switchableInterpProbSpan2[j]);
                 }
             }
         }
 
         private static void ReadInterModeProbs(ref Vp9EntropyProbs fc, ref Reader r)
         {
+            Span<Array3<byte>> interModeProbSpan1 = fc.InterModeProb.AsSpan();
+            
             for (int i = 0; i < Constants.InterModeContexts; ++i)
             {
+                Span<byte> interModeProbSpan2 = interModeProbSpan1[i].AsSpan();
+                
                 for (int j = 0; j < Constants.InterModes - 1; ++j)
                 {
-                    r.DiffUpdateProb( ref fc.InterModeProb[i][j]);
+                    r.DiffUpdateProb(ref interModeProbSpan2[j]);
                 }
             }
         }
@@ -72,30 +90,43 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
         {
             r.UpdateMvProbs(ctx.Joints.AsSpan(), EntropyMv.Joints - 1);
 
-            for (int i = 0; i < 2; ++i)
-            {
-                r.UpdateMvProbs(MemoryMarshal.CreateSpan(ref ctx.Sign[i], 1), 1);
-                r.UpdateMvProbs(ctx.Classes[i].AsSpan(), EntropyMv.Classes - 1);
-                r.UpdateMvProbs(ctx.Class0[i].AsSpan(), EntropyMv.Class0Size - 1);
-                r.UpdateMvProbs(ctx.Bits[i].AsSpan(), EntropyMv.OffsetBits);
-            }
+            Span<byte> signSpan = ctx.Sign.AsSpan();
+            Span<Array10<byte>> classesSpan = ctx.Classes.AsSpan();
+            Span<Array1<byte>> class0Span = ctx.Class0.AsSpan();
+            Span<Array10<byte>> bitsSpan = ctx.Bits.AsSpan();
 
             for (int i = 0; i < 2; ++i)
             {
+                r.UpdateMvProbs(MemoryMarshal.CreateSpan(ref signSpan[i], 1), 1);
+                r.UpdateMvProbs(classesSpan[i].AsSpan(), EntropyMv.Classes - 1);
+                r.UpdateMvProbs(class0Span[i].AsSpan(), EntropyMv.Class0Size - 1);
+                r.UpdateMvProbs(bitsSpan[i].AsSpan(), EntropyMv.OffsetBits);
+            }
+            
+            Span<Array2<Array3<byte>>> class0FpSpan1 = ctx.Class0Fp.AsSpan();
+            Span<Array3<byte>> fpSpan = ctx.Fp.AsSpan();
+
+            for (int i = 0; i < 2; ++i)
+            {
+                Span<Array3<byte>> class0FpSpan2 = class0FpSpan1[i].AsSpan();
+                
                 for (int j = 0; j < EntropyMv.Class0Size; ++j)
                 {
-                    r.UpdateMvProbs(ctx.Class0Fp[i][j].AsSpan(), EntropyMv.FpSize - 1);
+                    r.UpdateMvProbs(class0FpSpan2[j].AsSpan(), EntropyMv.FpSize - 1);
                 }
 
-                r.UpdateMvProbs(ctx.Fp[i].AsSpan(), 3);
+                r.UpdateMvProbs(fpSpan[i].AsSpan(), 3);
             }
 
             if (allowHp)
             {
+                Span<byte> class0HpSpan = ctx.Class0Hp.AsSpan();
+                Span<byte> hpSpan = ctx.Hp.AsSpan();
+                
                 for (int i = 0; i < 2; ++i)
                 {
-                    r.UpdateMvProbs(MemoryMarshal.CreateSpan(ref ctx.Class0Hp[i], 1), 1);
-                    r.UpdateMvProbs(MemoryMarshal.CreateSpan(ref ctx.Hp[i], 1), 1);
+                    r.UpdateMvProbs(MemoryMarshal.CreateSpan(ref class0HpSpan[i], 1), 1);
+                    r.UpdateMvProbs(MemoryMarshal.CreateSpan(ref hpSpan[i], 1), 1);
                 }
             }
         }
@@ -751,10 +782,16 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             int refr;
             bool isScaled;
 
+            Span<sbyte> refFrameSpan = mi.RefFrame.AsSpan();
+            Span<Mv> mvSpan = mi.Mv.AsSpan();
+            Span<RefBuffer> frameRefsSpan = cm.FrameRefs.AsSpan();
+            Span<Ptr<RefBuffer>> blockRefsSpan = xd.BlockRefs.AsSpan();
+            Span<MacroBlockDPlane> planeSpan = xd.Plane.AsSpan();
+
             for (refr = 0; refr < 1 + isCompound; ++refr)
             {
-                int frame = mi.RefFrame[refr];
-                ref RefBuffer refBuf = ref cm.FrameRefs[frame - Constants.LastFrame];
+                int frame = refFrameSpan[refr];
+                ref RefBuffer refBuf = ref frameRefsSpan[frame - Constants.LastFrame];
                 ref ScaleFactors sf = ref refBuf.Sf;
                 ref Surface refFrameBuf = ref refBuf.Buf;
 
@@ -767,13 +804,13 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 isScaled = sf.IsScaled();
                 ReconInter.SetupPrePlanes(ref xd, refr, ref refFrameBuf, miRow, miCol,
                     isScaled ? new Ptr<ScaleFactors>(ref sf) : Ptr<ScaleFactors>.Null);
-                xd.BlockRefs[refr] = new Ptr<RefBuffer>(ref refBuf);
+                blockRefsSpan[refr] = new Ptr<RefBuffer>(ref refBuf);
 
                 if (sbType < BlockSize.Block8x8)
                 {
                     for (plane = 0; plane < Constants.MaxMbPlane; ++plane)
                     {
-                        ref MacroBlockDPlane pd = ref xd.Plane[plane];
+                        ref MacroBlockDPlane pd = ref planeSpan[plane];
                         ref Buf2D dstBuf = ref pd.Dst;
                         int num4x4W = pd.N4W;
                         int num4x4H = pd.N4H;
@@ -811,10 +848,10 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 }
                 else
                 {
-                    Mv mv = mi.Mv[refr];
+                    Mv mv = mvSpan[refr];
                     for (plane = 0; plane < Constants.MaxMbPlane; ++plane)
                     {
-                        ref MacroBlockDPlane pd = ref xd.Plane[plane];
+                        ref MacroBlockDPlane pd = ref planeSpan[plane];
                         ref Buf2D dstBuf = ref pd.Dst;
                         int num4x4W = pd.N4W;
                         int num4x4H = pd.N4H;
@@ -847,12 +884,14 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
         private static void SetPlaneN4(ref MacroBlockD xd, int bw, int bh, int bwl, int bhl)
         {
+            Span<MacroBlockDPlane> planeSpan = xd.Plane.AsSpan();
+            
             for (int i = 0; i < Constants.MaxMbPlane; i++)
             {
-                xd.Plane[i].N4W = (ushort)((bw << 1) >> xd.Plane[i].SubsamplingX);
-                xd.Plane[i].N4H = (ushort)((bh << 1) >> xd.Plane[i].SubsamplingY);
-                xd.Plane[i].N4Wl = (byte)(bwl - xd.Plane[i].SubsamplingX);
-                xd.Plane[i].N4Hl = (byte)(bhl - xd.Plane[i].SubsamplingY);
+                planeSpan[i].N4W = (ushort)((bw << 1) >> planeSpan[i].SubsamplingX);
+                planeSpan[i].N4H = (ushort)((bh << 1) >> planeSpan[i].SubsamplingY);
+                planeSpan[i].N4Wl = (byte)(bwl - planeSpan[i].SubsamplingX);
+                planeSpan[i].N4Hl = (byte)(bhl - planeSpan[i].SubsamplingY);
             }
         }
 
@@ -892,7 +931,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             // as they are always compared to values that are in 1/8th pel units
             xd.SetMiRowCol(ref tile, miRow, bh, miCol, bw, cm.MiRows, cm.MiCols);
 
-            ReconInter.SetupDstPlanes(ref xd.Plane, ref xd.CurBuf, miRow, miCol);
+            ReconInter.SetupDstPlanes(xd.Plane.AsSpan(), ref xd.CurBuf, miRow, miCol);
             return ref xd.Mi[0].Value;
         }
 
@@ -933,10 +972,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             if (!mi.IsInterBlock())
             {
-                int plane;
-                for (plane = 0; plane < Constants.MaxMbPlane; ++plane)
+                Span<MacroBlockDPlane> planeSpan = xd.Plane.AsSpan();
+                
+                for (int plane = 0; plane < Constants.MaxMbPlane; ++plane)
                 {
-                    ref MacroBlockDPlane pd = ref xd.Plane[plane];
+                    ref MacroBlockDPlane pd = ref planeSpan[plane];
                     TxSize txSize = plane != 0 ? mi.GetUvTxSize(ref pd) : mi.TxSize;
                     int num4x4W = pd.N4W;
                     int num4x4H = pd.N4H;
@@ -967,12 +1007,13 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 // Reconstruction
                 if (mi.Skip == 0)
                 {
+                    Span<MacroBlockDPlane> planeSpan = xd.Plane.AsSpan();
+                    
                     int eobtotal = 0;
-                    int plane;
 
-                    for (plane = 0; plane < Constants.MaxMbPlane; ++plane)
+                    for (int plane = 0; plane < Constants.MaxMbPlane; ++plane)
                     {
-                        ref MacroBlockDPlane pd = ref xd.Plane[plane];
+                        ref MacroBlockDPlane pd = ref planeSpan[plane];
                         TxSize txSize = plane != 0 ? mi.GetUvTxSize(ref pd) : mi.TxSize;
                         int num4x4W = pd.N4W;
                         int num4x4H = pd.N4H;
@@ -1159,22 +1200,30 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             }
         }
 
-        private static void ReadCoefProbsCommon(ref Array2<Array2<Array6<Array6<Array3<byte>>>>> coefProbs,
+        private static void ReadCoefProbsCommon(ReadOnlySpan<Array2<Array6<Array6<Array3<byte>>>>> coefProbs1,
             ref Reader r, int txSize)
         {
             if (r.ReadBit() != 0)
             {
                 for (int i = 0; i < Constants.PlaneTypes; ++i)
                 {
+                    Span<Array6<Array6<Array3<byte>>>> coefProbs2 = coefProbs1[i].AsSpan(); 
+                    
                     for (int j = 0; j < Entropy.RefTypes; ++j)
                     {
+                        Span<Array6<Array3<byte>>> coefProbs3 = coefProbs2[j].AsSpan(); 
+                        
                         for (int k = 0; k < Entropy.CoefBands; ++k)
                         {
+                            Span<Array3<byte>> coefProbs4 = coefProbs3[k].AsSpan();
+                            
                             for (int l = 0; l < Entropy.BAND_COEFF_CONTEXTS(k); ++l)
                             {
+                                Span<byte> coefProbs5 = coefProbs4[l].AsSpan();
+                                
                                 for (int m = 0; m < Entropy.UnconstrainedNodes; ++m)
                                 {
-                                    r.DiffUpdateProb( ref coefProbs[i][j][k][l][m]);
+                                    r.DiffUpdateProb(ref coefProbs5[m]);
                                 }
                             }
                         }
@@ -1185,10 +1234,13 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
         private static void ReadCoefProbs(ref Vp9EntropyProbs fc, TxMode txMode, ref Reader r)
         {
+            Span<Array2<Array2<Array6<Array6<Array3<byte>>>>>> coefProbsSpan = fc.CoefProbs.AsSpan();
+            
             int maxTxSize = (int)Luts.TxModeToBiggestTxSize[(int)txMode];
+            
             for (int txSize = (int)TxSize.Tx4x4; txSize <= maxTxSize; ++txSize)
             {
-                ReadCoefProbsCommon(ref fc.CoefProbs[txSize], ref r, txSize);
+                ReadCoefProbsCommon(coefProbsSpan[txSize].AsSpan(), ref r, txSize);
             }
         }
 
@@ -1207,11 +1259,14 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 lf.ModeRefDeltaUpdate = rb.ReadBit() != 0;
                 if (lf.ModeRefDeltaUpdate)
                 {
+                    Span<sbyte> refDeltasSpan = lf.RefDeltas.AsSpan();
+                    Span<sbyte> modeDeltasSpan = lf.ModeDeltas.AsSpan();
+                    
                     for (int i = 0; i < LoopFilter.MaxRefLfDeltas; i++)
                     {
                         if (rb.ReadBit() != 0)
                         {
-                            lf.RefDeltas[i] = (sbyte)rb.ReadSignedLiteral(6);
+                            refDeltasSpan[i] = (sbyte)rb.ReadSignedLiteral(6);
                         }
                     }
 
@@ -1219,7 +1274,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     {
                         if (rb.ReadBit() != 0)
                         {
-                            lf.ModeDeltas[i] = (sbyte)rb.ReadSignedLiteral(6);
+                            modeDeltasSpan[i] = (sbyte)rb.ReadSignedLiteral(6);
                         }
                     }
                 }
@@ -1268,6 +1323,8 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             cm.ResizeContextBuffers(allocator, width, height);
             SetupRenderSize(ref cm, ref rb);
 
+            Span<RefCntBuffer> frameBuffsSpan = pool.FrameBufs.AsSpan();
+
             if (cm.GetFrameNewBuffer().ReallocFrameBuffer(
                     allocator,
                     cm.Width,
@@ -1277,21 +1334,21 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     cm.UseHighBitDepth,
                     Surface.DecBorderInPixels,
                     cm.ByteAlignment,
-                    new Ptr<VpxCodecFrameBuffer>(ref pool.FrameBufs[cm.NewFbIdx].RawFrameBuffer),
+                    new Ptr<VpxCodecFrameBuffer>(ref frameBuffsSpan[cm.NewFbIdx].RawFrameBuffer),
                     FrameBuffers.GetFrameBuffer,
                     pool.CbPriv) != 0)
             {
                 cm.Error.InternalError(CodecErr.MemError, "Failed to allocate frame buffer");
             }
 
-            pool.FrameBufs[cm.NewFbIdx].Released = 0;
-            pool.FrameBufs[cm.NewFbIdx].Buf.SubsamplingX = cm.SubsamplingX;
-            pool.FrameBufs[cm.NewFbIdx].Buf.SubsamplingY = cm.SubsamplingY;
-            pool.FrameBufs[cm.NewFbIdx].Buf.BitDepth = (uint)cm.BitDepth;
-            pool.FrameBufs[cm.NewFbIdx].Buf.ColorSpace = cm.ColorSpace;
-            pool.FrameBufs[cm.NewFbIdx].Buf.ColorRange = cm.ColorRange;
-            pool.FrameBufs[cm.NewFbIdx].Buf.RenderWidth = cm.RenderWidth;
-            pool.FrameBufs[cm.NewFbIdx].Buf.RenderHeight = cm.RenderHeight;
+            frameBuffsSpan[cm.NewFbIdx].Released = 0;
+            frameBuffsSpan[cm.NewFbIdx].Buf.SubsamplingX = cm.SubsamplingX;
+            frameBuffsSpan[cm.NewFbIdx].Buf.SubsamplingY = cm.SubsamplingY;
+            frameBuffsSpan[cm.NewFbIdx].Buf.BitDepth = (uint)cm.BitDepth;
+            frameBuffsSpan[cm.NewFbIdx].Buf.ColorSpace = cm.ColorSpace;
+            frameBuffsSpan[cm.NewFbIdx].Buf.ColorRange = cm.ColorRange;
+            frameBuffsSpan[cm.NewFbIdx].Buf.RenderWidth = cm.RenderWidth;
+            frameBuffsSpan[cm.NewFbIdx].Buf.RenderHeight = cm.RenderHeight;
         }
 
         private static bool ValidRefFrameImgFmt(
@@ -1312,13 +1369,15 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             bool hasValidRefFrame = false;
             ref BufferPool pool = ref cm.BufferPool.Value;
+            Span<RefBuffer> frameRefsSpan = cm.FrameRefs.AsSpan();
+            
             for (int i = 0; i < Constants.RefsPerFrame; ++i)
             {
                 if (rb.ReadBit() != 0)
                 {
-                    if (cm.FrameRefs[i].Idx != RefBuffer.InvalidIdx)
+                    if (frameRefsSpan[i].Idx != RefBuffer.InvalidIdx)
                     {
-                        ref Surface buf = ref cm.FrameRefs[i].Buf;
+                        ref Surface buf = ref frameRefsSpan[i].Buf;
                         width = buf.YCropWidth;
                         height = buf.YCropHeight;
                         found = true;
@@ -1343,7 +1402,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             // has valid dimensions.
             for (int i = 0; i < Constants.RefsPerFrame; ++i)
             {
-                ref RefBuffer refFrame = ref cm.FrameRefs[i];
+                ref RefBuffer refFrame = ref frameRefsSpan[i];
                 hasValidRefFrame |=
                     refFrame.Idx != RefBuffer.InvalidIdx &&
                     ScaleFactors.ValidRefFrameSize(refFrame.Buf.YCropWidth, refFrame.Buf.YCropHeight, width,
@@ -1357,7 +1416,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             for (int i = 0; i < Constants.RefsPerFrame; ++i)
             {
-                ref RefBuffer refFrame = ref cm.FrameRefs[i];
+                ref RefBuffer refFrame = ref frameRefsSpan[i];
                 if (refFrame.Idx == RefBuffer.InvalidIdx ||
                     !ValidRefFrameImgFmt(
                         (BitDepth)refFrame.Buf.BitDepth,
@@ -1374,6 +1433,8 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             cm.ResizeContextBuffers(allocator, width, height);
             SetupRenderSize(ref cm, ref rb);
+            
+            Span<RefCntBuffer> frameBuffsSpan = pool.FrameBufs.AsSpan();
 
             if (cm.GetFrameNewBuffer().ReallocFrameBuffer(
                     allocator,
@@ -1384,21 +1445,21 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     cm.UseHighBitDepth,
                     Surface.DecBorderInPixels,
                     cm.ByteAlignment,
-                    new Ptr<VpxCodecFrameBuffer>(ref pool.FrameBufs[cm.NewFbIdx].RawFrameBuffer),
+                    new Ptr<VpxCodecFrameBuffer>(ref frameBuffsSpan[cm.NewFbIdx].RawFrameBuffer),
                     FrameBuffers.GetFrameBuffer,
                     pool.CbPriv) != 0)
             {
                 cm.Error.InternalError(CodecErr.MemError, "Failed to allocate frame buffer");
             }
 
-            pool.FrameBufs[cm.NewFbIdx].Released = 0;
-            pool.FrameBufs[cm.NewFbIdx].Buf.SubsamplingX = cm.SubsamplingX;
-            pool.FrameBufs[cm.NewFbIdx].Buf.SubsamplingY = cm.SubsamplingY;
-            pool.FrameBufs[cm.NewFbIdx].Buf.BitDepth = (uint)cm.BitDepth;
-            pool.FrameBufs[cm.NewFbIdx].Buf.ColorSpace = cm.ColorSpace;
-            pool.FrameBufs[cm.NewFbIdx].Buf.ColorRange = cm.ColorRange;
-            pool.FrameBufs[cm.NewFbIdx].Buf.RenderWidth = cm.RenderWidth;
-            pool.FrameBufs[cm.NewFbIdx].Buf.RenderHeight = cm.RenderHeight;
+            frameBuffsSpan[cm.NewFbIdx].Released = 0;
+            frameBuffsSpan[cm.NewFbIdx].Buf.SubsamplingX = cm.SubsamplingX;
+            frameBuffsSpan[cm.NewFbIdx].Buf.SubsamplingY = cm.SubsamplingY;
+            frameBuffsSpan[cm.NewFbIdx].Buf.BitDepth = (uint)cm.BitDepth;
+            frameBuffsSpan[cm.NewFbIdx].Buf.ColorSpace = cm.ColorSpace;
+            frameBuffsSpan[cm.NewFbIdx].Buf.ColorRange = cm.ColorRange;
+            frameBuffsSpan[cm.NewFbIdx].Buf.RenderWidth = cm.RenderWidth;
+            frameBuffsSpan[cm.NewFbIdx].Buf.RenderHeight = cm.RenderHeight;
         }
 
         // Reads the next tile returning its size and adjusting '*data' accordingly
@@ -1438,7 +1499,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
         }
 
         private static void GetTileBuffers(ref Vp9Common cm, ArrayPtr<byte> data, int tileCols,
-            ref Array64<TileBuffer> tileBuffers)
+            Span<TileBuffer> tileBuffers)
         {
             for (int c = 0; c < tileCols; ++c)
             {
@@ -1454,14 +1515,16 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             ArrayPtr<byte> data,
             int tileCols,
             int tileRows,
-            ref Array4<Array64<TileBuffer>> tileBuffers)
+            Span<Array64<TileBuffer>> tileBuffers1)
         {
             for (int r = 0; r < tileRows; ++r)
             {
+                Span<TileBuffer> tileBuffers2 = tileBuffers1[r].AsSpan();
+                
                 for (int c = 0; c < tileCols; ++c)
                 {
                     bool isLast = r == tileRows - 1 && c == tileCols - 1;
-                    ref TileBuffer buf = ref tileBuffers[r][c];
+                    ref TileBuffer buf = ref tileBuffers2[c];
                     GetTileBuffer(isLast, ref cm.Error, ref data, ref buf);
                 }
             }
@@ -1485,15 +1548,20 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             MemoryUtil.Fill(cm.AboveSegContext.ToPointer(), (sbyte)0, alignedCols);
 
             LoopFilter.ResetLfm(ref cm);
+            
+            Span<Array64<TileBuffer>> tileBuffers1 = tileBuffers.AsSpan();
+            Span<TileWorkerData> tileWorkerDataSpan = cm.TileWorkerData.AsSpan();
 
-            GetTileBuffers(ref cm, data, tileCols, tileRows, ref tileBuffers);
+            GetTileBuffers(ref cm, data, tileCols, tileRows, tileBuffers1);
             // Load all tile information into tile_data.
             for (tileRow = 0; tileRow < tileRows; ++tileRow)
             {
+                Span<TileBuffer> tileBuffers2 = tileBuffers1[tileRow].AsSpan();
+                
                 for (tileCol = 0; tileCol < tileCols; ++tileCol)
                 {
-                    ref TileBuffer buf = ref tileBuffers[tileRow][tileCol];
-                    ref TileWorkerData tileData = ref cm.TileWorkerData[(tileCols * tileRow) + tileCol];
+                    ref TileBuffer buf = ref tileBuffers2[tileCol];
+                    ref TileWorkerData tileData = ref tileWorkerDataSpan[(tileCols * tileRow) + tileCol];
                     tileData.Xd = cm.Mb;
                     tileData.Xd.Corrupted = false;
                     tileData.Xd.Counts = cm.Counts;
@@ -1513,7 +1581,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     for (tileCol = 0; tileCol < tileCols; ++tileCol)
                     {
                         int col = tileCol;
-                        ref TileWorkerData tileData = ref cm.TileWorkerData[(tileCols * tileRow) + col];
+                        ref TileWorkerData tileData = ref tileWorkerDataSpan[(tileCols * tileRow) + col];
                         tile.SetCol(ref cm, col);
                         tileData.Xd.LeftContext = new Array3<Array16<sbyte>>();
                         tileData.Xd.LeftSegContext = new Array8<sbyte>();
@@ -1532,11 +1600,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             }
 
             // Get last tile data.
-            return cm.TileWorkerData[(tileCols * tileRows) - 1].BitReader.FindEnd();
+            return tileWorkerDataSpan[(tileCols * tileRows) - 1].BitReader.FindEnd();
         }
 
         private static bool DecodeTileCol(ref TileWorkerData tileData, ref Vp9Common cm,
-            ref Array64<TileBuffer> tileBuffers)
+            Span<TileBuffer> tileBuffers)
         {
             ref TileInfo tile = ref tileData.Xd.Tile;
             int finalCol = (1 << cm.Log2TileCols) - 1;
@@ -1594,10 +1662,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             cm.AboveContext.AsSpan().Clear();
             cm.AboveSegContext.AsSpan().Clear();
+            
+            Span<TileWorkerData> tileWorkerDataSpan = cm.TileWorkerData.AsSpan();
 
             for (n = 0; n < numWorkers; ++n)
             {
-                ref TileWorkerData tileData = ref cm.TileWorkerData[n + totalTiles];
+                ref TileWorkerData tileData = ref tileWorkerDataSpan[n + totalTiles];
 
                 tileData.Xd = cm.Mb;
                 tileData.Xd.Counts = new Ptr<Vp9BackwardUpdates>(ref tileData.Counts);
@@ -1605,17 +1675,17 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             }
 
             Array64<TileBuffer> tileBuffers = new();
+            Span<TileBuffer> tileBuffersSpan = tileBuffers.AsSpan();
 
-            GetTileBuffers(ref cm, data, tileCols, ref tileBuffers);
+            GetTileBuffers(ref cm, data, tileCols, tileBuffersSpan);
 
-            tileBuffers.AsSpan().Slice(0, tileCols).Sort(CompareTileBuffers);
+            tileBuffersSpan[..tileCols].Sort(CompareTileBuffers);
 
             if (numWorkers == tileCols)
             {
-                TileBuffer largest = tileBuffers[0];
-                Span<TileBuffer> buffers = tileBuffers.AsSpan();
-                buffers.Slice(1).CopyTo(buffers.Slice(0, tileBuffers.Length - 1));
-                tileBuffers[tileCols - 1] = largest;
+                TileBuffer largest = tileBuffersSpan[0];
+                tileBuffersSpan[1..].CopyTo(tileBuffersSpan[..^1]);
+                tileBuffersSpan[tileCols - 1] = largest;
             }
             else
             {
@@ -1626,9 +1696,9 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 // larger tile implies it is more difficult to decode.
                 while (start < end)
                 {
-                    tmp = tileBuffers[start];
-                    tileBuffers[start] = tileBuffers[end];
-                    tileBuffers[end] = tmp;
+                    tmp = tileBuffersSpan[start];
+                    tileBuffersSpan[start] = tileBuffersSpan[end];
+                    tileBuffersSpan[end] = tmp;
                     start += 2;
                     end -= 2;
                 }
@@ -1641,7 +1711,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             for (n = 0; n < numWorkers; ++n)
             {
                 int count = baseVal + ((remain + n) / numWorkers);
-                ref TileWorkerData tileData = ref cm.TileWorkerData[n + totalTiles];
+                ref TileWorkerData tileData = ref tileWorkerDataSpan[n + totalTiles];
 
                 tileData.BufStart = bufStart;
                 tileData.BufEnd = bufStart + count - 1;
@@ -1655,7 +1725,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             {
                 ref TileWorkerData tileData = ref cmPtr.Value.TileWorkerData[n + totalTiles];
 
-                if (!DecodeTileCol(ref tileData, ref cmPtr.Value, ref tileBuffers))
+                if (!DecodeTileCol(ref tileData, ref cmPtr.Value, tileBuffers.AsSpan()))
                 {
                     cmPtr.Value.Mb.Corrupted = true;
                 }
@@ -1665,14 +1735,14 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             {
                 if (bitReaderEnd.IsNull)
                 {
-                    ref TileWorkerData tileData = ref cm.TileWorkerData[n - 1 + totalTiles];
+                    ref TileWorkerData tileData = ref tileWorkerDataSpan[n - 1 + totalTiles];
                     bitReaderEnd = tileData.DataEnd;
                 }
             }
 
             for (n = 0; n < numWorkers; ++n)
             {
-                ref TileWorkerData tileData = ref cm.TileWorkerData[n + totalTiles];
+                ref TileWorkerData tileData = ref tileWorkerDataSpan[n + totalTiles];
                 AccumulateFrameCounts(ref cm.Counts.Value, ref tileData.Counts);
             }
 
@@ -1706,7 +1776,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
         {
             if (cm.FrameType == FrameType.KeyFrame && cm.CurrentVideoFrame > 0)
             {
-                ref Array12<RefCntBuffer> frameBufs = ref cm.BufferPool.Value.FrameBufs;
+                Span<RefCntBuffer> frameBuffs = cm.BufferPool.Value.FrameBufs.AsSpan();
                 ref BufferPool pool = ref cm.BufferPool.Value;
 
                 for (int i = 0; i < Constants.FrameBuffers; ++i)
@@ -1716,11 +1786,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                         continue;
                     }
 
-                    frameBufs[i].RefCount = 0;
-                    if (frameBufs[i].Released == 0)
+                    frameBuffs[i].RefCount = 0;
+                    if (frameBuffs[i].Released == 0)
                     {
-                        FrameBuffers.ReleaseFrameBuffer(pool.CbPriv, ref frameBufs[i].RawFrameBuffer);
-                        frameBufs[i].Released = 1;
+                        FrameBuffers.ReleaseFrameBuffer(pool.CbPriv, ref frameBuffs[i].RawFrameBuffer);
+                        frameBuffs[i].Released = 1;
                     }
                 }
             }
@@ -1739,7 +1809,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                    rb.ReadLiteral(8) == SyncCode2;
         }
 
-        private static void RefCntFb(ref Array12<RefCntBuffer> bufs, ref int idx, int newIdx)
+        private static void RefCntFb(Span<RefCntBuffer> bufs, ref int idx, int newIdx)
         {
             int refIndex = idx;
 
@@ -1758,12 +1828,14 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
         {
             ref Vp9Common cm = ref pbi.Common;
             ref BufferPool pool = ref cm.BufferPool.Value;
-            ref Array12<RefCntBuffer> frameBufs = ref pool.FrameBufs;
+            Span<RefCntBuffer> frameBuffs = pool.FrameBufs.AsSpan();
             int mask, refIndex = 0;
             ulong sz;
 
             cm.LastFrameType = cm.FrameType;
             cm.LastIntraOnly = cm.IntraOnly;
+
+            Span<int> refFrameSpan = cm.RefFrameMap.AsSpan();
 
             if (rb.ReadLiteral(2) != FrameMarker)
             {
@@ -1780,14 +1852,14 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             if (cm.ShowExistingFrame != 0)
             {
                 // Show an existing frame directly.
-                int frameToShow = cm.RefFrameMap[rb.ReadLiteral(3)];
-                if (frameToShow < 0 || frameBufs[frameToShow].RefCount < 1)
+                int frameToShow = refFrameSpan[rb.ReadLiteral(3)];
+                if (frameToShow < 0 || frameBuffs[frameToShow].RefCount < 1)
                 {
                     cm.Error.InternalError(CodecErr.UnsupBitstream,
                         $"Buffer {frameToShow} does not contain a decoded frame");
                 }
 
-                RefCntFb(ref frameBufs, ref cm.NewFbIdx, frameToShow);
+                RefCntFb(frameBuffs, ref cm.NewFbIdx, frameToShow);
                 pbi.RefreshFrameFlags = 0;
                 cm.Lf.FilterLevel = 0;
                 cm.ShowFrame = 1;
@@ -1809,16 +1881,18 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 cm.ReadBitdepthColorspaceSampling(ref rb);
                 pbi.RefreshFrameFlags = (1 << Constants.RefFrames) - 1;
 
+                Span<RefBuffer> frameRefsSpan = cm.FrameRefs.AsSpan();
+
                 for (int i = 0; i < Constants.RefsPerFrame; ++i)
                 {
-                    cm.FrameRefs[i].Idx = RefBuffer.InvalidIdx;
-                    cm.FrameRefs[i].Buf = default;
+                    frameRefsSpan[i].Idx = RefBuffer.InvalidIdx;
+                    frameRefsSpan[i].Buf = default;
                 }
 
                 SetupFrameSize(allocator, ref cm, ref rb);
                 if (pbi.NeedResync != 0)
                 {
-                    cm.RefFrameMap.AsSpan().Fill(-1);
+                    refFrameSpan.Fill(-1);
                     FlushAllFbOnKey(ref cm);
                     pbi.NeedResync = 0;
                 }
@@ -1857,22 +1931,25 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     SetupFrameSize(allocator, ref cm, ref rb);
                     if (pbi.NeedResync != 0)
                     {
-                        cm.RefFrameMap.AsSpan().Fill(-1);
+                        refFrameSpan.Fill(-1);
                         pbi.NeedResync = 0;
                     }
                 }
                 else if (pbi.NeedResync != 1)
                 {
+                    Span<RefBuffer> frameRefsSpan = cm.FrameRefs.AsSpan();
+                    Span<sbyte> refFrameSignBiasSpan = cm.RefFrameSignBias.AsSpan();
+                    
                     /* Skip if need resync */
                     pbi.RefreshFrameFlags = rb.ReadLiteral(Constants.RefFrames);
                     for (int i = 0; i < Constants.RefsPerFrame; ++i)
                     {
                         int refr = rb.ReadLiteral(Constants.RefFramesLog2);
-                        int idx = cm.RefFrameMap[refr];
-                        ref RefBuffer refFrame = ref cm.FrameRefs[i];
+                        int idx = refFrameSpan[refr];
+                        ref RefBuffer refFrame = ref frameRefsSpan[i];
                         refFrame.Idx = idx;
-                        refFrame.Buf = frameBufs[idx].Buf;
-                        cm.RefFrameSignBias[Constants.LastFrame + i] = (sbyte)rb.ReadBit();
+                        refFrame.Buf = frameBuffs[idx].Buf;
+                        refFrameSignBiasSpan[Constants.LastFrame + i] = (sbyte)rb.ReadBit();
                     }
 
                     SetupFrameSizeWithRefs(allocator, ref cm, ref rb);
@@ -1882,7 +1959,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
                     for (int i = 0; i < Constants.RefsPerFrame; ++i)
                     {
-                        ref RefBuffer refBuf = ref cm.FrameRefs[i];
+                        ref RefBuffer refBuf = ref frameRefsSpan[i];
                         refBuf.Sf.SetupScaleFactorsForFrame(
                             refBuf.Buf.YCropWidth,
                             refBuf.Buf.YCropHeight,
@@ -1923,23 +2000,25 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             // below, forcing the use of context 0 for those frame types.
             cm.FrameContextIdx = (uint)rb.ReadLiteral(Constants.FrameContextsLog2);
 
+            Span<int> nextRefFrameMapSpan = cm.NextRefFrameMap.AsSpan();
+
             // Generate next_ref_frame_map.
             for (mask = pbi.RefreshFrameFlags; mask != 0; mask >>= 1)
             {
                 if ((mask & 1) != 0)
                 {
-                    cm.NextRefFrameMap[refIndex] = cm.NewFbIdx;
-                    ++frameBufs[cm.NewFbIdx].RefCount;
+                    nextRefFrameMapSpan[refIndex] = cm.NewFbIdx;
+                    ++frameBuffs[cm.NewFbIdx].RefCount;
                 }
                 else
                 {
-                    cm.NextRefFrameMap[refIndex] = cm.RefFrameMap[refIndex];
+                    nextRefFrameMapSpan[refIndex] = cm.RefFrameMap[refIndex];
                 }
 
                 // Current thread holds the reference frame.
                 if (cm.RefFrameMap[refIndex] >= 0)
                 {
-                    ++frameBufs[cm.RefFrameMap[refIndex]].RefCount;
+                    ++frameBuffs[cm.RefFrameMap[refIndex]].RefCount;
                 }
 
                 ++refIndex;
@@ -1947,11 +2026,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             for (; refIndex < Constants.RefFrames; ++refIndex)
             {
-                cm.NextRefFrameMap[refIndex] = cm.RefFrameMap[refIndex];
+                nextRefFrameMapSpan[refIndex] = refFrameSpan[refIndex];
                 // Current thread holds the reference frame.
-                if (cm.RefFrameMap[refIndex] >= 0)
+                if (refFrameSpan[refIndex] >= 0)
                 {
-                    ++frameBufs[cm.RefFrameMap[refIndex]].RefCount;
+                    ++frameBuffs[refFrameSpan[refIndex]].RefCount;
                 }
             }
 
@@ -1998,9 +2077,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             ReadCoefProbs(ref fc, cm.TxMode, ref r);
 
+            Span<byte> skipProbSpan = fc.SkipProb.AsSpan();
+
             for (int k = 0; k < Constants.SkipContexts; ++k)
             {
-                r.DiffUpdateProb(ref fc.SkipProb[k]);
+                r.DiffUpdateProb(ref skipProbSpan[k]);
             }
 
             if (!cm.FrameIsIntraOnly())
@@ -2011,10 +2092,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 {
                     ReadSwitchableInterpProbs(ref fc, ref r);
                 }
+                
+                Span<byte> intraInterProbSpan = fc.IntraInterProb.AsSpan();
 
                 for (int i = 0; i < Constants.IntraInterContexts; i++)
                 {
-                    r.DiffUpdateProb( ref fc.IntraInterProb[i]);
+                    r.DiffUpdateProb(ref intraInterProbSpan[i]);
                 }
 
                 cm.ReferenceMode = cm.ReadFrameReferenceMode(ref r);
@@ -2024,20 +2107,28 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 }
 
                 cm.ReadFrameReferenceModeProbs(ref r);
+                
+                Span<Array9<byte>> yModeProbSpan1 = fc.YModeProb.AsSpan();
 
                 for (int j = 0; j < EntropyMode.BlockSizeGroups; j++)
                 {
+                    Span<byte> yModeProbSpan2 = yModeProbSpan1[j].AsSpan();
+                    
                     for (int i = 0; i < Constants.IntraModes - 1; ++i)
                     {
-                        r.DiffUpdateProb( ref fc.YModeProb[j][i]);
+                        r.DiffUpdateProb(ref yModeProbSpan2[i]);
                     }
                 }
+                
+                Span<Array3<byte>> partitionProbSpan1 = fc.PartitionProb.AsSpan();
 
                 for (int j = 0; j < Constants.PartitionContexts; ++j)
                 {
+                    Span<byte> partitionProbSpan2 = partitionProbSpan1[j].AsSpan();
+                    
                     for (int i = 0; i < Constants.PartitionTypes - 1; ++i)
                     {
-                        r.DiffUpdateProb( ref fc.PartitionProb[j][i]);
+                        r.DiffUpdateProb(ref partitionProbSpan2[i]);
                     }
                 }
 
@@ -2095,7 +2186,9 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
 
             xd.SetupBlockPlanes(cm.SubsamplingX, cm.SubsamplingY);
 
-            cm.Fc = new Ptr<Vp9EntropyProbs>(ref cm.FrameContexts[(int)cm.FrameContextIdx]);
+            Span<Vp9EntropyProbs> frameContextsSpan = cm.FrameContexts.AsSpan();
+
+            cm.Fc = new Ptr<Vp9EntropyProbs>(ref frameContextsSpan[(int)cm.FrameContextIdx]);
 
             xd.Corrupted = false;
             newFb.Corrupted = ReadCompressedHeader(ref pbi, data, firstPartitionSize) ? 1 : 0;
@@ -2164,7 +2257,7 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             // Non frame parallel update frame context here.
             if (cm.RefreshFrameContext != 0 && contextUpdated == 0)
             {
-                cm.FrameContexts[(int)cm.FrameContextIdx] = cm.Fc.Value;
+                frameContextsSpan[(int)cm.FrameContextIdx] = cm.Fc.Value;
             }
         }
     }

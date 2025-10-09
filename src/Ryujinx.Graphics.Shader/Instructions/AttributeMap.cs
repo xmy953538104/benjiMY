@@ -275,12 +275,8 @@ namespace Ryujinx.Graphics.Shader.Instructions
         {
             location = 0;
 
-            if (!_attributes.TryGetValue(offset, out AttributeEntry entry))
-            {
-                return IoVariable.Invalid;
-            }
-
-            if (((StagesMask)(1 << (int)definitions.Stage) & entry.OutputMask) == StagesMask.None)
+            if (!_attributes.TryGetValue(offset, out AttributeEntry entry) ||
+                ((StagesMask)(1 << (int)definitions.Stage) & entry.OutputMask) == StagesMask.None)
             {
                 return IoVariable.Invalid;
             }
@@ -326,9 +322,9 @@ namespace Ryujinx.Graphics.Shader.Instructions
                 return false;
             }
 
-            return stage == ShaderStage.TessellationControl ||
-                   stage == ShaderStage.TessellationEvaluation ||
-                   stage == ShaderStage.Geometry;
+            return stage is ShaderStage.TessellationControl
+                or ShaderStage.TessellationEvaluation
+                or ShaderStage.Geometry;
         }
 
         public static bool HasInvocationId(ShaderStage stage, bool isOutput)

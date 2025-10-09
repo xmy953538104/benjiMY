@@ -2,6 +2,7 @@ package org.kenjinx.android.views
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.os.Build
 import android.provider.DocumentsContract
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -43,7 +44,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -51,7 +51,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -79,38 +78,16 @@ import org.kenjinx.android.widgets.ActionButton
 import org.kenjinx.android.widgets.DropdownSelector
 import org.kenjinx.android.widgets.ExpandableView
 import org.kenjinx.android.widgets.SimpleAlertDialog
+import org.kenjinx.android.widgets.SwitchSelector
 
-// NEU: Enums importieren
-import org.kenjinx.android.SystemLanguage
-import org.kenjinx.android.RegionCode
-
-// >>> NEU: QuickSettings + OrientationPreference
+// >>> QuickSettings + OrientationPreference
 import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.viewmodels.QuickSettings.OrientationPreference
 import org.kenjinx.android.viewmodels.QuickSettings.OverlayMenuPosition // ← NEU
 
-// --- Local fallback for missing SwitchSelector widget ---
-@Composable
-fun MutableState<Boolean>.SwitchSelector(label: String = "", enabled: Boolean = true) {
-    val state = this
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f)
-        )
-        Switch(
-            checked = state.value,
-            onCheckedChange = { if (enabled) state.value = it },
-            enabled = enabled
-        )
-    }
-}
+// Import enums
+import org.kenjinx.android.SystemLanguage
+import org.kenjinx.android.RegionCode
 
 class SettingViews {
     companion object {
@@ -129,8 +106,8 @@ class SettingViews {
             val enablePptc = remember { mutableStateOf(false) }
             val enableLowPowerPptc = remember { mutableStateOf(false) }
             val enableJitCacheEviction = remember { mutableStateOf(false) }
-            var enableFsIntegrityChecks = remember { mutableStateOf(false) }
-            var fsGlobalAccessLogMode = remember { mutableIntStateOf(0) }
+            val enableFsIntegrityChecks = remember { mutableStateOf(false) }
+            val fsGlobalAccessLogMode = remember { mutableIntStateOf(0) }
             val ignoreMissingServices = remember { mutableStateOf(false) }
             val enableShaderCache = remember { mutableStateOf(false) }
             val enableTextureRecompression = remember { mutableStateOf(false) }
@@ -148,7 +125,7 @@ class SettingViews {
             val showDataImportDialog = remember { mutableStateOf(false) }
             val dataResetState = remember { mutableStateOf(DataResetState.Query) }
             val dataImportState = remember { mutableStateOf(DataImportState.File) }
-            var dataFile = remember { mutableStateOf<DocumentFile?>(null) }
+            val dataFile = remember { mutableStateOf<DocumentFile?>(null) }
             val isGrid = remember { mutableStateOf(true) }
             val useSwitchLayout = remember { mutableStateOf(true) }
             val enableMotion = remember { mutableStateOf(true) }
@@ -164,18 +141,17 @@ class SettingViews {
             val enableDebugLogs = remember { mutableStateOf(true) }
             val enableGraphicsLogs = remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
-            val showShortcutGuide = remember { mutableStateOf(false) }
 
-            // NEU: Sprache & Region States
-            val systemLanguage = remember { mutableStateOf(SystemLanguage.AmericanEnglish) }
-            val regionCode = remember { mutableStateOf(RegionCode.USA) }
-
-            // NEU: Orientation aus QuickSettings laden
+            // Load orientation from QuickSettings
             val orientationPref = remember {
                 mutableStateOf(QuickSettings(mainViewModel.activity).orientationPreference)
             }
 
-            // NEU: Overlay Settings aus QuickSettings laden
+            // Language & Region States
+            val systemLanguage = remember { mutableStateOf(SystemLanguage.AmericanEnglish) }
+            val regionCode = remember { mutableStateOf(RegionCode.USA) }
+
+            // Load overlay settings from QuickSettings
             val overlayMenuPosition = remember {
                 mutableStateOf(QuickSettings(mainViewModel.activity).overlayMenuPosition)
             }
@@ -217,7 +193,6 @@ class SettingViews {
                     enableTraceLogs,
                     enableDebugLogs,
                     enableGraphicsLogs,
-                    // NEU:
                     systemLanguage,
                     regionCode
                 )
@@ -264,7 +239,6 @@ class SettingViews {
                                     enableTraceLogs,
                                     enableDebugLogs,
                                     enableGraphicsLogs,
-                                    // NEU:
                                     systemLanguage,
                                     regionCode
                                 )
@@ -292,27 +266,31 @@ class SettingViews {
                     ExpandableView(onCardArrowClick = { }, title = "User Interface", icon = Icons.Outlined.BarChart ,isFirst = true) {
                         Column(modifier = Modifier.fillMaxWidth()) {
 
-                            // NEU: Screen Orientation
+                            // Screen Orientation
                             OrientationDropdown(
                                 selectedOrientation = orientationPref.value,
                                 onOrientationSelected = { sel ->
                                     orientationPref.value = sel
-                                    // sofort speichern und anwenden
+                                    // Save and use immediately
                                     val qs = QuickSettings(mainViewModel.activity)
                                     qs.orientationPreference = sel
                                     qs.save()
 
-                                    // 1) Activity-Ausrichtung setzen
+                                    // 1) Set activity alignment
                                     val act = mainViewModel.activity
                                     act.requestedOrientation = sel.value
 
-                                    // 2) Rotation/Größe sofort ins Rendering nachreichen
-                                    val rot = act.display?.rotation
+                                    // 2) Submit rotation/size immediately to the rendering
+                                    val rot = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                        act.display?.rotation
+                                    } else {
+                                        TODO("VERSION.SDK_INT < R")
+                                    }
                                     mainViewModel.gameHost?.onOrientationOrSizeChanged(rot)
                                 }
                             )
 
-                            // NEU: Overlay Menu Position (DropdownSelector wie gewohnt)
+                            // Overlay Menu Position (DropdownSelector as usual)
                             OverlayPositionDropdown(
                                 selectedPosition = overlayMenuPosition.value,
                                 onPositionSelected = { pos ->
@@ -323,7 +301,7 @@ class SettingViews {
                                 }
                             )
 
-                            // NEU: Overlay transparency Slider – identischer Stil wie Controller Stick Sensitivity
+                            // Overlay transparency slider – identical style as controller stick sensitivity
                             val interactionSource: MutableInteractionSource = remember { MutableInteractionSource() }
                             Row(
                                 modifier = Modifier
@@ -452,23 +430,6 @@ class SettingViews {
                             ) {
                                 ActionButton(
                                     onClick = {
-                                        showShortcutGuide.value = true
-                                    },
-                                    text = "Shortcut Guide",
-                                    icon = Icons.Default.Build,
-                                    modifier = Modifier.weight(1f),
-                                    isFullWidth = false,
-                                )
-                            }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp)
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                ActionButton(
-                                    onClick = {
                                         showDataResetDialog.value = true
                                     },
                                     text = "Reinit App Data",
@@ -542,41 +503,6 @@ class SettingViews {
                             }
                         }
                     }
-
-                    // === Shortcut Guide Dialog ===
-                    SimpleAlertDialog.Custom(
-                        showDialog = showShortcutGuide,
-                        onDismissRequest = { showShortcutGuide.value = false },
-                        properties = DialogProperties(usePlatformDefaultWidth = false)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "Shortcut Guide",
-                                style = MaterialTheme.typography.titleMedium,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Text(
-                                text = "How to create a home screen shortcut:\n\n" +
-                                    "1) Tap 'Create shortcut' on the Home screen.\n" +
-                                    "2) Pick your game file (.nsp, .xci).\n" +
-                                    "3) Enter a shortcut name and optionally choose a custom icon.\n" +
-                                    "4) Confirm Android's 'Add to Home screen' dialog.\n\n" +
-                                    "Tip: The confirmation requires a tap; rotation will revert shortly after.",
-                                textAlign = TextAlign.Start
-                            )
-                            Button(onClick = { showShortcutGuide.value = false }) {
-                                Text("OK")
-                            }
-                        }
-                    }
-
                     SimpleAlertDialog.Custom(
                         showDialog = showKeyDialog,
                         onDismissRequest = {
@@ -1348,7 +1274,7 @@ class SettingViews {
                     ExpandableView(onCardArrowClick = { }, title = "System", icon = Icons.Outlined.Settings) {
                         Column(modifier = Modifier.fillMaxWidth()) {
 
-                            // NEU: Sprache & Region
+                            // Language & Region
                             LanguageDropdown(
                                 selectedLanguage = systemLanguage.value,
                                 onLanguageSelected = { lang -> systemLanguage.value = lang }
@@ -1409,7 +1335,8 @@ class SettingViews {
                                 }
                             )
 
-                            var isDriverSelectorOpen = remember { mutableStateOf(false) }
+
+                            val isDriverSelectorOpen = remember { mutableStateOf(false) }
 
                             Row(
                                 modifier = Modifier
@@ -1480,34 +1407,7 @@ class SettingViews {
             }
         }
 
-        // ---- NEU: Dropdown für Orientation ----
-        @Composable
-        fun OrientationDropdown(
-            selectedOrientation: OrientationPreference,
-            onOrientationSelected: (OrientationPreference) -> Unit
-        ) {
-            val options = listOf(
-                OrientationPreference.Sensor,
-                OrientationPreference.SensorLandscape,
-                OrientationPreference.SensorPortrait
-            )
-
-            DropdownSelector(
-                label = "Screen Orientation",
-                selectedValue = selectedOrientation,
-                options = options,
-                getDisplayText = { opt ->
-                    when (opt) {
-                        OrientationPreference.Sensor -> "Sensor"
-                        OrientationPreference.SensorLandscape -> "Sensor Landscape"
-                        OrientationPreference.SensorPortrait -> "Sensor Portrait"
-                    }
-                },
-                onOptionSelected = onOrientationSelected
-            )
-        }
-
-        // ---- NEU: Dropdown für Overlay-Position ----
+        // ---- Overlay position dropdown ----
         @Composable
         fun OverlayPositionDropdown(
             selectedPosition: OverlayMenuPosition,
@@ -1540,7 +1440,7 @@ class SettingViews {
             )
         }
 
-        // ---- NEU: Dropdowns für Sprache & Region ----
+        // ---- Dropdowns for language & region ----
 
         @Composable
         fun LanguageDropdown(
@@ -1603,7 +1503,36 @@ class SettingViews {
             )
         }
 
-        // ---- bereits vorhandene Dropdowns ----
+        // ---- Existing dropdowns ----
+
+        // ---- Dropdown for orientation ----
+        @Composable
+        fun OrientationDropdown(
+            selectedOrientation: OrientationPreference,
+            onOrientationSelected: (OrientationPreference) -> Unit
+        ) {
+            val options = listOf(
+                OrientationPreference.Sensor,
+                OrientationPreference.SensorLandscape,
+                OrientationPreference.SensorPortrait
+            )
+
+            DropdownSelector(
+                label = "Screen Orientation",
+                selectedValue = selectedOrientation,
+                options = options,
+                getDisplayText = { opt ->
+                    when (opt) {
+                        OrientationPreference.Sensor -> "Sensor"
+                        OrientationPreference.SensorLandscape -> "Sensor Landscape"
+                        OrientationPreference.SensorPortrait -> "Sensor Portrait"
+                    }
+                },
+                onOptionSelected = onOrientationSelected
+            )
+        }
+
+        // ---- Existing dropdowns ----
 
         @Composable
         fun MemoryModeDropdown(

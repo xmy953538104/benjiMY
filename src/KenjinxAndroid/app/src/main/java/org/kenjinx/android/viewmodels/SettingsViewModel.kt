@@ -1,7 +1,6 @@
 package org.kenjinx.android.viewmodels
 
 import android.content.SharedPreferences
-import android.net.Uri
 import androidx.compose.runtime.MutableState
 import androidx.documentfile.provider.DocumentFile
 import androidx.preference.PreferenceManager
@@ -21,7 +20,7 @@ import java.io.FileOutputStream
 import kotlin.concurrent.thread
 import androidx.core.content.edit
 
-// NEU: Enums importieren
+// Import enums
 import org.kenjinx.android.SystemLanguage
 import org.kenjinx.android.RegionCode
 
@@ -76,7 +75,6 @@ class SettingsViewModel(val activity: MainActivity) {
         enableTraceLogs: MutableState<Boolean>,
         enableDebugLogs: MutableState<Boolean>,
         enableGraphicsLogs: MutableState<Boolean>,
-        // NEU:
         systemLanguage: MutableState<SystemLanguage>,
         regionCode: MutableState<RegionCode>
     ) {
@@ -113,7 +111,7 @@ class SettingsViewModel(val activity: MainActivity) {
         enableDebugLogs.value = sharedPref.getBoolean("enableDebugLogs", false)
         enableGraphicsLogs.value = sharedPref.getBoolean("enableGraphicsLogs", false)
 
-        // NEU: Sprache/Region laden (Strings, fallback auf Defaults, dann .valueOf)
+        // Load language/region (strings, fallback to defaults, then .valueOf)
         val langName = sharedPref.getString("system_language", "AmericanEnglish") ?: "AmericanEnglish"
         val regionName = sharedPref.getString("region_code", "USA") ?: "USA"
         systemLanguage.value = runCatching { SystemLanguage.valueOf(langName) }.getOrElse { SystemLanguage.AmericanEnglish }
@@ -153,7 +151,6 @@ class SettingsViewModel(val activity: MainActivity) {
         enableTraceLogs: MutableState<Boolean>,
         enableDebugLogs: MutableState<Boolean>,
         enableGraphicsLogs: MutableState<Boolean>,
-        // NEU:
         systemLanguage: MutableState<SystemLanguage>,
         regionCode: MutableState<RegionCode>
     ) {
@@ -192,7 +189,7 @@ class SettingsViewModel(val activity: MainActivity) {
             putBoolean("enableDebugLogs", enableDebugLogs.value)
             putBoolean("enableGraphicsLogs", enableGraphicsLogs.value)
 
-            // NEU: Sprache/Region als String speichern (Enumname)
+            // Save language/region as string (enum name)
             putString("system_language", systemLanguage.value.name)
             putString("region_code", regionCode.value.name)
         }
@@ -214,15 +211,9 @@ class SettingsViewModel(val activity: MainActivity) {
 
         activity.storageHelper!!.onFolderSelected = { _, folder ->
             val p = folder.getAbsolutePath(activity)
-            // Pfad (legacy) weiter speichern
             sharedPref.edit {
                 putString("gameFolder", p)
             }
-            // ➜ NEU: auch den SAF-URI als Default-Startort für den Shortcut-Picker merken
-            runCatching {
-                MainActivity.mainViewModel?.defaultGameFolderUri = folder.uri
-            }
-
             activity.storageHelper!!.onFolderSelected = previousFolderCallback
         }
 
@@ -338,6 +329,7 @@ class SettingsViewModel(val activity: MainActivity) {
                     } finally {
                         MainActivity.mainViewModel?.refreshFirmwareVersion()
                         installState.value = FirmwareInstallState.Done
+                        descriptor.close()
                     }
                 }
             }
@@ -410,7 +402,7 @@ class SettingsViewModel(val activity: MainActivity) {
                                 if (!header.isDirectory) {
                                     val bos = BufferedOutputStream(FileOutputStream(filePath))
                                     val bytesIn = ByteArray(4096)
-                                    var read: Int = 0
+                                    var read = 0
                                     while (zip.read(bytesIn).also { read = it } > 0) {
                                         bos.write(bytesIn, 0, read)
                                     }

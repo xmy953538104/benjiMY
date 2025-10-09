@@ -436,7 +436,7 @@ namespace Ryujinx.Audio.Renderer.Server
                     return result;
                 }
 
-                PoolMapper poolMapper = new PoolMapper(_processHandle, _memoryPools, _behaviourContext.IsMemoryPoolForceMappingEnabled());
+                PoolMapper poolMapper = new(_processHandle, _memoryPools, _behaviourContext.IsMemoryPoolForceMappingEnabled());
 
                 result = stateUpdater.UpdateVoices(_voiceContext, poolMapper);
 
@@ -532,13 +532,13 @@ namespace Ryujinx.Audio.Renderer.Server
 
                 CommandType commandType = command.CommandType;
 
-                if (commandType == CommandType.AdpcmDataSourceVersion1 ||
-                    commandType == CommandType.AdpcmDataSourceVersion2 ||
-                    commandType == CommandType.PcmInt16DataSourceVersion1 ||
-                    commandType == CommandType.PcmInt16DataSourceVersion2 ||
-                    commandType == CommandType.PcmFloatDataSourceVersion1 ||
-                    commandType == CommandType.PcmFloatDataSourceVersion2 ||
-                    commandType == CommandType.Performance)
+                if (commandType is CommandType.AdpcmDataSourceVersion1
+                    or CommandType.AdpcmDataSourceVersion2
+                    or CommandType.PcmInt16DataSourceVersion1
+                    or CommandType.PcmInt16DataSourceVersion2
+                    or CommandType.PcmFloatDataSourceVersion1
+                    or CommandType.PcmFloatDataSourceVersion2
+                    or CommandType.Performance)
                 {
                     break;
                 }

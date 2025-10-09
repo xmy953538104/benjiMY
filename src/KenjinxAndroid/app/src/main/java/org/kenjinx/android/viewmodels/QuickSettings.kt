@@ -7,7 +7,7 @@ import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 
 class QuickSettings(val activity: Activity) {
-    // --- NEU: Ausrichtung
+    // --- Alignment
     enum class OrientationPreference(val value: Int) {
         Sensor(ActivityInfo.SCREEN_ORIENTATION_SENSOR),
         SensorLandscape(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE),
@@ -19,14 +19,14 @@ class QuickSettings(val activity: Activity) {
         }
     }
 
-    // --- NEU: Overlay-Position
+    // --- Overlay Position
     enum class OverlayMenuPosition {
         BottomMiddle, BottomLeft, BottomRight, TopMiddle, TopLeft, TopRight
     }
 
     var orientationPreference: OrientationPreference
 
-    // --- NEU: Overlay Settings
+    // --- Overlay Settings
     var overlayMenuPosition: OverlayMenuPosition
     var overlayMenuOpacity: Float
 
@@ -41,17 +41,6 @@ class QuickSettings(val activity: Activity) {
     var useNce: Boolean
     var memoryConfiguration: MemoryConfiguration
     var useVirtualController: Boolean
-    // Amiibo slots (URIs + names)
-    var amiibo1Uri: String?
-    var amiibo1Name: String?
-    var amiibo2Uri: String?
-    var amiibo2Name: String?
-    var amiibo3Uri: String?
-    var amiibo3Name: String?
-    var amiibo4Uri: String?
-    var amiibo4Name: String?
-    var amiibo5Uri: String?
-    var amiibo5Name: String?
     var memoryManagerMode: MemoryManagerMode
     var enableShaderCache: Boolean
     var enableTextureRecompression: Boolean
@@ -77,20 +66,7 @@ class QuickSettings(val activity: Activity) {
     private var sharedPref: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
 
     init {
-        // Load Amiibo slots
-        amiibo1Uri = sharedPref.getString("amiibo1Uri", null)
-        amiibo1Name = sharedPref.getString("amiibo1Name", null)
-        amiibo2Uri = sharedPref.getString("amiibo2Uri", null)
-        amiibo2Name = sharedPref.getString("amiibo2Name", null)
-        amiibo3Uri = sharedPref.getString("amiibo3Uri", null)
-        amiibo3Name = sharedPref.getString("amiibo3Name", null)
-        amiibo4Uri = sharedPref.getString("amiibo4Uri", null)
-        amiibo4Name = sharedPref.getString("amiibo4Name", null)
-        amiibo5Uri = sharedPref.getString("amiibo5Uri", null)
-        amiibo5Name = sharedPref.getString("amiibo5Name", null)
-
-
-        // --- NEU: Ausrichtung laden (Default: Sensor)
+        // --- Load alignment (Default: Sensor)
         val oriValue = sharedPref.getInt("orientationPreference", ActivityInfo.SCREEN_ORIENTATION_SENSOR)
         orientationPreference = OrientationPreference.fromValue(oriValue)
 
@@ -136,19 +112,7 @@ class QuickSettings(val activity: Activity) {
 
     fun save() {
         sharedPref.edit {
-            // Amiibo slots
-            putString("amiibo1Uri", amiibo1Uri)
-            putString("amiibo1Name", amiibo1Name)
-            putString("amiibo2Uri", amiibo2Uri)
-            putString("amiibo2Name", amiibo2Name)
-            putString("amiibo3Uri", amiibo3Uri)
-            putString("amiibo3Name", amiibo3Name)
-            putString("amiibo4Uri", amiibo4Uri)
-            putString("amiibo4Name", amiibo4Name)
-            putString("amiibo5Uri", amiibo5Uri)
-            putString("amiibo5Name", amiibo5Name)
-
-            // --- NEU: Ausrichtung speichern
+            // --- Save orientation
             putInt("orientationPreference", orientationPreference.value)
 
             // --- NEU: Overlay Settings speichern

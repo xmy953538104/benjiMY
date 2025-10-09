@@ -22,7 +22,7 @@ class MotionSensorManager(val activity: MainActivity) : SensorEventListener2 {
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         gyro = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
         setOrientation90()
-        var orientationListener = object : OrientationEventListener(activity) {
+        object : OrientationEventListener(activity) {
             override fun onOrientationChanged(orientation: Int) {
                 when {
                     isWithinOrientationRange(orientation, 270) -> {

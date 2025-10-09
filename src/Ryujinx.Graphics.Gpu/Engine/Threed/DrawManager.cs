@@ -821,6 +821,8 @@ namespace Ryujinx.Graphics.Gpu.Engine.Threed
             // on the screen scissor state, then we need to force only one texture to be bound to avoid
             // host clipping.
             var screenScissorState = _state.State.ScreenScissorState;
+            
+            Span<ScissorState> scissorStateSpan = _state.State.ScissorState.AsSpan();
 
             bool clearAffectedByStencilMask = (_state.State.ClearFlags & 1) != 0;
             bool clearAffectedByScissor = (_state.State.ClearFlags & 0x100) != 0;
@@ -831,9 +833,9 @@ namespace Ryujinx.Graphics.Gpu.Engine.Threed
 
                 bool fullClear = screenScissorState.X == 0 && screenScissorState.Y == 0;
 
-                if (fullClear && clearAffectedByScissor && _state.State.ScissorState[0].Enable)
+                if (fullClear && clearAffectedByScissor && scissorStateSpan[0].Enable)
                 {
-                    ref var scissorState = ref _state.State.ScissorState[0];
+                    ref var scissorState = ref scissorStateSpan[0];
 
                     fullClear = scissorState.X1 == screenScissorState.X &&
                         scissorState.Y1 == screenScissorState.Y &&
@@ -850,11 +852,8 @@ namespace Ryujinx.Graphics.Gpu.Engine.Threed
                     bool hasDepth = dsFormat.Format.HasDepth();
                     bool hasStencil = dsFormat.Format.HasStencil();
 
-                    if (hasStencil && (!clearStencil || (clearAffectedByStencilMask && _state.State.StencilTestState.FrontMask != 0xff)))
-                    {
-                        fullClear = false;
-                    }
-                    else if (hasDepth && !clearDepth)
+                    if (hasStencil && (!clearStencil || (clearAffectedByStencilMask && _state.State.StencilTestState.FrontMask != 0xff)) ||
+                        hasDepth && !clearDepth)
                     {
                         fullClear = false;
                     }
@@ -892,9 +891,9 @@ namespace Ryujinx.Graphics.Gpu.Engine.Threed
                 int scissorW = screenScissorState.Width;
                 int scissorH = screenScissorState.Height;
 
-                if (clearAffectedByScissor && _state.State.ScissorState[0].Enable)
+                if (clearAffectedByScissor && scissorStateSpan[0].Enable)
                 {
-                    ref var scissorState = ref _state.State.ScissorState[0];
+                    ref var scissorState = ref scissorStateSpan[0];
 
                     scissorX = Math.Max(scissorX, scissorState.X1);
                     scissorY = Math.Max(scissorY, scissorState.Y1);
@@ -913,7 +912,7 @@ namespace Ryujinx.Graphics.Gpu.Engine.Threed
 
                 Span<Rectangle<int>> scissors =
                 [
-                    new Rectangle<int>(scissorX, scissorY, scissorW, scissorH)
+                    new(scissorX, scissorY, scissorW, scissorH)
                 ];
 
                 _context.Renderer.Pipeline.SetScissors(scissors);

@@ -218,7 +218,8 @@ namespace Ryujinx.Audio.Renderer.Server.Splitter
         /// <returns>True if any biquad filter is enabled.</returns>
         public bool IsBiquadFilterEnabled()
         {
-            return _biquadFilters[0].Enable || _biquadFilters[1].Enable;
+            Span<BiquadFilterParameter> biquadFiltersSpan = _biquadFilters.AsSpan();
+            return biquadFiltersSpan[0].Enable || biquadFiltersSpan[1].Enable;
         }
 
         /// <summary>

@@ -690,11 +690,8 @@ namespace Ryujinx.Graphics.Gpu.Memory
             if (_pageTable[l0] == null)
             {
                 _pageTable[l0] = new ulong[PtLvl1Size];
-
-                for (ulong index = 0; index < PtLvl1Size; index++)
-                {
-                    _pageTable[l0][index] = PteUnmapped;
-                }
+                
+                Array.Fill(_pageTable[l0], PteUnmapped);
             }
 
             _pageTable[l0][l1] = pte;

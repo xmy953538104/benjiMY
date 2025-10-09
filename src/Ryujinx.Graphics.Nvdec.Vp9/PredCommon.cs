@@ -1,4 +1,5 @@
 using Ryujinx.Graphics.Nvdec.Vp9.Types;
+using System;
 using System.Diagnostics;
 
 namespace Ryujinx.Graphics.Nvdec.Vp9
@@ -109,15 +110,17 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     sbyte vrfa = aSg ? xd.AboveMi.Value.RefFrame[0] : xd.AboveMi.Value.RefFrame[varRefIdx];
                     sbyte vrfl = lSg ? xd.LeftMi.Value.RefFrame[0] : xd.LeftMi.Value.RefFrame[varRefIdx];
 
-                    if (vrfa == vrfl && cm.CompVarRef[1] == vrfa)
+                    Span<sbyte> compVarRefSpan = cm.CompVarRef.AsSpan();
+                    
+                    if (vrfa == vrfl && compVarRefSpan[1] == vrfa)
                     {
                         predContext = 0;
                     }
                     else if (lSg && aSg)
                     {
                         // Single/Single
-                        if ((vrfa == cm.CompFixedRef && vrfl == cm.CompVarRef[0]) ||
-                            (vrfl == cm.CompFixedRef && vrfa == cm.CompVarRef[0]))
+                        if ((vrfa == cm.CompFixedRef && vrfl == compVarRefSpan[0]) ||
+                            (vrfl == cm.CompFixedRef && vrfa == compVarRefSpan[0]))
                         {
                             predContext = 4;
                         }
@@ -135,11 +138,11 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                         // Single/Comp
                         sbyte vrfc = lSg ? vrfa : vrfl;
                         sbyte rfs = aSg ? vrfa : vrfl;
-                        if (vrfc == cm.CompVarRef[1] && rfs != cm.CompVarRef[1])
+                        if (vrfc == compVarRefSpan[1] && rfs != compVarRefSpan[1])
                         {
                             predContext = 1;
                         }
-                        else if (rfs == cm.CompVarRef[1] && vrfc != cm.CompVarRef[1])
+                        else if (rfs == compVarRefSpan[1] && vrfc != compVarRefSpan[1])
                         {
                             predContext = 2;
                         }
@@ -212,14 +215,15 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 {
                     // Intra/Inter or Inter/Intra
                     ref ModeInfo edgeMi = ref aboveIntra ? ref xd.LeftMi.Value : ref xd.AboveMi.Value;
+                    Span<sbyte> refFrameSpan = edgeMi.RefFrame.AsSpan();
                     if (!edgeMi.HasSecondRef())
                     {
-                        predContext = 4 * (edgeMi.RefFrame[0] == Constants.LastFrame ? 1 : 0);
+                        predContext = 4 * (refFrameSpan[0] == Constants.LastFrame ? 1 : 0);
                     }
                     else
                     {
-                        predContext = 1 + (edgeMi.RefFrame[0] == Constants.LastFrame ||
-                                           edgeMi.RefFrame[1] == Constants.LastFrame
+                        predContext = 1 + (refFrameSpan[0] == Constants.LastFrame ||
+                                           refFrameSpan[1] == Constants.LastFrame
                             ? 1
                             : 0);
                     }
@@ -229,10 +233,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     // Inter/Inter
                     bool aboveHasSecond = xd.AboveMi.Value.HasSecondRef();
                     bool leftHasSecond = xd.LeftMi.Value.HasSecondRef();
-                    sbyte above0 = xd.AboveMi.Value.RefFrame[0];
-                    sbyte above1 = xd.AboveMi.Value.RefFrame[1];
-                    sbyte left0 = xd.LeftMi.Value.RefFrame[0];
-                    sbyte left1 = xd.LeftMi.Value.RefFrame[1];
+                    Span<sbyte> aRefFrameSpan = xd.AboveMi.Value.RefFrame.AsSpan();
+                    sbyte above0 = aRefFrameSpan[0];
+                    sbyte above1 = aRefFrameSpan[1];
+                    Span<sbyte> lRefFrameSpan = xd.LeftMi.Value.RefFrame.AsSpan();
+                    sbyte left0 = lRefFrameSpan[0];
+                    sbyte left1 = lRefFrameSpan[1];
 
                     if (aboveHasSecond && leftHasSecond)
                     {
@@ -281,8 +287,10 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     }
                     else
                     {
-                        predContext = 1 + (edgeMi.RefFrame[0] == Constants.LastFrame ||
-                                           edgeMi.RefFrame[1] == Constants.LastFrame
+                        Span<sbyte> refFrameSpan = edgeMi.RefFrame.AsSpan();
+                        
+                        predContext = 1 + (refFrameSpan[0] == Constants.LastFrame ||
+                                           refFrameSpan[1] == Constants.LastFrame
                             ? 1
                             : 0);
                     }
@@ -321,21 +329,22 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                 {
                     // Intra/Inter or Inter/Intra
                     ref ModeInfo edgeMi = ref aboveIntra ? ref xd.LeftMi.Value : ref xd.AboveMi.Value;
+                    Span<sbyte> refFrameSpan = edgeMi.RefFrame.AsSpan();
                     if (!edgeMi.HasSecondRef())
                     {
-                        if (edgeMi.RefFrame[0] == Constants.LastFrame)
+                        if (refFrameSpan[0] == Constants.LastFrame)
                         {
                             predContext = 3;
                         }
                         else
                         {
-                            predContext = 4 * (edgeMi.RefFrame[0] == Constants.GoldenFrame ? 1 : 0);
+                            predContext = 4 * (refFrameSpan[0] == Constants.GoldenFrame ? 1 : 0);
                         }
                     }
                     else
                     {
-                        predContext = 1 + (2 * (edgeMi.RefFrame[0] == Constants.GoldenFrame ||
-                                                edgeMi.RefFrame[1] == Constants.GoldenFrame
+                        predContext = 1 + (2 * (refFrameSpan[0] == Constants.GoldenFrame ||
+                                                refFrameSpan[1] == Constants.GoldenFrame
                             ? 1
                             : 0));
                     }
@@ -345,10 +354,12 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
                     // Inter/Inter
                     bool aboveHasSecond = xd.AboveMi.Value.HasSecondRef();
                     bool leftHasSecond = xd.LeftMi.Value.HasSecondRef();
-                    sbyte above0 = xd.AboveMi.Value.RefFrame[0];
-                    sbyte above1 = xd.AboveMi.Value.RefFrame[1];
-                    sbyte left0 = xd.LeftMi.Value.RefFrame[0];
-                    sbyte left1 = xd.LeftMi.Value.RefFrame[1];
+                    Span<sbyte> aRefFrameSpan = xd.AboveMi.Value.RefFrame.AsSpan();
+                    sbyte above0 = aRefFrameSpan[0];
+                    sbyte above1 = aRefFrameSpan[1];
+                    Span<sbyte> lRefFrameSpan = xd.LeftMi.Value.RefFrame.AsSpan();
+                    sbyte left0 = lRefFrameSpan[0];
+                    sbyte left1 = lRefFrameSpan[1];
 
                     if (aboveHasSecond && leftHasSecond)
                     {
@@ -407,19 +418,20 @@ namespace Ryujinx.Graphics.Nvdec.Vp9
             {
                 // One edge available
                 ref ModeInfo edgeMi = ref !xd.AboveMi.IsNull ? ref xd.AboveMi.Value : ref xd.LeftMi.Value;
+                Span<sbyte> refFrameSpan = edgeMi.RefFrame.AsSpan();
 
-                if (!edgeMi.IsInterBlock() || (edgeMi.RefFrame[0] == Constants.LastFrame && !edgeMi.HasSecondRef()))
+                if (!edgeMi.IsInterBlock() || (refFrameSpan[0] == Constants.LastFrame && !edgeMi.HasSecondRef()))
                 {
                     predContext = 2;
                 }
                 else if (!edgeMi.HasSecondRef())
                 {
-                    predContext = 4 * (edgeMi.RefFrame[0] == Constants.GoldenFrame ? 1 : 0);
+                    predContext = 4 * (refFrameSpan[0] == Constants.GoldenFrame ? 1 : 0);
                 }
                 else
                 {
-                    predContext = 3 * (edgeMi.RefFrame[0] == Constants.GoldenFrame ||
-                                       edgeMi.RefFrame[1] == Constants.GoldenFrame
+                    predContext = 3 * (refFrameSpan[0] == Constants.GoldenFrame ||
+                                       refFrameSpan[1] == Constants.GoldenFrame
                         ? 1
                         : 0);
                 }

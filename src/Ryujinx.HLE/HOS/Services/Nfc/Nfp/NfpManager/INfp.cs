@@ -7,11 +7,6 @@ using Ryujinx.HLE.HOS.Services.Hid;
 using Ryujinx.HLE.HOS.Services.Hid.HidServer;
 using Ryujinx.HLE.HOS.Services.Nfc.Nfp.NfpManager;
 using Ryujinx.Horizon.Common;
-// ▼ NEU:
-using Ryujinx.HLE.Kenjinx;
-using System.Security.Cryptography;
-using Ryujinx.Common.Logging;
-// ▲ NEU
 using System;
 using System.Buffers.Binary;
 using System.Globalization;
@@ -133,6 +128,7 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
         public ResultCode StartDetection(ServiceCtx context)
         {
             ResultCode resultCode = CheckNfcIsEnabled();
+
             if (resultCode != ResultCode.Success)
             {
                 return resultCode;
@@ -146,30 +142,9 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
                 {
                     context.Device.System.NfpDevices[i].State = NfpDeviceState.SearchingForTag;
 
-                    // ▼ NEU: Falls via Bridge bereits ein Tag injiziert wurde, sofort übernehmen.
-                    if (KenjinxAmiiboShim.TryConsume(out var tagBytes))
-                    {
-                        var dev = context.Device.System.NfpDevices[i];
-
-                        if (TryGetFigureIdFrom1Dc(tagBytes, out var fid, out var raw))
-                        {
-                            dev.AmiiboId = fid;
-                            Logger.Info?.PrintMsg(LogClass.ServiceNfp, $"Kenjinx: raw@1DC={raw} → FigureID={fid}");
-                        }
-                        else
-                        {
-                            dev.AmiiboId = MakeAmiiboIdFromBytes(tagBytes); // Fallback (SHA1)
-                            Logger.Info?.PrintMsg(LogClass.ServiceNfp, $"Kenjinx: FigureID={dev.AmiiboId} (fallback, keine 1DC-Bytes)");
-                        }
-
-                        dev.UseRandomUuid = false; // stabile UUID über die Session
-                        dev.State = NfpDeviceState.TagFound;
-                    }
-                    // ▲ NEU
                     break;
                 }
             }
-
             _cancelTokenSource = new CancellationTokenSource();
             Task.Run(() =>
             {
@@ -179,30 +154,6 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
                     {
                         break;
                     }
-
-                    // ▼ NEU: Während der Suche nach neu injizierten Tags poll’en.
-                    for (int d = 0; d < context.Device.System.NfpDevices.Count; d++)
-                    {
-                        var dev = context.Device.System.NfpDevices[d];
-
-                        if (dev.State == NfpDeviceState.SearchingForTag && KenjinxAmiiboShim.TryConsume(out var tagBytesLoop))
-                        {
-                            if (TryGetFigureIdFrom1Dc(tagBytesLoop, out var fid, out var raw))
-                            {
-                                dev.AmiiboId = fid;
-                                Logger.Info?.PrintMsg(LogClass.ServiceNfp, $"Kenjinx: raw@1DC={raw} → FigureID={fid}");
-                            }
-                            else
-                            {
-                                dev.AmiiboId = MakeAmiiboIdFromBytes(tagBytesLoop); // Fallback (SHA1)
-                                Logger.Info?.PrintMsg(LogClass.ServiceNfp, $"Kenjinx: FigureID={dev.AmiiboId} (fallback, keine 1DC-Bytes)");
-                            }
-
-                            dev.UseRandomUuid = false;
-                            dev.State = NfpDeviceState.TagFound;
-                        }
-                    }
-                    // ▲ NEU
 
                     for (int i = 0; i < context.Device.System.NfpDevices.Count; i++)
                     {
@@ -226,6 +177,7 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
         public ResultCode StopDetection(ServiceCtx context)
         {
             ResultCode resultCode = CheckNfcIsEnabled();
+
             if (resultCode != ResultCode.Success)
             {
                 return resultCode;
@@ -240,63 +192,12 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
                 if (context.Device.System.NfpDevices[i].Handle == (PlayerIndex)deviceHandle)
                 {
                     context.Device.System.NfpDevices[i].State = NfpDeviceState.Initialized;
+
                     break;
                 }
             }
-
-            // ▼ NEU: injizierten Tag verwerfen
-            KenjinxAmiiboShim.Clear();
-            // ▲ NEU
-
             return ResultCode.Success;
         }
-
-        // ▼▼▼ NEU: FigureID direkt aus 0x1DC (8 Bytes) ohne 16-Bit-Vertauschung
-        private static bool TryGetFigureIdFrom1Dc(byte[] data, out string figureId, out string debugRaw)
-        {
-            figureId = string.Empty;
-            debugRaw = string.Empty;
-
-            const int off = 0x1DC;
-            const int len = 8;
-
-            if (data == null || data.Length < off + len)
-            {
-                return false;
-            }
-
-            var s = data.AsSpan(off, len);
-
-            // Debug-String "AA-BB-..." in Großbuchstaben
-            debugRaw = $"{s[0]:X2}-{s[1]:X2}-{s[2]:X2}-{s[3]:X2}-{s[4]:X2}-{s[5]:X2}-{s[6]:X2}-{s[7]:X2}";
-
-            // FigureID als 16-stelliger lower-case Hex-String in **derselben Reihenfolge**
-            // Layout: [0..1]=CharId(BE), [2]=Variant, [3]=Type, [4..5]=Model(BE), [6]=Series, [7]=unk
-            figureId =
-                $"{s[0]:x2}{s[1]:x2}{s[2]:x2}{s[3]:x2}{s[4]:x2}{s[5]:x2}{s[6]:x2}{s[7]:x2}";
-
-            return true;
-        }
-        // ▲▲▲ NEU
-
-        // Fallback: deterministische 16 Hex-Zeichen aus SHA1 (erste 8 Bytes)
-        private static string MakeAmiiboIdFromBytes(byte[] data)
-        {
-            if (data == null || data.Length == 0) return "0000000000000000";
-
-            using var sha = SHA1.Create();
-            var hash = sha.ComputeHash(data); // 20 Bytes
-            char[] buf = new char[16];
-            for (int i = 0, k = 0; i < 8; i++)
-            {
-                byte b = hash[i];
-                buf[k++] = GetHex((b >> 4) & 0xF);
-                buf[k++] = GetHex(b & 0xF);
-            }
-            return new string(buf);
-        }
-
-        private static char GetHex(int v) => (char)(v < 10 ? ('0' + v) : ('a' + (v - 10)));
 
         [CommandCmif(5)]
         // Mount(bytes<8, 4>, u32, u32)
@@ -313,12 +214,7 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
             DeviceType deviceType = (DeviceType)context.RequestData.ReadUInt32();
             MountTarget mountTarget = (MountTarget)context.RequestData.ReadUInt32();
 
-            if (deviceType != 0)
-            {
-                return ResultCode.WrongArgument;
-            }
-
-            if (((uint)mountTarget & 3) == 0)
+            if (deviceType != 0 || ((uint)mountTarget & 3) == 0)
             {
                 return ResultCode.WrongArgument;
             }
@@ -1071,7 +967,7 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
         {
             // TODO: Find the differencies between IUser and ISystem/IDebug.
 
-            if (_permissionLevel == NfpPermissionLevel.Debug || _permissionLevel == NfpPermissionLevel.System)
+            if (_permissionLevel is NfpPermissionLevel.Debug or NfpPermissionLevel.System)
             {
                 return GetRegisterInfo(context);
             }

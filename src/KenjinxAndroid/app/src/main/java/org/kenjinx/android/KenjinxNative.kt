@@ -89,16 +89,12 @@ interface KenjinxNativeJna : Library {
     fun userGetAllUsers(): Array<String>
     fun deviceGetDlcContentList(path: String, titleId: Long): Array<String>
     fun loggingEnabledGraphicsLog(enabled: Boolean)
-    // NEW: Surface-Rotation (0/90/180/270 Grad)
+    // Surface rotation (0/90/180/270 degrees)
     fun deviceSetSurfaceRotation(degrees: Int)
-    // NEW (optional alias): kompakter Resize-Shortcut
+    // (optional alias): compact resize shortcut
     fun deviceResize(width: Int, height: Int)
-    // NEW: Window-Handle nach jedem Requery setzen
+    // Set window handle after each query
     fun deviceSetWindowHandle(handle: Long)
-    // Amiibo
-    fun amiiboLoadBin(bytes: ByteArray, length: Int): Boolean
-    fun amiiboClear()
-
 }
 
 val jnaInstance: KenjinxNativeJna = Native.load(
@@ -124,13 +120,13 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
 
     @JvmStatic
     fun updateProgress(infoPtr: Long, progress: Float) {
-        // String aus dem Native-Pointer holen und ins Progress-Overlay schieben
+        // Get string from native pointer and push into progress overlay
         val text = NativeHelpers.instance.getStringJava(infoPtr)
         MainActivity.mainViewModel?.gameHost?.setProgress(text, progress)
     }
     @JvmStatic
     fun onSurfaceSizeChanged(width: Int, height: Int) {
-        // No-Op: Platzhalter – Hook, falls benötigt.
+        // No-Op: Placeholder – Hook if needed.
     }
 
     @JvmStatic
@@ -148,15 +144,15 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
     @JvmStatic
     fun resizeRendererAndInput(width: Int, height: Int) {
         try {
-            // Alternativ: deviceResize(width, height)
+            // Alternatively: deviceResize(width, height)
             graphicsRendererSetSize(width, height)
             inputSetClientSize(width, height)
         } catch (_: Throwable) {}
     }
 
     /**
-     * Variante A (Pointer → Strings via NativeHelpers).
-     * Wird von älteren JNI/Interop-Pfaden benutzt.
+     * Variant A (Pointer → Strings via NativeHelpers).
+     * Used by older JNI/Interop paths.
      */
     @JvmStatic
     fun updateUiHandler(
@@ -191,8 +187,8 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
     }
 
     /**
-     * Variante B (Strings direkt). Wird von neueren JNI/Interop-Pfaden benutzt.
-     * Signatur entspricht exakt dem C#-Aufruf in AndroidUIHandler.cs / Interop.UpdateUiHandler(...).
+     * Variant B (strings directly). Used by newer JNI/interop paths.
+     * Signature exactly matches the C# call in AndroidUIHandler.cs / Interop.UpdateUiHandler(...).
      */
     @JvmStatic
     fun uiHandlerUpdate(

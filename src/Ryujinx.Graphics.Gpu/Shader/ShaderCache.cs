@@ -1,5 +1,6 @@
 using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
+using Ryujinx.Common.Memory;
 using Ryujinx.Graphics.GAL;
 using Ryujinx.Graphics.Gpu.Engine.Threed;
 using Ryujinx.Graphics.Gpu.Engine.Types;
@@ -258,21 +259,25 @@ namespace Ryujinx.Graphics.Gpu.Shader
 
             int count = rtControl.UnpackCount();
 
+            Span<RtColorState> rtColorStateSpan = state.RtColorState.AsSpan();
+            Span<bool> attachmentEnableSpan = pipeline.AttachmentEnable.AsSpan();
+            Span<Format> attachmentFormatsSpan = pipeline.AttachmentFormats.AsSpan();
+
             for (int index = 0; index < Constants.TotalRenderTargets; index++)
             {
                 int rtIndex = rtControl.UnpackPermutationIndex(index);
 
-                var colorState = state.RtColorState[rtIndex];
+                var colorState = rtColorStateSpan[rtIndex];
 
                 if (index >= count || colorState.Format == 0 || colorState.WidthOrStride == 0)
                 {
-                    pipeline.AttachmentEnable[index] = false;
-                    pipeline.AttachmentFormats[index] = Format.R8G8B8A8Unorm;
+                    attachmentEnableSpan[index] = false;
+                    attachmentFormatsSpan[index] = Format.R8G8B8A8Unorm;
                 }
                 else
                 {
-                    pipeline.AttachmentEnable[index] = true;
-                    pipeline.AttachmentFormats[index] = colorState.Format.Convert().Format;
+                    attachmentEnableSpan[index] = true;
+                    attachmentFormatsSpan[index] = colorState.Format.Convert().Format;
                 }
             }
 
@@ -580,15 +585,18 @@ namespace Ryujinx.Graphics.Gpu.Shader
 
             TransformFeedbackDescriptor[] descs = new TransformFeedbackDescriptor[Constants.TotalTransformFeedbackBuffers];
 
+            Span<TfState> tfStateSpan = state.TfState.AsSpan();
+            Span<Array32<uint>> tfVaryingLocationsSpan = state.TfVaryingLocations.AsSpan();
+            
             for (int i = 0; i < Constants.TotalTransformFeedbackBuffers; i++)
             {
-                var tf = state.TfState[i];
+                var tf = tfStateSpan[i];
 
                 descs[i] = new TransformFeedbackDescriptor(
                     tf.BufferIndex,
                     tf.Stride,
                     tf.VaryingsCount,
-                    ref state.TfVaryingLocations[i]);
+                    ref tfVaryingLocationsSpan[i]);
             }
 
             return descs;

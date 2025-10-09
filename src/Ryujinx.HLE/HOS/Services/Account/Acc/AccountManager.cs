@@ -60,7 +60,7 @@ namespace Ryujinx.HLE.HOS.Services.Account.Acc
             }
         }
 
-        public void AddUser(string name, byte[] image, UserId userId = new UserId())
+        public void AddUser(string name, byte[] image, UserId userId = new())
         {
             if (userId.IsNull)
             {
@@ -69,7 +69,7 @@ namespace Ryujinx.HLE.HOS.Services.Account.Acc
 
             UserProfile profile = new(userId, name, image);
 
-            _profiles.AddOrUpdate(userId.ToString(), profile, (key, old) => profile);
+            _profiles.AddOrUpdate(userId.ToString(), profile, (_, _) => profile);
 
             _accountSaveDataManager.Save(_profiles);
         }

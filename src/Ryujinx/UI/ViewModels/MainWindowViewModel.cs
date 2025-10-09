@@ -8,7 +8,6 @@ using Avalonia.Threading;
 using DynamicData;
 using DynamicData.Binding;
 using FluentAvalonia.UI.Controls;
-using Gommon;
 using LibHac.Common;
 using Ryujinx.Ava.Common;
 using Ryujinx.Ava.Common.Locale;
@@ -125,8 +124,8 @@ namespace Ryujinx.Ava.UI.ViewModels
         private ApplicationContextMenu _listAppContextMenu;
         private ApplicationContextMenu _gridAppContextMenu;
 
-        private readonly object _refreshLock = new object();
-        private readonly object _applicationsLock = new object();
+        private readonly object _refreshLock = new();
+        private readonly object _applicationsLock = new();
 
         public ApplicationData ListSelectedApplication
         {
@@ -1630,7 +1629,7 @@ namespace Ryujinx.Ava.UI.ViewModels
                     VolumeStatusText = args.VolumeStatus;
                     FifoStatusText = args.FifoStatus;
                     ShaderCountText = args.ShaderCount > 0 ? $"Compiling shaders: {args.ShaderCount}" : string.Empty;
-                    ShowRightmostSeparator = !ShaderCountText.IsNullOrEmpty();
+                    ShowRightmostSeparator = !string.IsNullOrEmpty(ShaderCountText);
 
                     ShowStatusSeparator = true;
                 });

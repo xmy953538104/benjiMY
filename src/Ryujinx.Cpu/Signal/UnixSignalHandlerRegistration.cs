@@ -123,7 +123,7 @@ namespace Ryujinx.Cpu.Signal
             }
             else
             {
-                SigAction sig = new SigAction
+                SigAction sig = new()
                 {
                     sa_handler = action,
                     sa_flags = SA_SIGINFO,
@@ -238,7 +238,7 @@ namespace Ryujinx.Cpu.Signal
         {
             if (PlatformInfo.IsBionic)
             {
-                SigActionBionic tmp = new SigActionBionic
+                SigActionBionic tmp = new()
                 {
                     sa_handler = oldAction.sa_handler,
                     sa_mask = oldAction.sa_mask,

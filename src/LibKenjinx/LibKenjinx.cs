@@ -20,7 +20,6 @@ using Ryujinx.Common.Logging.Targets;
 using Ryujinx.Common.Utilities;
 using Ryujinx.Graphics.GAL.Multithreading;
 using Ryujinx.HLE;
-using Ryujinx.HLE.Kenjinx;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.HOS;
 using Ryujinx.HLE.HOS.Services.Account.Acc;
@@ -34,13 +33,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;               // <--- NEU
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.Json;         // <--- NEU
+using System.Text.Json;
 using Path = System.IO.Path;
-using System.Linq;
-
 
 namespace LibKenjinx
 {
@@ -143,7 +140,7 @@ namespace LibKenjinx
             {
                 try
                 {
-                    if (extension == "nsp" || extension == "pfs0" || extension == "xci")
+                    if (extension is "nsp" or "pfs0" or "xci")
                     {
                         IFileSystem pfs;
 
@@ -693,60 +690,6 @@ namespace LibKenjinx
                 uiHandler.SetResponse(isOkPressed, input);
             }
         }
-
-        // ===== Amiibo Helpers (Kenjinx) =====
-        public static bool AmiiboLoadFromBytes(byte[] data)
-        {
-            if (data == null || data.Length == 0)
-            {
-                Logger.Warning?.Print(LogClass.Service, "[Amiibo] Load aborted: empty data.");
-                return false;
-            }
-
-            var dev = SwitchDevice?.EmulationContext;
-            if (dev == null)
-            {
-                Logger.Warning?.Print(LogClass.Service, "[Amiibo] Load aborted: no active EmulationContext.");
-                return false;
-            }
-
-            try
-            {
-                var ok = AmiiboBridge.TryLoadVirtualAmiibo(dev, data, out string msg);
-                if (ok)
-                    Logger.Info?.Print(LogClass.Service, $"[Amiibo] Loaded {data.Length} bytes. {msg}");
-                else
-                    Logger.Warning?.Print(LogClass.Service, $"[Amiibo] Injection failed. {msg}");
-                return ok;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error?.Print(LogClass.Service, $"[Amiibo] Exception: {ex}");
-                return false;
-            }
-        }
-
-        public static void AmiiboClear()
-        {
-            var dev = SwitchDevice?.EmulationContext;
-            if (dev == null)
-            {
-                Logger.Warning?.Print(LogClass.Service, "[Amiibo] Clear aborted: no active EmulationContext.");
-                return;
-            }
-
-            try
-            {
-                AmiiboBridge.ClearVirtualAmiibo(dev);
-                Logger.Info?.Print(LogClass.Service, "[Amiibo] Cleared.");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error?.Print(LogClass.Service, $"[Amiibo] Clear exception: {ex}");
-            }
-        }
-        // ===== End Amiibo Helpers =====
-
     }
 
     public class SwitchDevice : IDisposable
@@ -886,7 +829,7 @@ namespace LibKenjinx
             EnableJitCacheEviction = enableJitCacheEviction;
             EnableFsIntegrityChecks = enableFsIntegrityChecks;
 
-            HLEConfiguration configuration = new HLEConfiguration(VirtualFileSystem,
+            HLEConfiguration configuration = new(VirtualFileSystem,
                                                                   LibHacHorizonManager,
                                                                   ContentManager,
                                                                   AccountManager,
@@ -938,14 +881,14 @@ namespace LibKenjinx
                 control.SaveDataOwnerId = applicationId.Value;
             }
 
-            // --- Pfade fürs physische Save-Verzeichnis (Android-Sandbox) vorbereiten
+            // --- Prepare paths for the physical save directory (Android sandbox)
             string savesRoot = Path.Combine(
                 AppDataManager.BaseDirPath,
                 Ryujinx.HLE.FileSystem.VirtualFileSystem.UserNandPath,
                 "save"
             );
 
-            // Vorher-Liste der existierenden Save-Dirs merken (um Neu-Erstellung zu erkennen)
+            // Remember the previous list of existing save dirs (to recognize new creation)
             string[] before = Array.Empty<string>();
             try
             {
@@ -954,7 +897,7 @@ namespace LibKenjinx
             }
             catch { /* ignore */ }
 
-            // Bestehende Horizon-APIs zum Erzeugen/Absichern der Saves aufrufen
+            // Call existing Horizon APIs to create/secure the saves
             var rc = LibHacHorizonManager.RyujinxClient.Fs.EnsureApplicationCacheStorage(out _, out _, applicationId, in control);
             if (rc.IsFailure())
             {
@@ -968,8 +911,8 @@ namespace LibKenjinx
                 Logger.Error?.Print(LogClass.Application, $"Error calling EnsureApplicationSaveData. Result code {rc.ToStringWithName()}");
             }
 
-            // Nachher-Liste der Save-Dirs holen und Differenz bilden
-            string createdSaveDirName = null;
+            // Get the after-list of save dirs and calculate the difference
+            string? createdSaveDirName = null;
             try
             {
                 Directory.CreateDirectory(savesRoot);
@@ -981,7 +924,7 @@ namespace LibKenjinx
                 {
                     if (!beforeSet.Contains(d))
                     {
-                        // dies ist sehr wahrscheinlich der frisch angelegte Save-Ordner
+                        // This is most likely the newly created save folder
                         createdSaveDirName = Path.GetFileName(d);
                         break;
                     }
@@ -989,14 +932,14 @@ namespace LibKenjinx
             }
             catch
             {
-                // Falls das Listing scheitert, laufen wir einfach ohne Erkennung weiter.
+                // If the listing fails, we simply continue without detection.
             }
 
-            // TitleId & TitleName bestimmen
+            // TitleId string normalized
             string titleIdHex = titleId.ToString("x16");
             string titleName = TryGetTitleName(ref control) ?? "Unknown";
 
-            // Marker-Datei & Mapping schreiben (jetzt als Upsert, nicht mehr append-only)
+            // Write marker file & mapping (now as upsert, no longer append-only)
             try
             {
                 if (!string.IsNullOrEmpty(createdSaveDirName))
@@ -1024,11 +967,11 @@ namespace LibKenjinx
         }
 
 /// <summary>
-/// Aktualisiert .../save/titleid_map.ndjson im NDJSON-Format:
-/// - Liest bestehende Zeilen
-/// - Ersetzt/fügt Eintrag für titleId
-/// - Schreibt die Datei vollständig neu (keine unbegrenzte Größenzunahme)
-/// - Überschreibt den Ordner NIE mit leerem Wert; versucht, ihn über Marker zu ermitteln
+/// Updates .../save/titleid_map.ndjson in NDJSON format:
+/// - Reads existing lines
+/// - Replaces/adds entry for titleId
+/// - Completely rewrites the file (no unlimited size increase)
+/// - NEVER overwrites the folder with an empty value; attempts to determine it via markers
 /// </summary>
 private static void UpsertTitleMapNdjson(string savesRoot, string titleIdHex, string titleName, string createdFolder)
 {
@@ -1176,9 +1119,9 @@ private static string ResolveSaveFolderByMarker(string savesRoot, string titleId
 
 
         /// <summary>
-        /// Holt den (bevorzugt amerikanischen) Titel aus dem NACP, als Fallback den ersten nicht-leeren.
+        /// Gets the (preferably American) title from the NACP, as a fallback the first non-empty one.
         /// </summary>
-        private static string TryGetTitleName(ref LibHac.Ns.ApplicationControlProperty control)
+        private static string? TryGetTitleName(ref LibHac.Ns.ApplicationControlProperty control)
         {
             try
             {
@@ -1190,7 +1133,7 @@ private static string ResolveSaveFolderByMarker(string savesRoot, string titleId
                     if (!string.IsNullOrWhiteSpace(s)) return s;
                 }
 
-                // Fallback: erstbeste nicht-leere Lokalisation
+                // Fallback: first non-empty localization
                 foreach (ref readonly var t in control.Title)
                 {
                     var s = t.NameString.ToString();

@@ -330,7 +330,7 @@ namespace ARMeilleure.Instructions
 
             float result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 if ((context.Fpcr & FPCR.Dn) != 0)
                 {
@@ -510,7 +510,7 @@ namespace ARMeilleure.Instructions
 
             double result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 if ((context.Fpcr & FPCR.Dn) != 0)
                 {
@@ -692,7 +692,7 @@ namespace ARMeilleure.Instructions
 
             ushort resultBits;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 if (altHp)
                 {
@@ -1670,7 +1670,7 @@ namespace ARMeilleure.Instructions
 
             float result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 result = FPProcessNaN(type, op, context, fpcr);
             }
@@ -1849,7 +1849,7 @@ namespace ARMeilleure.Instructions
 
             float result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 result = FPProcessNaN(type, op, context, fpcr);
             }
@@ -1894,7 +1894,7 @@ namespace ARMeilleure.Instructions
 
             float result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 result = FPProcessNaN(type, op, context, fpcr);
             }
@@ -2100,7 +2100,7 @@ namespace ARMeilleure.Instructions
 
             float result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 result = FPProcessNaN(type, op, context, fpcr);
             }
@@ -2399,7 +2399,7 @@ namespace ARMeilleure.Instructions
 
             ushort resultBits;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 if (altHp)
                 {
@@ -3377,7 +3377,7 @@ namespace ARMeilleure.Instructions
 
             double result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 result = FPProcessNaN(type, op, context, fpcr);
             }
@@ -3556,7 +3556,7 @@ namespace ARMeilleure.Instructions
 
             double result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 result = FPProcessNaN(type, op, context, fpcr);
             }
@@ -3601,7 +3601,7 @@ namespace ARMeilleure.Instructions
 
             double result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 result = FPProcessNaN(type, op, context, fpcr);
             }
@@ -3807,7 +3807,7 @@ namespace ARMeilleure.Instructions
 
             double result;
 
-            if (type == FPType.SNaN || type == FPType.QNaN)
+            if (type is FPType.SNaN or FPType.QNaN)
             {
                 result = FPProcessNaN(type, op, context, fpcr);
             }

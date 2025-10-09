@@ -2,7 +2,6 @@ using Ryujinx.Graphics.GAL;
 using Ryujinx.Memory.Range;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Ryujinx.Graphics.Gpu.Memory
@@ -39,10 +38,8 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// Only modified from the GPU thread. Must lock for add/remove.
         /// Must lock for any access from other threads.
         /// </remarks>
-        private readonly RangeList<Buffer> _buffers;
+        private readonly NonOverlappingRangeList<Buffer> _buffers;
         private readonly MultiRangeList<MultiRangeBuffer> _multiRangeBuffers;
-
-        private Buffer[] _bufferOverlaps;
 
         private readonly Dictionary<ulong, BufferCacheEntry> _dirtyCache;
         private readonly Dictionary<ulong, BufferCacheEntry> _modifiedCache;
@@ -64,8 +61,6 @@ namespace Ryujinx.Graphics.Gpu.Memory
             _buffers = [];
             _multiRangeBuffers = [];
 
-            _bufferOverlaps = new Buffer[OverlapsBufferInitialCapacity];
-
             _dirtyCache = new Dictionary<ulong, BufferCacheEntry>();
 
             // There are a lot more entries on the modified cache, so it is separate from the one for ForceDirty.
@@ -79,24 +74,21 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <param name="e">Event arguments</param>
         public void MemoryUnmappedHandler(object sender, UnmapEventArgs e)
         {
-            Buffer[] overlaps = new Buffer[10];
-            int overlapCount;
-
             MultiRange range = ((MemoryManager)sender).GetPhysicalRegions(e.Address, e.Size);
 
             for (int index = 0; index < range.Count; index++)
             {
                 MemoryRange subRange = range.GetSubRange(index);
+                
+                _buffers.Lock.EnterReadLock();
+                Span<RangeItem<Buffer>> overlaps = _buffers.FindOverlapsAsSpan(subRange.Address, subRange.Size);
 
-                lock (_buffers)
+                for (int i = 0; i < overlaps.Length; i++)
                 {
-                    overlapCount = _buffers.FindOverlaps(subRange.Address, subRange.Size, ref overlaps);
+                    overlaps[i].Value.Unmapped(subRange.Address, subRange.Size);
                 }
 
-                for (int i = 0; i < overlapCount; i++)
-                {
-                    overlaps[i].Unmapped(subRange.Address, subRange.Size);
-                }
+                _buffers.Lock.ExitReadLock();
             }
         }
 
@@ -137,7 +129,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <returns>Physical ranges of the buffer, after address translation</returns>
         public MultiRange TranslateAndCreateMultiBuffers(MemoryManager memoryManager, ulong gpuVa, ulong size, BufferStage stage)
         {
-            if (gpuVa == 0)
+            if (gpuVa == 0 || size == 0)
             {
                 return new MultiRange(MemoryManager.PteUnmapped, size);
             }
@@ -336,7 +328,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
                         ulong alignedEndAddress = (endAddress + alignmentMask) & ~alignmentMask;
                         ulong alignedSize = alignedEndAddress - alignedAddress;
 
-                        Buffer buffer = _buffers.FindFirstOverlap(alignedAddress, alignedSize);
+                        Buffer buffer = _buffers.FindOverlap(alignedAddress, alignedSize).Value;
                         BufferRange bufferRange = buffer.GetRange(alignedAddress, alignedSize, false);
 
                         alignedSubRanges[i] = new MemoryRange(alignedAddress, alignedSize);
@@ -403,7 +395,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
 
                 if (subRange.Address != MemoryManager.PteUnmapped)
                 {
-                    Buffer buffer = _buffers.FindFirstOverlap(subRange.Address, subRange.Size);
+                    Buffer buffer = _buffers.FindOverlap(subRange.Address, subRange.Size).Value;
 
                     virtualBuffer.AddPhysicalDependency(buffer, subRange.Address, dstOffset, subRange.Size);
                     physicalBuffers.Add(buffer);
@@ -495,10 +487,12 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <param name="stage">The type of usage that created the buffer</param>
         private void CreateBufferAligned(ulong address, ulong size, BufferStage stage)
         {
-            Buffer[] overlaps = _bufferOverlaps;
-            int overlapsCount = _buffers.FindOverlapsNonOverlapping(address, size, ref overlaps);
+            Buffer newBuffer = null;
+            
+            _buffers.Lock.EnterWriteLock();
+            Span<RangeItem<Buffer>> overlaps = _buffers.FindOverlapsAsSpan(address, size);
 
-            if (overlapsCount != 0)
+            if (overlaps.Length != 0)
             {
                 // The buffer already exists. We can just return the existing buffer
                 // if the buffer we need is fully contained inside the overlapping buffer.
@@ -507,9 +501,8 @@ namespace Ryujinx.Graphics.Gpu.Memory
                 // old buffer(s) to the new buffer.
 
                 ulong endAddress = address + size;
-                Buffer overlap0 = overlaps[0];
 
-                if (overlap0.Address > address || overlap0.EndAddress < endAddress)
+                if (overlaps[0].Address > address || overlaps[0].EndAddress < endAddress)
                 {
                     bool anySparseCompatible = false;
 
@@ -522,53 +515,60 @@ namespace Ryujinx.Graphics.Gpu.Memory
                     // sequential memory.
                     // Allowing for 2 pages (rather than just one) is necessary to catch cases where the
                     // range crosses a page, and after alignment, ends having a size of 2 pages.
-                    if (overlapsCount == 1 &&
-                        address >= overlap0.Address &&
-                        endAddress - overlap0.EndAddress <= BufferAlignmentSize * 2)
+                    if (overlaps.Length == 1 &&
+                        address >= overlaps[0].Address &&
+                        endAddress - overlaps[0].EndAddress <= BufferAlignmentSize * 2)
                     {
                         // Try to grow the buffer by 1.5x of its current size.
                         // This improves performance in the cases where the buffer is resized often by small amounts.
-                        ulong existingSize = overlap0.Size;
+                        ulong existingSize = overlaps[0].Value.Size;
                         ulong growthSize = (existingSize + Math.Min(existingSize >> 1, MaxDynamicGrowthSize)) & ~BufferAlignmentMask;
 
                         size = Math.Max(size, growthSize);
                         endAddress = address + size;
 
-                        overlapsCount = _buffers.FindOverlapsNonOverlapping(address, size, ref overlaps);
+                        overlaps = _buffers.FindOverlapsAsSpan(address, size);
                     }
-
-                    for (int index = 0; index < overlapsCount; index++)
+                    
+                    address = Math.Min(address, overlaps[0].Address);
+                    endAddress = Math.Max(endAddress, overlaps[^1].EndAddress);
+                    
+                    for (int i = 0; i < overlaps.Length; i++)
                     {
-                        Buffer buffer = overlaps[index];
-
-                        anySparseCompatible |= buffer.SparseCompatible;
-
-                        address = Math.Min(address, buffer.Address);
-                        endAddress = Math.Max(endAddress, buffer.EndAddress);
-
-                        lock (_buffers)
-                        {
-                            _buffers.Remove(buffer);
-                        }
+                        anySparseCompatible |= overlaps[i].Value.SparseCompatible;
                     }
 
+                    RangeItem<Buffer>[] overlapsArray = overlaps.ToArray();
+                    
+                    _buffers.RemoveRange(overlaps[0], overlaps[^1]);
+                    
+                    _buffers.Lock.ExitWriteLock();
+                    
                     ulong newSize = endAddress - address;
 
-                    CreateBufferAligned(address, newSize, stage, anySparseCompatible, overlaps, overlapsCount);
+                    newBuffer = CreateBufferAligned(address, newSize, stage, anySparseCompatible, overlapsArray);
+                }
+                else
+                {
+                    _buffers.Lock.ExitWriteLock();
                 }
             }
             else
             {
+                _buffers.Lock.ExitWriteLock();
+                
                 // No overlap, just create a new buffer.
-                Buffer buffer = new(_context, _physicalMemory, address, size, stage, sparseCompatible: false);
-
-                lock (_buffers)
-                {
-                    _buffers.Add(buffer);
-                }
+                newBuffer = new(_context, _physicalMemory, address, size, stage, sparseCompatible: false, []);
             }
 
-            ShrinkOverlapsBufferIfNeeded();
+            if (newBuffer is not null)
+            {
+                _buffers.Lock.EnterWriteLock();
+                
+                _buffers.Add(newBuffer);
+                
+                _buffers.Lock.ExitWriteLock();
+            }
         }
 
         /// <summary>
@@ -582,72 +582,75 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <param name="alignment">Alignment of the start address of the buffer</param>
         private void CreateBufferAligned(ulong address, ulong size, BufferStage stage, ulong alignment)
         {
-            Buffer[] overlaps = _bufferOverlaps;
-            int overlapsCount = _buffers.FindOverlapsNonOverlapping(address, size, ref overlaps);
             bool sparseAligned = alignment >= SparseBufferAlignmentSize;
+            Buffer newBuffer = null;
+            
+            _buffers.Lock.EnterWriteLock();
+            Span<RangeItem<Buffer>> overlaps = _buffers.FindOverlapsAsSpan(address, size);
 
-            if (overlapsCount != 0)
+            if (overlaps.Length != 0)
             {
                 // If the buffer already exists, make sure if covers the entire range,
                 // and make sure it is properly aligned, otherwise sparse mapping may fail.
 
                 ulong endAddress = address + size;
-                Buffer overlap0 = overlaps[0];
 
-                if (overlap0.Address > address ||
-                    overlap0.EndAddress < endAddress ||
-                    (overlap0.Address & (alignment - 1)) != 0 ||
-                    (!overlap0.SparseCompatible && sparseAligned))
+                if (overlaps[0].Address > address ||
+                    overlaps[0].EndAddress < endAddress ||
+                    (overlaps[0].Address & (alignment - 1)) != 0 ||
+                    (!overlaps[0].Value.SparseCompatible && sparseAligned))
                 {
                     // We need to make sure the new buffer is properly aligned.
                     // However, after the range is aligned, it is possible that it
                     // overlaps more buffers, so try again after each extension
                     // and ensure we cover all overlaps.
 
-                    int oldOverlapsCount;
-
+                    endAddress = Math.Max(endAddress, overlaps[^1].EndAddress);
+                    int oldOverlapCount;
+                    
                     do
                     {
-                        for (int index = 0; index < overlapsCount; index++)
-                        {
-                            Buffer buffer = overlaps[index];
-
-                            address = Math.Min(address, buffer.Address);
-                            endAddress = Math.Max(endAddress, buffer.EndAddress);
-                        }
+                        address = Math.Min(address, overlaps[0].Address);
+                        endAddress = Math.Max(endAddress, overlaps[^1].EndAddress);
 
                         address &= ~(alignment - 1);
 
-                        oldOverlapsCount = overlapsCount;
-                        overlapsCount = _buffers.FindOverlapsNonOverlapping(address, endAddress - address, ref overlaps);
+                        oldOverlapCount = overlaps.Length;
+                        overlaps = _buffers.FindOverlapsAsSpan(address, endAddress - address);
                     }
-                    while (oldOverlapsCount != overlapsCount);
-
-                    lock (_buffers)
-                    {
-                        for (int index = 0; index < overlapsCount; index++)
-                        {
-                            _buffers.Remove(overlaps[index]);
-                        }
-                    }
+                    while (oldOverlapCount != overlaps.Length);
 
                     ulong newSize = endAddress - address;
-
-                    CreateBufferAligned(address, newSize, stage, sparseAligned, overlaps, overlapsCount);
+                    
+                    RangeItem<Buffer>[] overlapsArray = overlaps.ToArray();
+                    
+                    _buffers.RemoveRange(overlaps[0], overlaps[^1]);
+                    
+                    _buffers.Lock.ExitWriteLock();
+                    
+                    newBuffer = CreateBufferAligned(address, newSize, stage, sparseAligned, overlapsArray);
+                }
+                else
+                {
+                    _buffers.Lock.ExitWriteLock();
                 }
             }
             else
             {
+                _buffers.Lock.ExitWriteLock();
+                
                 // No overlap, just create a new buffer.
-                Buffer buffer = new(_context, _physicalMemory, address, size, stage, sparseAligned);
-
-                lock (_buffers)
-                {
-                    _buffers.Add(buffer);
-                }
+                newBuffer = new(_context, _physicalMemory, address, size, stage, sparseAligned, []);
             }
 
-            ShrinkOverlapsBufferIfNeeded();
+            if (newBuffer is not null)
+            {
+                _buffers.Lock.EnterWriteLock();
+                
+                _buffers.Add(newBuffer);
+                
+                _buffers.Lock.ExitWriteLock();
+            }
         }
 
         /// <summary>
@@ -660,19 +663,13 @@ namespace Ryujinx.Graphics.Gpu.Memory
         /// <param name="stage">The type of usage that created the buffer</param>
         /// <param name="sparseCompatible">Indicates if the buffer can be used in a sparse buffer mapping</param>
         /// <param name="overlaps">Buffers overlapping the range</param>
-        /// <param name="overlapsCount">Total of overlaps</param>
-        private void CreateBufferAligned(ulong address, ulong size, BufferStage stage, bool sparseCompatible, Buffer[] overlaps, int overlapsCount)
+        private Buffer CreateBufferAligned(ulong address, ulong size, BufferStage stage, bool sparseCompatible, RangeItem<Buffer>[] overlaps)
         {
-            Buffer newBuffer = new Buffer(_context, _physicalMemory, address, size, stage, sparseCompatible, overlaps.Take(overlapsCount));
+            Buffer newBuffer = new(_context, _physicalMemory, address, size, stage, sparseCompatible, overlaps);
 
-            lock (_buffers)
+            for (int index = 0; index < overlaps.Length; index++)
             {
-                _buffers.Add(newBuffer);
-            }
-
-            for (int index = 0; index < overlapsCount; index++)
-            {
-                Buffer buffer = overlaps[index];
+                Buffer buffer = overlaps[index].Value;
 
                 int dstOffset = (int)(buffer.Address - newBuffer.Address);
 
@@ -688,6 +685,8 @@ namespace Ryujinx.Graphics.Gpu.Memory
             NotifyBuffersModified?.Invoke();
 
             RecreateMultiRangeBuffers(address, size);
+            
+            return newBuffer;
         }
 
         /// <summary>
@@ -715,17 +714,6 @@ namespace Ryujinx.Graphics.Gpu.Memory
             for (int index = 0; index < overlapCount; index++)
             {
                 CreateMultiRangeBuffer(overlaps[index].Range, BufferStage.None);
-            }
-        }
-
-        /// <summary>
-        /// Resizes the temporary buffer used for range list intersection results, if it has grown too much.
-        /// </summary>
-        private void ShrinkOverlapsBufferIfNeeded()
-        {
-            if (_bufferOverlaps.Length > OverlapsBufferMaxCapacity)
-            {
-                Array.Resize(ref _bufferOverlaps, OverlapsBufferMaxCapacity);
             }
         }
 
@@ -909,7 +897,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
             {
                 MemoryRange subRange = range.GetSubRange(i);
 
-                Buffer subBuffer = _buffers.FindFirstOverlap(subRange.Address, subRange.Size);
+                Buffer subBuffer = _buffers.FindOverlap(subRange.Address, subRange.Size).Value;
 
                 subBuffer.SynchronizeMemory(subRange.Address, subRange.Size);
 
@@ -957,7 +945,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
 
             if (size != 0)
             {
-                buffer = _buffers.FindFirstOverlap(address, size);
+                buffer = _buffers.FindOverlap(address, size).Value;
 
                 buffer.CopyFromDependantVirtualBuffers();
                 buffer.SynchronizeMemory(address, size);
@@ -969,7 +957,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
             }
             else
             {
-                buffer = _buffers.FindFirstOverlap(address, 1);
+                buffer = _buffers.FindOverlapFast(address, 1).Value;
             }
 
             return buffer;
@@ -1007,7 +995,7 @@ namespace Ryujinx.Graphics.Gpu.Memory
         {
             if (size != 0)
             {
-                Buffer buffer = _buffers.FindFirstOverlap(address, size);
+                Buffer buffer = _buffers.FindOverlap(address, size).Value;
 
                 if (copyBackVirtual)
                 {

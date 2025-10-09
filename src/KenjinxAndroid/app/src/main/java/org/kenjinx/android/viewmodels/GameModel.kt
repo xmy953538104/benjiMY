@@ -73,7 +73,7 @@ class GameModel(var file: DocumentFile, val context: Context) {
                             context.contentResolver.openFileDescriptor(file.uri, "rw")
 
                         return updateDescriptor?.fd ?: -1
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         return -2
                     }
                 }

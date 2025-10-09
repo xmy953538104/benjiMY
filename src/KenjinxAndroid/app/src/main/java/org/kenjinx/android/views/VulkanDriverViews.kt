@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -42,11 +43,11 @@ class VulkanDriverViews {
     companion object {
         @Composable
         fun Main(activity: MainActivity, openDialog: MutableState<Boolean>) {
-            var driverViewModel = VulkanDriverViewModel(activity)
-            var isChanged = remember { mutableStateOf(false) }
-            var refresh = remember { mutableStateOf(false) }
-            var drivers = driverViewModel.getAvailableDrivers()
-            var selectedDriver = remember { mutableStateOf(0) }
+            val driverViewModel = VulkanDriverViewModel(activity)
+            val isChanged = remember { mutableStateOf(false) }
+            val refresh = remember { mutableStateOf(false) }
+            val drivers = driverViewModel.getAvailableDrivers()
+            val selectedDriver = remember { mutableIntStateOf(0) }
 
             if (refresh.value) {
                 isChanged.value = true
@@ -54,7 +55,7 @@ class VulkanDriverViews {
             }
 
             if (!isChanged.value) {
-                selectedDriver.value =
+                selectedDriver.intValue =
                     drivers.indexOfFirst { it.driverPath == driverViewModel.selected } + 1
                 isChanged.value = true
             }
@@ -75,7 +76,7 @@ class VulkanDriverViews {
                         onClick = {
                             driverViewModel.add(refresh)
                             refresh.value = true
-                            selectedDriver.value = 0
+                            selectedDriver.intValue = 0
                             driverViewModel.selected = ""
                         }
                     ) {
@@ -132,16 +133,16 @@ class VulkanDriverViews {
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp)
                                         .clickable {
-                                            selectedDriver.value = 0
+                                            selectedDriver.intValue = 0
                                             isChanged.value = true
                                             driverViewModel.selected = ""
                                         },
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     RadioButton(
-                                        selected = selectedDriver.value == 0 || driverViewModel.selected.isEmpty(),
+                                        selected = selectedDriver.intValue == 0 || driverViewModel.selected.isEmpty(),
                                         onClick = {
-                                            selectedDriver.value = 0
+                                            selectedDriver.intValue = 0
                                             isChanged.value = true
                                             driverViewModel.selected = ""
                                         }
@@ -155,7 +156,7 @@ class VulkanDriverViews {
                                 }
                                 var driverIndex = 1
                                 for (driver in drivers) {
-                                    var ind = driverIndex
+                                    val ind = driverIndex
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -163,16 +164,16 @@ class VulkanDriverViews {
                                                 vertical = 4.dp
                                             )
                                             .clickable {
-                                                selectedDriver.value = ind
+                                                selectedDriver.intValue = ind
                                                 isChanged.value = true
                                                 driverViewModel.selected = driver.driverPath
                                             },
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         RadioButton(
-                                            selected = selectedDriver.value == ind,
+                                            selected = selectedDriver.intValue == ind,
                                             onClick = {
-                                                selectedDriver.value = ind
+                                                selectedDriver.intValue = ind
                                                 isChanged.value = true
                                                 driverViewModel.selected = driver.driverPath
                                             }

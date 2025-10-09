@@ -63,7 +63,7 @@ namespace Ryujinx.HLE.FileSystem
         {
             var romfsStream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
 
-            _romFsByPid.AddOrUpdate(pid, romfsStream, (pid, oldStream) =>
+            _romFsByPid.AddOrUpdate(pid, romfsStream, (_, oldStream) =>
             {
                 oldStream.Close();
 
@@ -73,7 +73,7 @@ namespace Ryujinx.HLE.FileSystem
 
         public void SetRomFs(ulong pid, Stream romfsStream)
         {
-            _romFsByPid.AddOrUpdate(pid, romfsStream, (pid, oldStream) =>
+            _romFsByPid.AddOrUpdate(pid, romfsStream, (_, oldStream) =>
             {
                 oldStream.Close();
 
@@ -637,7 +637,7 @@ namespace Ryujinx.HLE.FileSystem
 
         private static readonly ExtraDataFixInfo[] _systemExtraDataFixInfo =
         [
-            new ExtraDataFixInfo()
+            new()
             {
                 StaticSaveDataId = 0x8000000000000030,
                 OwnerId = 0x010000000000001F,
@@ -645,7 +645,7 @@ namespace Ryujinx.HLE.FileSystem
                 DataSize = 0x10000,
                 JournalSize = 0x10000,
             },
-            new ExtraDataFixInfo()
+            new()
             {
                 StaticSaveDataId = 0x8000000000001040,
                 OwnerId = 0x0100000000001009,

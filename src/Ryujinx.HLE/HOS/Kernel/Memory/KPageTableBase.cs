@@ -442,17 +442,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Memory
 
             ulong addrSpacePagesCount = (AddressSpaceEnd - AddressSpaceStart) / PageSize;
 
-            if (AddressSpaceStart > address)
-            {
-                return KernelResult.InvalidMemState;
-            }
-
-            if (addrSpacePagesCount < pagesCount)
-            {
-                return KernelResult.InvalidMemState;
-            }
-
-            if (endAddr - 1 > AddressSpaceEnd - 1)
+            if (AddressSpaceStart > address || addrSpacePagesCount < pagesCount || endAddr - 1 > AddressSpaceEnd - 1)
             {
                 return KernelResult.InvalidMemState;
             }

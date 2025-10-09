@@ -611,7 +611,7 @@ namespace Ryujinx.Ava.UI.Windows
             if (ViewModel.AppHost != null)
             {
                 ViewModel.AppHost.AppExit -= ViewModel.AppHost_AppExit;
-                ViewModel.AppHost.AppExit += (sender, e) =>
+                ViewModel.AppHost.AppExit += (_, _) =>
                 {
                     ViewModel.AppHost = null;
 
@@ -700,7 +700,7 @@ namespace Ryujinx.Ava.UI.Windows
             {
                 ApplicationLibrary.DesiredLanguage = ConfigurationState.Instance.System.Language;
                 
-                ApplicationLibrary.ApplicationCountUpdated += (sender, args) => {
+                ApplicationLibrary.ApplicationCountUpdated += (_, args) => {
                     if (args.NumAppsFound == args.NumAppsLoaded && args.NumAppsFound > 0)
                     {
                         ViewModel.RefreshView();

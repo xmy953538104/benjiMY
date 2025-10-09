@@ -81,15 +81,7 @@ namespace Ryujinx.Graphics.Device
             {
                 uint alignedOffset = index * RegisterSize;
 
-                var readCallback = Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_readCallbacks), (IntPtr)index);
-                if (readCallback != null)
-                {
-                    return readCallback();
-                }
-                else
-                {
-                    return GetRefUnchecked<int>(alignedOffset);
-                }
+                return _readCallbacks[index]?.Invoke() ?? GetRefUnchecked<int>(alignedOffset);
             }
 
             return 0;
@@ -104,9 +96,9 @@ namespace Ryujinx.Graphics.Device
                 uint alignedOffset = index * RegisterSize;
                 DebugWrite(alignedOffset, data);
 
-                GetRefIntAlignedUncheck(index) = data;
+                SetIntAlignedUncheck(index, data);
 
-                Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_writeCallbacks), (IntPtr)index)?.Invoke(data);
+                _writeCallbacks[index]?.Invoke(data);
             }
         }
 
@@ -119,11 +111,9 @@ namespace Ryujinx.Graphics.Device
                 uint alignedOffset = index * RegisterSize;
                 DebugWrite(alignedOffset, data);
 
-                ref var storage = ref GetRefIntAlignedUncheck(index);
-                changed = storage != data;
-                storage = data;
+                changed = SetIntAlignedUncheckChanged(index, data);
 
-                Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_writeCallbacks), (IntPtr)index)?.Invoke(data);
+                _writeCallbacks[index]?.Invoke(data);
             }
             else
             {
@@ -160,6 +150,25 @@ namespace Ryujinx.Graphics.Device
         private ref int GetRefIntAlignedUncheck(ulong index)
         {
             return ref Unsafe.Add(ref Unsafe.As<TState, int>(ref State), (IntPtr)index);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetIntAlignedUncheck(ulong index, int data)
+        {
+            Unsafe.Add(ref Unsafe.As<TState, int>(ref State), (nint)index) = data;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool SetIntAlignedUncheckChanged(ulong index, int data)
+        {
+            ref int val = ref Unsafe.Add(ref Unsafe.As<TState, int>(ref State), (nint)index);
+            if (val == data)
+            {
+                return false;
+            }
+            val = data;
+            
+            return true;
         }
     }
 }
