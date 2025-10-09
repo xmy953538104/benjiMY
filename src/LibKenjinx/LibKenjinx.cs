@@ -20,6 +20,7 @@ using Ryujinx.Common.Logging.Targets;
 using Ryujinx.Common.Utilities;
 using Ryujinx.Graphics.GAL.Multithreading;
 using Ryujinx.HLE;
+using Ryujinx.HLE.Kenjinx;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.HOS;
 using Ryujinx.HLE.HOS.Services.Account.Acc;
@@ -690,9 +691,64 @@ namespace LibKenjinx
                 uiHandler.SetResponse(isOkPressed, input);
             }
         }
+
+        // ===== Amiibo Helpers (Kenjinx) =====
+        public static bool AmiiboLoadFromBytes(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                Logger.Warning?.Print(LogClass.Service, "[Amiibo] Load aborted: empty data.");
+                return false;
+            }
+
+            var dev = SwitchDevice?.EmulationContext;
+            if (dev == null)
+            {
+                Logger.Warning?.Print(LogClass.Service, "[Amiibo] Load aborted: no active EmulationContext.");
+                return false;
+            }
+
+            try
+            {
+                var ok = AmiiboBridge.TryLoadVirtualAmiibo(dev, data, out string msg);
+                if (ok)
+                    Logger.Info?.Print(LogClass.Service, $"[Amiibo] Loaded {data.Length} bytes. {msg}");
+                else
+                    Logger.Warning?.Print(LogClass.Service, $"[Amiibo] Injection failed. {msg}");
+                return ok;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error?.Print(LogClass.Service, $"[Amiibo] Exception: {ex}");
+                return false;
+            }
+        }
+
+        public static void AmiiboClear()
+        {
+            var dev = SwitchDevice?.EmulationContext;
+            if (dev == null)
+            {
+                Logger.Warning?.Print(LogClass.Service, "[Amiibo] Clear aborted: no active EmulationContext.");
+                return;
+            }
+
+            try
+            {
+                AmiiboBridge.ClearVirtualAmiibo(dev);
+                Logger.Info?.Print(LogClass.Service, "[Amiibo] Cleared.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error?.Print(LogClass.Service, $"[Amiibo] Clear exception: {ex}");
+            }
+        }
+        // ===== End Amiibo Helpers =====
+
     }
 
     public class SwitchDevice : IDisposable
+
     {
         private readonly SystemVersion _firmwareVersion;
         public VirtualFileSystem VirtualFileSystem { get; set; }

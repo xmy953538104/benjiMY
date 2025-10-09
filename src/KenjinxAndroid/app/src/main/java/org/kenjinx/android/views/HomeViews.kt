@@ -1,7 +1,11 @@
 package org.kenjinx.android.views
 
+import android.app.Activity
+import android.content.Intent
 import android.content.res.Resources
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -87,6 +91,14 @@ import org.kenjinx.android.viewmodels.GameModel
 import org.kenjinx.android.viewmodels.HomeViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.widgets.SimpleAlertDialog
+import org.kenjinx.android.ShortcutUtils
+import org.kenjinx.android.ShortcutWizardActivity
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.documentfile.provider.DocumentFile
 
 class HomeViews {
     companion object {
@@ -103,7 +115,18 @@ class HomeViews {
                 modifier = modifier.padding(8.dp)
             )
         }
+        // -- Helper for Shortcut-Flow
+        private fun resolveGameUri(gm: GameModel): Uri? = gm.file.uri
 
+        private fun decodeGameIcon(gm: GameModel): Bitmap? {
+            return try {
+                val b64 = gm.icon ?: return null
+                val bytes = Base64.getDecoder().decode(b64)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } catch (_: Throwable) {
+                null
+            }
+        }
         @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
         @Composable
         fun Home(
@@ -124,7 +147,70 @@ class HomeViews {
             var isFabVisible by remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
 
+            // NEW: Amiibo slot picker state
+            val showAmiiboSlotDialog = remember { mutableStateOf(false) }
+            val pendingSlot = remember { mutableStateOf(1) }
+
+            // Shortcut-Dialog-State
+            val showShortcutDialog = remember { mutableStateOf(false) }
+            val shortcutName = remember { mutableStateOf("") }
+
             val context = LocalContext.current
+            val activity = LocalContext.current as? Activity
+
+            // NEW: Launcher für Amiibo (OpenDocument)
+            val pickAmiiboLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                if (uri != null && activity != null) {
+                    try {
+                        activity.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) {}
+                    val name = DocumentFile.fromSingleUri(activity, uri)?.name ?: "amiibo.bin"
+                    val qs = QuickSettings(activity)
+                    when (pendingSlot.value) {
+                        1 -> { qs.amiibo1Uri = uri.toString(); qs.amiibo1Name = name }
+                        2 -> { qs.amiibo2Uri = uri.toString(); qs.amiibo2Name = name }
+                        3 -> { qs.amiibo3Uri = uri.toString(); qs.amiibo3Name = name }
+                        4 -> { qs.amiibo4Uri = uri.toString(); qs.amiibo4Name = name }
+                        5 -> { qs.amiibo5Uri = uri.toString(); qs.amiibo5Name = name }
+                    }
+                    qs.save()
+                    Toast.makeText(activity, "Amiibo saved to slot ${pendingSlot.value}", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            // Launcher for "Custom icon" (OpenDocument)
+            val pickImageLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                if (uri != null && gm != null && activity != null) {
+                    val bmp = runCatching {
+                        context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) }
+                    }.getOrNull()
+
+                    val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
+                    val gameUri = resolveGameUri(gm)
+                    if (gameUri != null) {
+                        ShortcutUtils.persistReadWrite(activity, gameUri)
+
+                        ShortcutUtils.pinShortcutForGame(
+                            activity = activity,
+                            gameUri = gameUri,
+                            label = label,
+                            iconBitmap = bmp
+                        ) {
+
+                        }
+                    } else {
+                        showError.value = "Shortcut failed (no game URI found)."
+                    }
+                }
+            }
 
             val nestedScrollConnection = remember {
                 object : NestedScrollConnection {
@@ -268,15 +354,27 @@ class HomeViews {
                     },
                     floatingActionButton = {
                         AnimatedVisibility(visible = isFabVisible) {
-                            FloatingActionButton(
-                                onClick = {
-                                    viewModel.requestReload()
-                                    viewModel.ensureReloadIfNecessary()
-                                },
-                                shape = MaterialTheme.shapes.small,
-                                containerColor = MaterialTheme.colorScheme.tertiary
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = "refresh")
+                            // NEW: two FABs in a row: Refresh + Import Amiibo
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                FloatingActionButton(
+                                    onClick = {
+                                        viewModel.requestReload()
+                                        viewModel.ensureReloadIfNecessary()
+                                    },
+                                    shape = MaterialTheme.shapes.small,
+                                    containerColor = MaterialTheme.colorScheme.tertiary
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "refresh")
+                                }
+                                FloatingActionButton(
+                                    onClick = { showAmiiboSlotDialog.value = true },
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    Icon(
+                                        org.kenjinx.android.Icons.folderOpen(MaterialTheme.colorScheme.onSurface),
+                                        contentDescription = "Import Amiibo"
+                                    )
+                                }
                             }
                         }
                     },
@@ -375,6 +473,51 @@ class HomeViews {
                         val name = viewModel.mainViewModel?.selected?.titleName ?: ""
                         DlcViews.Main(titleId, name, openDlcDialog, canClose)
                     }
+
+                    // NEW: Amiibo slot chooser dialog (outside of game)
+                    if (showAmiiboSlotDialog.value) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { showAmiiboSlotDialog.value = false },
+                            title = { Text("Import Amiibo") },
+                            text = {
+                                Column {
+                                    Text("Choose a slot to save this Amiibo:", modifier = Modifier.padding(bottom = 8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 1
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 1") }
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 2
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 2") }
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 3
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 3") }
+                                    }
+                                    Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 4
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 4") }
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 5
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 5") }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showAmiiboSlotDialog.value = false }) { Text("Close") }
+                            }
+                        )
+                    }
                 }
 
                 if (viewModel.mainViewModel?.loadGameModel?.value != null)
@@ -439,6 +582,21 @@ class HomeViews {
                                             contentDescription = "Run"
                                         )
                                     }
+
+                                    // create Shortcut
+                                    IconButton(onClick = {
+                                        val gm = viewModel.mainViewModel?.selected
+                                        if (gm != null) {
+                                            shortcutName.value = gm.titleName ?: ""
+                                            showShortcutDialog.value = true
+                                        }
+                                    }) {
+                                        Icon(
+                                            Icons.Filled.Add,
+                                            contentDescription = "Create Shortcut"
+                                        )
+                                    }
+
                                     val showAppMenu = remember { mutableStateOf(false) }
                                     Box {
                                         IconButton(onClick = { showAppMenu.value = true }) {
@@ -499,6 +657,72 @@ class HomeViews {
                             selectedModel.value = null
                         }
                     )
+
+                // --- Shortcut-Dialog
+                if (showShortcutDialog.value) {
+                    val gm = viewModel.mainViewModel?.selected
+                    AlertDialog(
+                        onDismissRequest = { showShortcutDialog.value = false },
+                        title = { Text("Create shortcut") },
+                        text = {
+                            Column {
+                                OutlinedTextField(
+                                    value = shortcutName.value,
+                                    onValueChange = { shortcutName.value = it },
+                                    label = { Text("Name") },
+                                    singleLine = true
+                                )
+                                Text(
+                                    text = "Choose icon:",
+                                    modifier = Modifier.padding(top = 12.dp)
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp)
+                                ) {
+                                    TextButton(onClick = {
+                                        // App icon (Grid image)
+                                        if (gm != null && activity != null) {
+                                            val gameUri = resolveGameUri(gm)
+                                            if (gameUri != null) {
+                                                // persist rights for the game file
+                                                ShortcutUtils.persistReadWrite(activity, gameUri)
+
+                                                val bmp = decodeGameIcon(gm)
+                                                val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
+
+                                                ShortcutUtils.pinShortcutForGame(
+                                                    activity = activity,
+                                                    gameUri = gameUri,
+                                                    label = label,
+                                                    iconBitmap = bmp
+                                                ) { }
+                                                showShortcutDialog.value = false
+                                            } else {
+                                                showShortcutDialog.value = false
+                                            }
+                                        } else {
+                                            showShortcutDialog.value = false
+                                        }
+                                    }) { Text("App icon") }
+
+                                    TextButton(onClick = {
+                                        // Custom icon: open picker
+                                        pickImageLauncher.launch(arrayOf("image/*"))
+                                        showShortcutDialog.value = false
+                                    }) { Text("Custom icon") }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showShortcutDialog.value = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
+                }
 
                 // --- Version badge bottom left above the entire content
                 VersionBadge(
