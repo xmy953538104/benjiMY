@@ -1068,6 +1068,8 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
 
             Logger.Error?.Print(LogClass.Cpu, $"Invalid memory access at virtual address 0x{va:X16}.");
 
+            Logger.Flush();
+
             return false;
         }
 
@@ -1075,6 +1077,8 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
         {
             KernelStatic.GetCurrentThread().PrintGuestStackTrace();
             KernelStatic.GetCurrentThread()?.PrintGuestRegisterPrintout();
+
+            Logger.Flush();
 
             throw new UndefinedInstructionException(address, opCode);
         }
