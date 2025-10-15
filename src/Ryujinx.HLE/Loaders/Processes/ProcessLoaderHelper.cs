@@ -190,7 +190,7 @@ namespace Ryujinx.HLE.Loaders.Processes
                 codeAddress,
                 codeSize);
 
-            result = process.InitializeKip(creationInfo, kip.Capabilities, pageList, context.ResourceLimit, memoryRegion, processContextFactory);
+            result = process.InitializeKip(creationInfo, kip.Capabilities, pageList, context.ResourceLimit, memoryRegion, context.Device.Configuration.MemoryConfiguration, processContextFactory);
             if (result != Result.Success)
             {
                 Logger.Error?.Print(LogClass.Loader, $"Process initialization returned error \"{result}\".");
@@ -401,6 +401,7 @@ namespace Ryujinx.HLE.Loaders.Processes
                 MemoryMarshal.Cast<byte, uint>(npdm.KernelCapabilityData),
                 resourceLimit,
                 memoryRegion,
+                context.Device.Configuration.MemoryConfiguration,
                 processContextFactory,
                 entrypointOffset: nsoPatch[0]?.Size ?? 0UL);
 
