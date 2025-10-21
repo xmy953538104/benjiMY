@@ -50,6 +50,9 @@ namespace Ryujinx.HLE.HOS
 
                 _programs.Enqueue(program);
                 _programDictionary.TryAdd($"{buildId}-{name}", program);
+
+                // NEU: Standardmäßig einschalten (bei Android gibt es (noch) keine UI, die EnableCheats aufruft)
+                program.IsEnabled = true;
             }
 
             Activate();
@@ -138,7 +141,11 @@ namespace Ryujinx.HLE.HOS
 
             // Re-enqueue the tampering program because the process is still valid.
             _programs.Enqueue(program);
-
+            // NEU: Wenn der Cheat (noch) disabled ist – nur weiter rotieren, nicht ausführen.
+            if (!program.IsEnabled)
+            {
+                return true;
+            }
             Logger.Debug?.Print(LogClass.TamperMachine, $"Running tampering program {program.Name}");
 
             try
@@ -159,10 +166,13 @@ namespace Ryujinx.HLE.HOS
             {
                 Logger.Debug?.Print(LogClass.TamperMachine, $"The tampering program {program.Name} crashed, this can happen while the game is starting");
 
-                if (!string.IsNullOrEmpty(ex.Message))
-                {
-                    Logger.Debug?.Print(LogClass.TamperMachine, ex.Message);
-                }
+                //if (!string.IsNullOrEmpty(ex.Message))
+                //{
+                //    Logger.Debug?.Print(LogClass.TamperMachine, ex.Message);
+                //}
+
+                // NEU: kompletter Stacktrace
+                Logger.Debug?.Print(LogClass.TamperMachine, ex.ToString());
             }
 
             return true;
