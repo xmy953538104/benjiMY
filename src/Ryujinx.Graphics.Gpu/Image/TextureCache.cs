@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Collections.Concurrent;
 
 namespace Ryujinx.Graphics.Gpu.Image
 {
@@ -48,6 +49,9 @@ namespace Ryujinx.Graphics.Gpu.Image
 
         private readonly AutoDeleteCache _cache;
 
+        // === Static registry of all TextureCache instances (weak) for broadcast resets ===
+        private static readonly ConcurrentBag<WeakReference<TextureCache>> _instances = new();
+
         /// <summary>
         /// Constructs a new instance of the texture manager.
         /// </summary>
@@ -67,6 +71,9 @@ namespace Ryujinx.Graphics.Gpu.Image
             _overlapInfo = new OverlapInfo[OverlapsBufferInitialCapacity];
 
             _cache = [];
+
+            // Register this cache instance for global reset broadcast.
+            _instances.Add(new WeakReference<TextureCache>(this));
         }
 
         /// <summary>

@@ -74,7 +74,7 @@ namespace Ryujinx.Graphics.Vulkan
             _activeType = currentType;
 
             _flushLock = new ReaderWriterLockSlim();
-            _useMirrors = gd.IsTBDR;
+            _useMirrors = gd.IsTBDR && !OperatingSystem.IsAndroid();
         }
 
         public BufferHolder(VulkanRenderer gd, Device device, VkBuffer buffer, Auto<MemoryAllocation> allocation, int size, BufferAllocationType type, BufferAllocationType currentType, int offset)
@@ -151,7 +151,7 @@ namespace Ryujinx.Graphics.Vulkan
                     commandBuffer,
                     PipelineStageFlags.AllCommandsBit,
                     PipelineStageFlags.AllCommandsBit,
-                    DependencyFlags.DeviceGroupBit,
+                    0,                  // statt DependencyFlags.DeviceGroupBit
                     1,
                     in memoryBarrier,
                     0,
@@ -264,7 +264,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         public Auto<DisposableBuffer> GetMirrorable(CommandBufferScoped cbs, ref int offset, int size, out bool mirrored)
         {
-            if (_pendingData != null && TryGetMirror(cbs, ref offset, size, out Auto<DisposableBuffer> result))
+            if (_useMirrors && _pendingData != null && TryGetMirror(cbs, ref offset, size, out Auto<DisposableBuffer> result))
             {
                 mirrored = true;
                 return result;
@@ -507,11 +507,20 @@ namespace Ryujinx.Graphics.Vulkan
 
         public unsafe void SetData(int offset, ReadOnlySpan<byte> data, CommandBufferScoped? cbs = null, Action endRenderPass = null, bool allowCbsWait = true)
         {
+            // --- Bounds guard: clamp writes to buffer size to prevent OOR after device/swapchain reset ---
+            if (offset < 0 || offset >= Size)
+            {
+                return;
+            }
+
             int dataSize = Math.Min(data.Length, Size - offset);
             if (dataSize == 0)
             {
                 return;
             }
+
+            // Always work on the clamped slice from here on
+            ReadOnlySpan<byte> dataSlice = data[..dataSize];
 
             bool allowMirror = _useMirrors && allowCbsWait && cbs != null && _activeType <= BufferAllocationType.HostMapped;
 
@@ -527,7 +536,7 @@ namespace Ryujinx.Graphics.Vulkan
                 {
                     WaitForFences(offset, dataSize);
 
-                    data[..dataSize].CopyTo(new Span<byte>((void*)(_map + offset), dataSize));
+                    dataSlice.CopyTo(new Span<byte>((void*)(_map + offset), dataSize));
 
                     if (_pendingData != null)
                     {
@@ -554,7 +563,7 @@ namespace Ryujinx.Graphics.Vulkan
                     _mirrors = new Dictionary<ulong, StagingBufferReserved>();
                 }
 
-                data[..dataSize].CopyTo(_pendingData.AsSpan(offset, dataSize));
+                dataSlice.CopyTo(_pendingData.AsSpan(offset, dataSize));
                 _pendingDataRanges.Add(offset, dataSize);
 
                 // Remove any overlapping mirrors.
@@ -585,12 +594,12 @@ namespace Ryujinx.Graphics.Vulkan
 
             if (cbs == null ||
                 !VulkanConfiguration.UseFastBufferUpdates ||
-                data.Length > MaxUpdateBufferSize ||
-                !TryPushData(cbs.Value, endRenderPass, offset, data))
+                dataSize > MaxUpdateBufferSize ||
+                !TryPushData(cbs.Value, endRenderPass, offset, dataSlice))
             {
                 if (allowCbsWait)
                 {
-                    _gd.BufferManager.StagingBuffer.PushData(_gd.CommandBufferPool, cbs, endRenderPass, this, offset, data);
+                    _gd.BufferManager.StagingBuffer.PushData(_gd.CommandBufferPool, cbs, endRenderPass, this, offset, dataSlice);
                 }
                 else
                 {
@@ -600,11 +609,11 @@ namespace Ryujinx.Graphics.Vulkan
                         cbs = _gd.CommandBufferPool.Rent();
                     }
 
-                    if (!_gd.BufferManager.StagingBuffer.TryPushData(cbs.Value, endRenderPass, this, offset, data))
+                    if (!_gd.BufferManager.StagingBuffer.TryPushData(cbs.Value, endRenderPass, this, offset, dataSlice))
                     {
                         // Need to do a slow upload.
                         BufferHolder srcHolder = _gd.BufferManager.Create(_gd, dataSize, baseType: BufferAllocationType.HostMapped);
-                        srcHolder.SetDataUnchecked(0, data);
+                        srcHolder.SetDataUnchecked(0, dataSlice);
 
                         var srcBuffer = srcHolder.GetBuffer();
                         var dstBuffer = this.GetBuffer(cbs.Value.CommandBuffer, true);
@@ -636,7 +645,7 @@ namespace Ryujinx.Graphics.Vulkan
             }
             else
             {
-                _gd.BufferManager.StagingBuffer.PushData(_gd.CommandBufferPool, null, null, this, offset, data);
+                _gd.BufferManager.StagingBuffer.PushData(_gd.CommandBufferPool, null, null, this, offset, data[..dataSize]);
             }
         }
 
@@ -647,9 +656,21 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetDataInline(CommandBufferScoped cbs, Action endRenderPass, int dstOffset, ReadOnlySpan<byte> data)
         {
-            if (!TryPushData(cbs, endRenderPass, dstOffset, data))
+            // Bound and align inline updates as well.
+            if (dstOffset < 0 || dstOffset >= Size)
             {
-                throw new ArgumentException($"Invalid offset 0x{dstOffset:X} or data size 0x{data.Length:X}.");
+                return;
+            }
+
+            int dataSize = Math.Min(data.Length, Size - dstOffset);
+            if (dataSize <= 0)
+            {
+                return;
+            }
+
+            if (!TryPushData(cbs, endRenderPass, dstOffset, data[..dataSize]))
+            {
+                throw new ArgumentException($"Invalid offset 0x{dstOffset:X} or data size 0x{dataSize:X}.");
             }
         }
 
@@ -709,8 +730,34 @@ namespace Ryujinx.Graphics.Vulkan
             int size,
             bool registerSrcUsage = true)
         {
-            var srcBuffer = registerSrcUsage ? src.Get(cbs, srcOffset, size).Value : src.GetUnsafe().Value;
-            var dstBuffer = dst.Get(cbs, dstOffset, size, true).Value;
+            // Schnelle Abbrüche / Sanity
+            if (size <= 0 || src == null || dst == null)
+            {
+                return;
+            }
+
+            VkBuffer srcBuffer;
+            VkBuffer dstBuffer;
+
+            try
+            {
+                srcBuffer = registerSrcUsage
+                    ? src.Get(cbs, srcOffset, size).Value
+                    : src.GetUnsafe().Value;
+
+                dstBuffer = dst.Get(cbs, dstOffset, size, true).Value;
+            }
+            catch (NullReferenceException)
+            {
+                // Quelle/Ziel gerade nicht verfügbar (z. B. nach Device/Surface-Reset) → kein Crash
+                return;
+            }
+
+            // Wenn ein Handle 0 ist, lieber abbrechen als die Pipeline ins Nirvana zu schicken.
+            if (srcBuffer.Handle == 0 || dstBuffer.Handle == 0)
+            {
+                return;
+            }
 
             InsertBufferBarrier(
                 gd,

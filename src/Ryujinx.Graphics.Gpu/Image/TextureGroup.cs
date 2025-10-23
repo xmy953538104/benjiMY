@@ -619,50 +619,98 @@ namespace Ryujinx.Graphics.Gpu.Image
         /// <param name="handle">Handle of the texture group to flush slices of</param>
         public void FlushIntoBuffer(TextureGroupHandle handle)
         {
-            // Ensure that the buffer exists.
-
-            if (_flushBufferInvalid && _flushBuffer != BufferHandle.Null)
+            try
             {
-                _flushBufferInvalid = false;
-                _context.Renderer.DeleteBuffer(_flushBuffer);
-                _flushBuffer = BufferHandle.Null;
-            }
-
-            if (_flushBuffer == BufferHandle.Null)
-            {
-                if (!TextureCompatibility.CanTextureFlush(Storage.Info, _context.Capabilities))
+                // Importierte Flush-Buffer ggf. aufräumen.
+                if (_flushBufferInvalid && _flushBuffer != BufferHandle.Null)
                 {
+                    _flushBufferInvalid = false;
+                    _context.Renderer.DeleteBuffer(_flushBuffer);
+                    _flushBuffer = BufferHandle.Null;
+                }
+
+                // Früh raus, wenn die Hardware/Format-Kombi keinen Texture-Flush unterstützt.
+                if (_flushBuffer == BufferHandle.Null)
+                {
+                    if (!TextureCompatibility.CanTextureFlush(Storage.Info, _context.Capabilities))
+                    {
+                        return;
+                    }
+
+                    bool canImport = Storage.Info.IsLinear &&
+                                     Storage.Info.Stride >= Storage.Info.Width * Storage.Info.FormatInfo.BytesPerPixel;
+
+                    var hostPointer = canImport ? _physicalMemory.GetHostPointer(Storage.Range) : 0;
+
+                    if (hostPointer != 0 && _context.Renderer.PrepareHostMapping(hostPointer, Storage.Size))
+                    {
+                        _flushBuffer = _context.Renderer.CreateBuffer(hostPointer, (int)Storage.Size);
+                        _flushBufferImported = true;
+                    }
+                    else
+                    {
+                        _flushBuffer = _context.Renderer.CreateBuffer((int)Storage.Size, BufferAccess.HostMemory);
+                        _flushBufferImported = false;
+                    }
+
+                    Storage.BlacklistScale();
+                }
+
+                // NEU: defensiv prüfen, ob eine gültige Host-Textur für den Flush vorhanden ist.
+                var flushTex = Storage.GetFlushTexture();
+                if (flushTex == null)
+                {
+                    // Direkt nach Device-/Surface-Reset kann das fehlen → ruhig überspringen.
                     return;
                 }
 
-                bool canImport = Storage.Info.IsLinear && Storage.Info.Stride >= Storage.Info.Width * Storage.Info.FormatInfo.BytesPerPixel;
+                int sliceStart = handle.BaseSlice;
+                int sliceEnd = sliceStart + handle.SliceCount;
 
-                var hostPointer = canImport ? _physicalMemory.GetHostPointer(Storage.Range) : 0;
-
-                if (hostPointer != 0 && _context.Renderer.PrepareHostMapping(hostPointer, Storage.Size))
+                for (int i = sliceStart; i < sliceEnd; i++)
                 {
-                    _flushBuffer = _context.Renderer.CreateBuffer(hostPointer, (int)Storage.Size);
-                    _flushBufferImported = true;
-                }
-                else
-                {
-                    _flushBuffer = _context.Renderer.CreateBuffer((int)Storage.Size, BufferAccess.HostMemory);
-                    _flushBufferImported = false;
-                }
+                    (int layer, int level) = GetLayerLevelForView(i);
 
-                Storage.BlacklistScale();
+                    // NEU: Bounds-Checks, damit wir nicht außerhalb von Offsets/Slice-Größen indexieren.
+                    if ((uint)i >= (uint)_allOffsets.Length)
+                    {
+                        continue;
+                    }
+                    if ((uint)level >= (uint)_sliceSizes.Length)
+                    {
+                        continue;
+                    }
+
+                    int dstStride = _flushBufferImported ? Storage.Info.Stride : 0;
+
+                    // NEU: einzelner Slice-Flush defensiv einfassen.
+                    try
+                    {
+                        flushTex.CopyTo(
+                            new BufferRange(_flushBuffer, _allOffsets[i], _sliceSizes[level]),
+                            layer,
+                            level,
+                            dstStride);
+                    }
+                    catch (NullReferenceException)
+                    {
+                        // Einzelner Slice invalid geworden (z.B. während Recreate) → überspringen.
+                        continue;
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        // Unerwartete Range – ebenfalls überspringen statt Crash.
+                        continue;
+                    }
+                }
             }
-
-            int sliceStart = handle.BaseSlice;
-            int sliceEnd = sliceStart + handle.SliceCount;
-
-            for (int i = sliceStart; i < sliceEnd; i++)
+            catch (NullReferenceException)
             {
-                (int layer, int level) = GetLayerLevelForView(i);
-
-                Storage.GetFlushTexture().CopyTo(new BufferRange(_flushBuffer, _allOffsets[i], _sliceSizes[level]), layer, level, _flushBufferImported ? Storage.Info.Stride : 0);
+                // Gesamter Flush-Pfad temporär invalide → sicher aussteigen.
+                return;
             }
         }
+
 
         /// <summary>
         /// Clears competing modified flags for all incompatible ranges, if they have possibly been modified.

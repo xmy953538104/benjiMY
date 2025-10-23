@@ -1,6 +1,11 @@
 # Changelog
 
-## 2.0.5b — 2025-10-09
+## 2.0.5c — 2025-10-23
+
+### Fixed
+- **Crashes**: Fixed some crashes.
+
+## 2.0.5b — 2025-10-23
 
 ### Added
 - **Cheat** Suport: Added a Cheat Manager by Long pressing a Game.

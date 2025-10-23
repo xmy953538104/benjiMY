@@ -6,6 +6,8 @@ import com.sun.jna.Native
 import org.kenjinx.android.viewmodels.GameInfo
 import java.util.Collections
 import android.view.Surface
+import android.util.Log
+import android.os.Build
 
 interface KenjinxNativeJna : Library {
     fun deviceInitialize(
@@ -69,6 +71,9 @@ interface KenjinxNativeJna : Library {
     fun deviceCloseEmulation()
     fun deviceReinitEmulation()
     fun deviceSignalEmulationClose()
+    fun deviceWaitForGpuDone(timeoutMs: Int)
+    fun deviceRecreateSwapchain()
+    fun graphicsSetBackendThreading(mode: Int)
     fun userGetOpenedUser(): String
     fun userGetUserPicture(userId: String): String
     fun userSetUserPicture(userId: String, picture: String)
@@ -99,6 +104,7 @@ interface KenjinxNativeJna : Library {
     fun amiiboLoadBin(bytes: ByteArray, length: Int): Boolean
     fun amiiboClear()
 
+    fun graphicsSetPresentEnabled(enabled: Boolean)
 }
 
 val jnaInstance: KenjinxNativeJna = Native.load(
@@ -111,6 +117,103 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
 
     fun loggingSetEnabled(logLevel: LogLevel, enabled: Boolean) =
         loggingSetEnabled(logLevel.ordinal, enabled)
+
+    override fun graphicsSetBackendThreading(mode: Int) {
+        try { jnaInstance.graphicsSetBackendThreading(mode) } catch (_: Throwable) {
+            Log.w("KenjinxNative", "graphicsSetBackendThreading not available")
+        }
+    }
+
+    override fun deviceRecreateSwapchain() {
+        try { jnaInstance.deviceRecreateSwapchain() } catch (_: Throwable) { /* ignore */ }
+    }
+
+
+    // --- Safe Kotlin-Implementierung für deviceResize (verlangt kein natives Symbol)
+    override fun deviceResize(width: Int, height: Int) {
+        try {
+            graphicsRendererSetSize(width, height)
+            inputSetClientSize(width, height)
+        } catch (_: Throwable) { /* ignore */ }
+    }
+
+    // --- Safer graphicsInitialize: try requested, fallback to SingleThread only on failure ---
+    override fun graphicsInitialize(
+        rescale: Float,
+        maxAnisotropy: Float,
+        fastGpuTime: Boolean,
+        fast2DCopy: Boolean,
+        enableMacroJit: Boolean,
+        enableMacroHLE: Boolean,
+        enableShaderCache: Boolean,
+        enableTextureRecompression: Boolean,
+        backendThreading: Int
+    ): Boolean {
+        // Ryujinx Threading enum: 0=Auto, 1=SingleThread(Off), 2=Threaded(On)
+        val AUTO = 0
+        val SINGLE_THREAD = 1
+        val THREADED = 2
+
+        val requested = backendThreading
+
+        // Optional-Heuristik: Auf QCOM „Auto“ -> SingleThread bevorzugen, explizites „On“ respektieren.
+        val firstChoice = if ("qcom".equals(android.os.Build.HARDWARE, true) && requested == AUTO) {
+            SINGLE_THREAD
+        } else {
+            requested
+        }
+
+        android.util.Log.i("KenjinxNative", "graphicsInitialize: request=$requested firstChoice=$firstChoice hw=${android.os.Build.HARDWARE}")
+
+        return try {
+            jnaInstance.graphicsInitialize(
+                rescale,
+                maxAnisotropy,
+                fastGpuTime,
+                fast2DCopy,
+                enableMacroJit,
+                enableMacroHLE,
+                enableShaderCache,
+                enableTextureRecompression,
+                firstChoice
+            )
+        } catch (t: Throwable) {
+            android.util.Log.e("KenjinxNative", "graphicsInitialize failed (firstChoice=$firstChoice). Fallback → SingleThread", t)
+            try {
+                jnaInstance.graphicsInitialize(
+                    rescale,
+                    maxAnisotropy,
+                    fastGpuTime,
+                    fast2DCopy,
+                    enableMacroJit,
+                    enableMacroHLE,
+                    enableShaderCache,
+                    enableTextureRecompression,
+                    SINGLE_THREAD
+                )
+            } catch (t2: Throwable) {
+                android.util.Log.e("KenjinxNative", "graphicsInitialize fallback failed", t2)
+                false
+            }
+        }
+    }
+    // ----------------------------------------------------------------
+
+
+    override fun uiHandlerSetup() {
+        try { jnaInstance.uiHandlerSetup() } catch (t: Throwable) {
+            Log.w("KenjinxNative", "uiHandlerSetup not available: ${t.javaClass.simpleName}: ${t.message}")
+        }
+    }
+
+    override fun uiHandlerSetResponse(isOkPressed: Boolean, input: String) {
+        try { jnaInstance.uiHandlerSetResponse(isOkPressed, input) } catch (_: Throwable) {
+            Log.w("KenjinxNative", "uiHandlerSetResponse ignored (native symbol missing)")
+        }
+    }
+
+    @JvmStatic
+    fun test() {}
 
     @JvmStatic
     fun frameEnded() = MainActivity.frameEnded()

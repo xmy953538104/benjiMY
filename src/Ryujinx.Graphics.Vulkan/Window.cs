@@ -341,7 +341,7 @@ namespace Ryujinx.Graphics.Vulkan
                     RecreateSwapchain();
                     semaphoreIndex = (_frameIndex - 1) % _imageAvailableSemaphores.Length;
                 }
-                else if(acquireResult == Result.ErrorSurfaceLostKhr)
+                else if (acquireResult == Result.ErrorSurfaceLostKhr)
                 {
                     _gd.RecreateSurface();
                 }
@@ -358,11 +358,15 @@ namespace Ryujinx.Graphics.Vulkan
 
             var cbs = _gd.CommandBufferPool.Rent();
 
+            // WICHTIG: Unser Renderpass erwartet die Attachments im Layout GENERAL.
+            // Also von Undefined/Present -> General mit ColorAttachmentWrite als Zielzugriff.
             Transition(
                 cbs.CommandBuffer,
                 swapchainImage,
+                PipelineStageFlags.TopOfPipeBit,
+                PipelineStageFlags.ColorAttachmentOutputBit,
                 0,
-                AccessFlags.TransferWriteBit,
+                AccessFlags.ColorAttachmentWriteBit,
                 ImageLayout.Undefined,
                 ImageLayout.General);
 
@@ -414,7 +418,6 @@ namespace Ryujinx.Graphics.Vulkan
                 }
 
                 CaptureFrame(view, srcX0, srcY0, srcX1 - srcX0, srcY1 - srcY0, view.Info.Format.IsBgr(), crop.FlipX, crop.FlipY);
-
                 ScreenCaptureRequested = false;
             }
 
@@ -459,18 +462,22 @@ namespace Ryujinx.Graphics.Vulkan
                     true);
             }
 
+            // Nach den ColorAttachment-Writes: General -> PresentSrcKhr
             Transition(
                 cbs.CommandBuffer,
                 swapchainImage,
-                0,
+                PipelineStageFlags.ColorAttachmentOutputBit,
+                PipelineStageFlags.BottomOfPipeBit,
+                AccessFlags.ColorAttachmentWriteBit,
                 0,
                 ImageLayout.General,
                 ImageLayout.PresentSrcKhr);
 
+            // Robuster: auf TOP_OF_PIPE warten (deckt Compute/Graphics gleichermaßen ab).
             _gd.CommandBufferPool.Return(
                 cbs,
                 [_imageAvailableSemaphores[semaphoreIndex]],
-                [PipelineStageFlags.ColorAttachmentOutputBit],
+                [PipelineStageFlags.TopOfPipeBit],
                 [_renderFinishedSemaphores[semaphoreIndex]]);
 
             // TODO: Present queue.
@@ -604,6 +611,8 @@ namespace Ryujinx.Graphics.Vulkan
         private unsafe void Transition(
             CommandBuffer commandBuffer,
             Image image,
+            PipelineStageFlags srcStage,
+            PipelineStageFlags dstStage,
             AccessFlags srcAccess,
             AccessFlags dstAccess,
             ImageLayout srcLayout,
@@ -626,8 +635,8 @@ namespace Ryujinx.Graphics.Vulkan
 
             _gd.Api.CmdPipelineBarrier(
                 commandBuffer,
-                PipelineStageFlags.TopOfPipeBit,
-                PipelineStageFlags.AllCommandsBit,
+                srcStage,
+                dstStage,
                 0,
                 0,
                 null,

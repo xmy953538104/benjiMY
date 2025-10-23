@@ -41,6 +41,8 @@ namespace Ryujinx.Graphics.Vulkan
         public VkFormat VkFormat { get; }
         private int _isValid;
         public bool Valid => Volatile.Read(ref _isValid) != 0;
+        // Hilft, Copy/Read-Pfade auf Swapchain-Views abzufangen
+        private bool HasStorage => Storage != null;
 
         public TextureView(
             VulkanRenderer gd,
@@ -210,7 +212,7 @@ namespace Ryujinx.Graphics.Vulkan
             var src = this;
             var dst = (TextureView)destination;
 
-            if (!Valid || !dst.Valid)
+            if (!Valid || !dst.Valid || !src.HasStorage || !dst.HasStorage)
             {
                 return;
             }
@@ -270,7 +272,7 @@ namespace Ryujinx.Graphics.Vulkan
             var src = this;
             var dst = (TextureView)destination;
 
-            if (!Valid || !dst.Valid)
+            if (!Valid || !dst.Valid || !src.HasStorage || !dst.HasStorage)
             {
                 return;
             }
@@ -324,6 +326,12 @@ namespace Ryujinx.Graphics.Vulkan
         {
             var dst = (TextureView)destination;
 
+            // NEU: Guard
+            if (!Valid || !dst.Valid || !HasStorage || !dst.HasStorage)
+            {
+                return;
+            }
+
             if (_gd.CommandBufferPool.OwnedByCurrentThread)
             {
                 _gd.PipelineInternal.EndRenderPass();
@@ -345,6 +353,12 @@ namespace Ryujinx.Graphics.Vulkan
         private void CopyToImpl(CommandBufferScoped cbs, TextureView dst, Extents2D srcRegion, Extents2D dstRegion, bool linearFilter)
         {
             var src = this;
+
+            // NEU: Guard
+            if (!src.Valid || !dst.Valid || !src.HasStorage || !dst.HasStorage)
+            {
+                return;
+            }
 
             var srcFormat = GetCompatibleGalFormat(src.Info.Format);
             var dstFormat = GetCompatibleGalFormat(dst.Info.Format);
@@ -655,21 +669,30 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void CopyTo(BufferRange range, int layer, int level, int stride)
         {
+            // Defensive: wenn View/Storage nicht bereit, einfach aussteigen.
+            if (!Valid || !HasStorage)
+            {
+                return;
+            }
+
             _gd.PipelineInternal.EndRenderPass();
             var cbs = _gd.PipelineInternal.CurrentCommandBuffer;
 
-            int outSize = Info.GetMipSize(level);
+            int outSize  = Info.GetMipSize(level);
             int hostSize = GetBufferDataLength(outSize);
 
-            var image = GetImage().Get(cbs).Value;
+            var image  = GetImage().Get(cbs).Value;
             int offset = range.Offset;
 
             Auto<DisposableBuffer> autoBuffer = _gd.BufferManager.GetBuffer(cbs.CommandBuffer, range.Handle, true);
             VkBuffer buffer = autoBuffer.Get(cbs, range.Offset, outSize).Value;
 
-            if (PrepareOutputBuffer(cbs, hostSize, buffer, out VkBuffer copyToBuffer, out BufferHolder tempCopyHolder))
+            VkBuffer copyToBuffer;
+            BufferHolder tempCopyHolder;
+
+            if (PrepareOutputBuffer(cbs, hostSize, buffer, out copyToBuffer, out tempCopyHolder))
             {
-                // No barrier necessary, as this is a temporary copy buffer.
+                // Temporärer Copy-Buffer: kein Barrier nötig, Offset wird 0.
                 offset = 0;
             }
             else
@@ -686,6 +709,7 @@ namespace Ryujinx.Graphics.Vulkan
                     outSize);
             }
 
+            // Vor dem Copy: Image für Transfer-Read bereit machen.
             InsertImageBarrier(
                 _gd.Api,
                 cbs.CommandBuffer,
@@ -700,10 +724,26 @@ namespace Ryujinx.Graphics.Vulkan
                 1,
                 1);
 
-            CopyFromOrToBuffer(cbs.CommandBuffer, copyToBuffer, image, hostSize, true, layer, level, 1, 1, singleSlice: true, offset, stride);
+            // Image -> Buffer
+            // (Achtung: hier KEIN benannter Parameter "toBuffer" verwenden; Signatur ist positional.)
+            CopyFromOrToBuffer(
+                cbs.CommandBuffer,
+                copyToBuffer,
+                image,
+                hostSize,
+                true,              // true = Image -> Buffer
+                layer,
+                level,
+                1,
+                1,
+                singleSlice: true,
+                offset,
+                stride);
 
+            // Nach dem Copy: Buffer-Barrier zurück auf Default (falls kein temp buffer verwendet).
             if (tempCopyHolder != null)
             {
+                // Vom temp-Buffer in den echten Ziel-Buffer kopieren.
                 CopyDataToOutputBuffer(cbs, tempCopyHolder, autoBuffer, hostSize, range.Offset);
                 tempCopyHolder.Dispose();
             }
@@ -720,6 +760,22 @@ namespace Ryujinx.Graphics.Vulkan
                     offset,
                     outSize);
             }
+
+            // WICHTIG: Image wieder in den Default-Zugriffsmodus überführen,
+            // damit der nächste Frame nicht „gegen“ TransferRead läuft.
+            InsertImageBarrier(
+                _gd.Api,
+                cbs.CommandBuffer,
+                image,
+                AccessFlags.TransferReadBit,
+                TextureStorage.DefaultAccessMask,
+                PipelineStageFlags.TransferBit,
+                PipelineStageFlags.AllCommandsBit,
+                Info.Format.ConvertAspectFlags(),
+                FirstLayer + layer,
+                FirstLevel + level,
+                1,
+                1);
         }
 
         private ReadOnlySpan<byte> GetData(CommandBufferPool cbp, PersistentFlushBuffer flushBuffer)

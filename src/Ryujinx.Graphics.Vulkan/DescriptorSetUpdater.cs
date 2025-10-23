@@ -678,6 +678,12 @@ namespace Ryujinx.Graphics.Vulkan
             }
 
             var program = _program;
+            if (program == null)
+            {
+                // Defensive: Falls Update vor SetProgram() gerufen wird, einfach nichts tun.
+                _dirty = DirtyFlags.None;
+                return;
+            }
 
             if ((_dirty & DirtyFlags.Uniform) == DirtyFlags.Uniform)
             {

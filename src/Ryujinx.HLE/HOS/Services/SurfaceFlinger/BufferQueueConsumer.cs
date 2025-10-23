@@ -28,7 +28,10 @@ namespace Ryujinx.HLE.HOS.Services.SurfaceFlinger
                     }
                 }
 
-                if (numAcquiredBuffers > Core.MaxAcquiredBufferCount)
+                // WICHTIG:
+                // Viele Android-Pipelines arbeiten mit mindestens Double-Buffering.
+                // Erlaube daher bis zu (MaxAcquiredBufferCount + 1), analog zu AttachBuffer().
+                if (numAcquiredBuffers > Core.MaxAcquiredBufferCount + 1)
                 {
                     bufferItem = null;
 
@@ -239,6 +242,13 @@ namespace Ryujinx.HLE.HOS.Services.SurfaceFlinger
 
                 Core.ConsumerListener = consumerListener;
                 Core.ConsumerControlledByApp = controlledByApp;
+
+                // **Android-Default anheben:** mindestens Double-Buffering zulassen.
+                // Wenn ein anderes Limit gebraucht wird, kann der Producer/Caller es später via SetMaxAcquiredBufferCount überschreiben.
+                if (Core.MaxAcquiredBufferCount < 2)
+                {
+                    Core.MaxAcquiredBufferCount = 2;
+                }
             }
 
             return Status.Success;
