@@ -112,6 +112,9 @@ import org.kenjinx.android.cheats.listMods
 import org.kenjinx.android.cheats.deleteMod
 import org.kenjinx.android.cheats.importModsZip
 
+// NEW: Saves
+import org.kenjinx.android.saves.*
+
 class HomeViews {
     companion object {
         const val ListImageSize = 150
@@ -171,16 +174,79 @@ class HomeViews {
             // NEW: Mods UI state
             val openModsDialog = remember { mutableStateOf(false) }
             val modsForSelected = remember { mutableStateOf(listOf<String>()) }
-            val importProgress = remember { mutableStateOf(0f) }
-            val importBusy = remember { mutableStateOf(false) }
-            val importStatusText = remember { mutableStateOf("") }
+            val modsImportProgress = remember { mutableStateOf(0f) }
+            val modsImportBusy = remember { mutableStateOf(false) }
+            val modsImportStatusText = remember { mutableStateOf("") }
+
+            // Save Manager State
+            val openSavesDialog = remember { mutableStateOf(false) }
+            val saveImportBusy = remember { mutableStateOf(false) }
+            val saveExportBusy = remember { mutableStateOf(false) }
+            val saveImportProgress = remember { mutableStateOf(0f) }
+            val saveExportProgress = remember { mutableStateOf(0f) }
+            val saveImportStatus = remember { mutableStateOf("") }
+            val saveExportStatus = remember { mutableStateOf("") }
+
+            val activity = LocalContext.current as? Activity
+            val gmSel = viewModel.mainViewModel?.selected
+            val currentTitleId = gmSel?.titleId ?: ""
+
+            // Import: OpenDocument (ZIP)
+            val importZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                if (uri != null && activity != null && currentTitleId.isNotEmpty()) {
+                    saveImportBusy.value = true
+                    saveImportProgress.value = 0f
+                    saveImportStatus.value = "Starting…"
+
+                    thread {
+                        val res = importSaveFromZip(activity, uri) { prog ->
+                            val frac = if (prog.total > 0) prog.bytes.toFloat() / prog.total else 0f
+                            saveImportProgress.value = frac.coerceIn(0f, 1f)
+                            saveImportStatus.value = "Importing: ${prog.currentEntry}"
+                        }
+                        saveImportBusy.value = false
+                        launchOnUiThread {
+                            Toast.makeText(activity, res.message, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+
+            // Export: CreateDocument (ZIP)
+            val exportZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.CreateDocument("application/zip")
+            ) { uri: Uri? ->
+                if (uri != null && activity != null && currentTitleId.isNotEmpty()) {
+                    saveExportBusy.value = true
+                    saveExportProgress.value = 0f
+                    saveExportStatus.value = "Starting…"
+
+                    thread {
+                        val res = exportSaveToZip(activity, currentTitleId, uri) { prog ->
+                            val frac = if (prog.total > 0) prog.bytes.toFloat() / prog.total else 0f
+                            saveExportProgress.value = frac.coerceIn(0f, 1f)
+                            saveExportStatus.value = "Exporting: ${prog.currentPath}"
+                        }
+                        saveExportBusy.value = false
+                        launchOnUiThread {
+                            Toast.makeText(
+                                activity,
+                                if (res.ok) "save exported" else (res.error ?: "export failed"),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            }
 
             // Shortcut-Dialog-State
             val showShortcutDialog = remember { mutableStateOf(false) }
             val shortcutName = remember { mutableStateOf("") }
 
             val context = LocalContext.current
-            val activity = LocalContext.current as? Activity
+            //val activity = LocalContext.current as? Activity
 
             // NEW: Launcher für Amiibo (OpenDocument)
             val pickAmiiboLauncher = rememberLauncherForActivityResult(
@@ -247,9 +313,9 @@ class HomeViews {
                         act.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     } catch (_: Exception) {}
 
-                    importBusy.value = true
-                    importProgress.value = 0f
-                    importStatusText.value = "Starting…"
+                    modsImportBusy.value = true
+                    modsImportProgress.value = 0f
+                    modsImportStatusText.value = "Starting…"
 
                     thread {
                         val res = importModsZip(
@@ -257,8 +323,8 @@ class HomeViews {
                             titleId,
                             uri
                         ) { prog ->
-                            importProgress.value = prog.fraction
-                            importStatusText.value = if (prog.currentEntry.isNotEmpty())
+                            modsImportProgress.value = prog.fraction
+                            modsImportStatusText.value = if (prog.currentEntry.isNotEmpty())
                                 "Copying: ${prog.currentEntry}"
                             else
                                 "Copying… ${(prog.fraction * 100).toInt()}%"
@@ -266,7 +332,7 @@ class HomeViews {
 
                         // Liste aktualisieren
                         modsForSelected.value = listMods(act, titleId)
-                        importBusy.value = false
+                        modsImportBusy.value = false
 
                         launchOnUiThread {
                             val msg = if (res.ok)
@@ -792,6 +858,14 @@ class HomeViews {
                                                     }
                                                 }
                                             )
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Manage Saves") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    openSavesDialog.value = true
+                                                }
+                                            )
+
                                         }
                                     }
                                 }
@@ -921,21 +995,21 @@ class HomeViews {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TextButton(
-                                    enabled = !importBusy.value,
+                                    enabled = !modsImportBusy.value,
                                     onClick = { pickModZipLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }
                                 ) { Text("Import .zip") }
                             }
 
                             // Progress
-                            if (importBusy.value) {
+                            if (modsImportBusy.value) {
                                 androidx.compose.material3.LinearProgressIndicator(
-                                    progress = { importProgress.value },
+                                    progress = { modsImportProgress.value },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(bottom = 8.dp)
                                 )
                                 Text(
-                                    importStatusText.value,
+                                    modsImportStatusText.value,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                     modifier = Modifier.padding(bottom = 8.dp)
@@ -985,6 +1059,72 @@ class HomeViews {
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(onClick = { openModsDialog.value = false }) { Text("Close") }
+                            }
+                        }
+                    }
+                }
+                if (openSavesDialog.value) {
+                    ModalBottomSheet(
+                        onDismissRequest = { openSavesDialog.value = false }
+                    ) {
+                        val act = activity
+                        val tId = currentTitleId
+
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Save Manager", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = viewModel.mainViewModel?.selected?.titleName ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                androidx.compose.material3.Button(
+                                    enabled = !saveImportBusy.value && !saveExportBusy.value && !tId.isNullOrEmpty(),
+                                    onClick = {
+                                        saveImportProgress.value = 0f
+                                        saveImportStatus.value = ""
+                                        importZipLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                                    }
+                                ) { Text("Import ZIP") }
+
+                                androidx.compose.material3.Button(
+                                    enabled = !saveImportBusy.value && !saveExportBusy.value && !tId.isNullOrEmpty(),
+                                    onClick = {
+                                        if (act != null && tId.isNotEmpty()) {
+                                            val fname = suggestedCreateDocNameForExport(act, tId)
+                                            saveExportProgress.value = 0f
+                                            saveExportStatus.value = ""
+                                            exportZipLauncher.launch(fname)
+                                        }
+                                    }
+                                ) { Text("Export ZIP") }
+                            }
+
+
+                            if (saveImportBusy.value) {
+                                Column(Modifier.padding(top = 12.dp)) {
+                                    androidx.compose.material3.LinearProgressIndicator(progress = { saveImportProgress.value })
+                                    Text(saveImportStatus.value, modifier = Modifier.padding(top = 6.dp))
+                                }
+                            }
+                            if (saveExportBusy.value) {
+                                Column(Modifier.padding(top = 12.dp)) {
+                                    androidx.compose.material3.LinearProgressIndicator(progress = { saveExportProgress.value })
+                                    Text(saveExportStatus.value, modifier = Modifier.padding(top = 6.dp))
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 12.dp),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                androidx.compose.material3.TextButton(
+                                    onClick = { openSavesDialog.value = false }
+                                ) { Text("Close") }
                             }
                         }
                     }
