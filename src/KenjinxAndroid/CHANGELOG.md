@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.5f — 2025-10-23
+
+### Added
+- **Save Manager**: Added a import/export function for saves as .zip. Compatible with Eden.
+
 ## 2.0.5e — 2025-10-23
 
 ### Added

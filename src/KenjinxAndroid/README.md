@@ -13,8 +13,9 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.5e – Highlights
+## Version 2.0.5f – Highlights
 
+- **Save Manager**: Added a import/export function for saves as .zip. Compatible with Eden.
 - **Mods**: Added a Mod Manager with import/delete.
 - **XBox Controllers**: Fixed L2 / R2 not working.
 - **Cheat** Suport: Added a Cheat Manager by Long pressing a  with import function.
@@ -34,7 +35,6 @@ Goal: jump into your game faster, with fewer rough edges.
 - **Language & Region** selection (Settings → System).
 - **Screen orientation** preference (Settings → User Interface):  
   **Sensor**, **SensorLandscape**, **SensorPortrait**.
-- Save files: groundwork for **item-ID based** mapping.
 
 ---
 
