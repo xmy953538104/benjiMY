@@ -4,6 +4,9 @@ import android.app.Activity
 import android.util.Log
 import java.io.File
 import java.nio.charset.Charset
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.content.Intent
 
 data class CheatItem(val buildId: String, val name: String) {
     val key get() = "$buildId-$name"
@@ -16,14 +19,8 @@ private fun cheatsDirExternal(activity: Activity, titleId: String): File {
     return File(base, "mods/contents/$titleId/cheats")
 }
 
-private fun cheatsDirInternal(activity: Activity, titleId: String): File {
-    val base = activity.filesDir                 // /data/user/0/<pkg>/files
-    return File(base, "mods/contents/$titleId/cheats")
-}
-
 private fun allCheatDirs(activity: Activity, titleId: String): List<File> {
-    // Reihenfolge: internal zuerst (hier schreibt LibKenjinx i.d.R.), dann external
-    return listOf(cheatsDirInternal(activity, titleId), cheatsDirExternal(activity, titleId))
+    return listOf(cheatsDirExternal(activity, titleId))
         .distinct()
         .filter { it.exists() && it.isDirectory }
 }
@@ -257,4 +254,64 @@ private fun rewriteCheatFile(original: String, enabledSections: Set<String>): St
         .trimEnd() + "\n"                 // genau ein Newline am Ende
 
     return result
+}
+private fun cheatsDirPreferredForWrite(activity: Activity, titleId: String): File {
+    val dir = cheatsDirExternal(activity, titleId)
+    if (!dir.exists()) dir.mkdirs()
+    return dir
+}
+
+private fun getDisplayName(activity: Activity, uri: Uri): String? {
+    return runCatching {
+        val cr = activity.contentResolver
+        cr.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    }.getOrNull()
+}
+
+private fun uniqueFile(targetDir: File, baseName: String): File {
+    var name = baseName
+    if (!name.lowercase().endsWith(".txt")) name += ".txt"
+    var out = File(targetDir, name)
+    var idx = 1
+    val stem = name.substringBeforeLast(".")
+    val ext = ".txt"
+    while (out.exists()) {
+        out = File(targetDir, "$stem ($idx)$ext")
+        idx++
+    }
+    return out
+}
+
+/**
+ * Importiert eine .txt aus einem SAF-Uri in den Cheats-Ordner des Titels.
+ * Gibt das Zieldatei-Objekt zurück, wenn erfolgreich.
+ */
+fun importCheatTxt(activity: Activity, titleId: String, source: Uri): Result<File> {
+    return runCatching {
+        // Lese-Rechte ggf. dauerhaft sichern
+        try {
+            activity.contentResolver.takePersistableUriPermission(
+                source,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (_: Throwable) {}
+
+        val targetDir = cheatsDirPreferredForWrite(activity, titleId)
+
+        val display = getDisplayName(activity, source) ?: "cheats.txt"
+        val target = uniqueFile(targetDir, display)
+
+        activity.contentResolver.openInputStream(source).use { ins ->
+            requireNotNull(ins) { "InputStream null" }
+            target.outputStream().use { outs ->
+                ins.copyTo(outs)
+            }
+        }
+
+        // nach Import: optional sofort neu einlesen/normalisieren wäre möglich,
+        // aber wir belassen die Datei so wie geliefert.
+        target
+    }
 }

@@ -105,6 +105,12 @@ import org.kenjinx.android.cheats.CheatPrefs
 import org.kenjinx.android.cheats.CheatItem
 import org.kenjinx.android.cheats.loadCheatsFromDisk
 import org.kenjinx.android.cheats.applyCheatSelectionOnDisk
+import org.kenjinx.android.cheats.importCheatTxt
+
+// NEW: Mods
+import org.kenjinx.android.cheats.listMods
+import org.kenjinx.android.cheats.deleteMod
+import org.kenjinx.android.cheats.importModsZip
 
 class HomeViews {
     companion object {
@@ -162,6 +168,13 @@ class HomeViews {
             val cheatsForSelected = remember { mutableStateOf(listOf<CheatItem>()) }
             val enabledCheatKeys = remember { mutableStateOf(mutableSetOf<String>()) }
 
+            // NEW: Mods UI state
+            val openModsDialog = remember { mutableStateOf(false) }
+            val modsForSelected = remember { mutableStateOf(listOf<String>()) }
+            val importProgress = remember { mutableStateOf(0f) }
+            val importBusy = remember { mutableStateOf(false) }
+            val importStatusText = remember { mutableStateOf("") }
+
             // Shortcut-Dialog-State
             val showShortcutDialog = remember { mutableStateOf(false) }
             val shortcutName = remember { mutableStateOf("") }
@@ -193,6 +206,80 @@ class HomeViews {
                     Toast.makeText(activity, "Amiibo saved to slot ${pendingSlot.value}", Toast.LENGTH_SHORT).show()
                 }
             }
+
+            // NEW: Cheats Import (.txt)
+            val importCheatLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                val act = viewModel.activity
+                val titleId = gm?.titleId ?: ""
+                if (uri != null && act != null && titleId.isNotEmpty()) {
+                    // nur .txt akzeptieren
+                    val okExt = runCatching {
+                        DocumentFile.fromSingleUri(act, uri)?.name?.lowercase()?.endsWith(".txt") == true
+                    }.getOrElse { false }
+                    if (!okExt) {
+                        Toast.makeText(act, "Please select a .txt file", Toast.LENGTH_SHORT).show()
+                        return@rememberLauncherForActivityResult
+                    }
+
+                    val res = importCheatTxt(act, titleId, uri)
+                    if (res.isSuccess) {
+                        Toast.makeText(act, "Imported: ${res.getOrNull()?.name}", Toast.LENGTH_SHORT).show()
+                        // danach Liste aktualisieren
+                        cheatsForSelected.value = loadCheatsFromDisk(act, titleId)
+                    } else {
+                        Toast.makeText(act, "Import failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            // NEW: Launcher for Mods
+            val pickModZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                val act = viewModel.activity
+                val titleId = gm?.titleId ?: ""
+                if (uri != null && act != null && titleId.isNotEmpty()) {
+                    // Persist permission (lesen)
+                    try {
+                        act.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: Exception) {}
+
+                    importBusy.value = true
+                    importProgress.value = 0f
+                    importStatusText.value = "Starting…"
+
+                    thread {
+                        val res = importModsZip(
+                            act,
+                            titleId,
+                            uri
+                        ) { prog ->
+                            importProgress.value = prog.fraction
+                            importStatusText.value = if (prog.currentEntry.isNotEmpty())
+                                "Copying: ${prog.currentEntry}"
+                            else
+                                "Copying… ${(prog.fraction * 100).toInt()}%"
+                        }
+
+                        // Liste aktualisieren
+                        modsForSelected.value = listMods(act, titleId)
+                        importBusy.value = false
+
+                        launchOnUiThread {
+                            val msg = if (res.ok)
+                                "Imported: ${res.imported.joinToString(", ")}"
+                            else
+                                "Import failed"
+                            Toast.makeText(act, msg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                }
+            }
+
 
             // Launcher for "Custom icon" (OpenDocument)
             val pickImageLauncher = rememberLauncherForActivityResult(
@@ -689,6 +776,22 @@ class HomeViews {
                                                     }
                                                 }
                                             )
+                                            // NEW: Manage Mods
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Manage Mods") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    val gm = viewModel.mainViewModel?.selected
+                                                    val act = viewModel.activity
+                                                    if (gm != null && !gm.titleId.isNullOrEmpty() && act != null) {
+                                                        val titleId = gm.titleId!!
+                                                        modsForSelected.value = listMods(act, titleId)
+                                                        openModsDialog.value = true
+                                                    } else {
+                                                        showError.value = "No title selected."
+                                                    }
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -712,24 +815,28 @@ class HomeViews {
                         Column(Modifier.padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                TextButton(onClick = { openCheatsDialog.value = false }) { Text("Cancel") }
+                                // LINKS: Import .txt
                                 TextButton(onClick = {
-                                    val act2 = act
-                                    if (act2 != null && titleId.isNotEmpty()) {
-                                        // 1) Auswahl persistent speichern (UI-State)
-                                        CheatPrefs(act2).setEnabled(titleId, enabledCheatKeys.value)
+                                    importCheatLauncher.launch(arrayOf("text/plain", "text/*", "*/*"))
+                                }) { Text("Import .txt") }
 
-                                        // 2) SOFORT die .txt umschreiben
-                                        applyCheatSelectionOnDisk(act2, titleId, enabledCheatKeys.value)
-
-                                        // 3) Liste neu laden (damit disabled Einträge sichtbar bleiben)
-                                        cheatsForSelected.value = loadCheatsFromDisk(act2, titleId)
-                                    }
-                                    openCheatsDialog.value = false
-                                }) { Text("Save") }
+                                // RECHTS: Cancel + Save
+                                Row {
+                                    TextButton(onClick = { openCheatsDialog.value = false }) { Text("Cancel") }
+                                    TextButton(onClick = {
+                                        val act2 = act
+                                        if (act2 != null && titleId.isNotEmpty()) {
+                                            CheatPrefs(act2).setEnabled(titleId, enabledCheatKeys.value)
+                                            applyCheatSelectionOnDisk(act2, titleId, enabledCheatKeys.value)
+                                            cheatsForSelected.value = loadCheatsFromDisk(act2, titleId)
+                                        }
+                                        openCheatsDialog.value = false
+                                    }) { Text("Save") }
+                                }
                             }
+
 
                             Text("Manage Cheats", style = MaterialTheme.typography.titleLarge)
                             Text(
@@ -787,6 +894,101 @@ class HomeViews {
                     }
                 }
 
+                // --- Mods Bottom Sheet ---
+                if (openModsDialog.value) {
+                    ModalBottomSheet(
+                        onDismissRequest = { openModsDialog.value = false }
+                    ) {
+                        val gm = viewModel.mainViewModel?.selected
+                        val act = viewModel.activity
+                        val titleId = gm?.titleId ?: ""
+
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Manage Mods", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = gm?.titleName ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            // Import-Zeile
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    enabled = !importBusy.value,
+                                    onClick = { pickModZipLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }
+                                ) { Text("Import .zip") }
+                            }
+
+                            // Progress
+                            if (importBusy.value) {
+                                androidx.compose.material3.LinearProgressIndicator(
+                                    progress = { importProgress.value },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                )
+                                Text(
+                                    importStatusText.value,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
+
+                            // Liste der Mods
+                            if (modsForSelected.value.isEmpty()) {
+                                Text("No mods found for this title.")
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 12.dp)
+                                ) {
+                                    items(modsForSelected.value) { modName ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(modName, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            Row {
+                                                TextButton(
+                                                    onClick = {
+                                                        val a = act
+                                                        if (a != null && titleId.isNotEmpty()) {
+                                                            thread {
+                                                                val ok = deleteMod(a, titleId, modName)
+                                                                if (ok) {
+                                                                    modsForSelected.value = listMods(a, titleId)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                ) { Text("Delete") }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = { openModsDialog.value = false }) { Text("Close") }
+                            }
+                        }
+                    }
+                }
                 // --- Shortcut-Dialog
                 if (showShortcutDialog.value) {
                     val gm = viewModel.mainViewModel?.selected
