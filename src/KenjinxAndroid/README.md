@@ -13,10 +13,11 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.5d – Highlights
+## Version 2.0.5e – Highlights
 
+- **Mods**: Added a Mod Manager with import/delete.
 - **XBox Controllers**: Fixed L2 / R2 not working.
-- **Cheat** Suport: Added a Cheat Manager by Long pressing a Game.
+- **Cheat** Suport: Added a Cheat Manager by Long pressing a  with import function.
 - **Overlay-Menu-Button** Position Dropdown and Opacity Slider (Settings → User Interface)
 - **Stretch to Fullscreen** toggle (Settings → Graphics)
 - **Amiibo** support

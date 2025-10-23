@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.5e — 2025-10-23
+
+### Added
+- **Cheats**: Added a Cheat Import function.
+- **Mods**: Added a Mod Manager with import/delete.
+
 ## 2.0.5d — 2025-10-23
 
 ### Fixed
