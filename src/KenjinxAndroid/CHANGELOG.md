@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.5d — 2025-10-23
+
+### Fixed
+- **XBox Controllers**: Fixed L2 / R2 not working.
+
 ## 2.0.5c — 2025-10-23
 
 ### Fixed

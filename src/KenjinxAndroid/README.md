@@ -13,8 +13,9 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.5b – Highlights
+## Version 2.0.5d – Highlights
 
+- **XBox Controllers**: Fixed L2 / R2 not working.
 - **Cheat** Suport: Added a Cheat Manager by Long pressing a Game.
 - **Overlay-Menu-Button** Position Dropdown and Opacity Slider (Settings → User Interface)
 - **Stretch to Fullscreen** toggle (Settings → Graphics)
