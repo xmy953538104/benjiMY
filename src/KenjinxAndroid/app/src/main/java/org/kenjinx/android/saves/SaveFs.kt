@@ -4,9 +4,9 @@ import android.app.Activity
 import android.content.ContentResolver
 import android.net.Uri
 import android.util.Log
+import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
-import java.io.InputStream
 import java.nio.charset.Charset
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -23,28 +23,29 @@ private fun savesRootExternal(activity: Activity): File {
     return File(base, "bis/user/save")
 }
 
-private fun isHex16(name: String) =
+private fun isHex16(name: String): Boolean =
     name.length == 16 && name.all { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }
 
 /* ========================= Metadata & Scan ======================== */
 
 data class SaveFolderMeta(
     val dir: File,
-    val indexHex: String,     // z.B. 0000000000000008
+    val indexHex: String,     // z.B. 0000000000000008 oder 000000000000000a
     val titleId: String?,     // aus TITLEID.txt (lowercase) oder geerbter Wert
     val titleName: String?,   // zweite Zeile aus TITLEID.txt, falls vorhanden
     val hasMarker: Boolean    // true, wenn dieser Ordner die TITLEID.txt selbst hat
 )
 
 /**
- * Scannt .../bis/user/save; ordnet nummerierte Ordner (16 Hex Zeichen) per „Marker-Vererbung“:
+ * Scannt .../bis/user/save; ordnet nummerierte Ordner (16 Hex-Zeichen) per „Marker-Vererbung“:
  * Ein Ordner ohne TITLEID.txt gehört zum zuletzt gesehenen Ordner mit TITLEID.txt davor.
  */
 fun listSaveFolders(activity: Activity): List<SaveFolderMeta> {
     val root = savesRootExternal(activity)
     if (!root.exists()) return emptyList()
 
-    val dirs = root.listFiles { f -> f.isDirectory && isHex16(f.name) }?.sortedBy { it.name.lowercase() }
+    val dirs = root.listFiles { f -> f.isDirectory && isHex16(f.name) }
+        ?.sortedBy { it.name.lowercase(Locale.ROOT) }
         ?: return emptyList()
 
     val out = ArrayList<SaveFolderMeta>(dirs.size)
@@ -57,7 +58,7 @@ fun listSaveFolders(activity: Activity): List<SaveFolderMeta> {
         if (has) {
             val txt = runCatching { marker.readText(Charset.forName("UTF-8")) }.getOrElse { "" }
             val lines = txt.split('\n', '\r').map { it.trim() }.filter { it.isNotEmpty() }
-            val tid = lines.getOrNull(0)?.lowercase()
+            val tid = lines.getOrNull(0)?.lowercase(Locale.ROOT)
             val name = lines.getOrNull(1)
             if (!tid.isNullOrBlank()) {
                 currentTid = tid
@@ -71,17 +72,33 @@ fun listSaveFolders(activity: Activity): List<SaveFolderMeta> {
     return out
 }
 
-/** Sucht alle Save-Ordner (oft 1–2 Stück) für eine TitleID (case-insensitive). */
-fun findSaveDirsForTitle(activity: Activity, titleId: String): List<File> {
-    val tidLc = titleId.trim().lowercase(Locale.ROOT)
-    return listSaveFolders(activity)
-        .filter { it.titleId.equals(tidLc, ignoreCase = true) }
-        .map { it.dir }
+/* ===== TitleID-Kandidaten (Base/Update tolerant) & Gruppierung ===== */
+
+private fun hex16CandidatesForSaves(id: String): List<String> {
+    val lc = id.trim().lowercase(Locale.ROOT)
+    if (!isHex16(lc)) return listOf(lc)
+    val head = lc.substring(0, 13)     // erste 13 Zeichen
+    val base = head + "000"            // ...000
+    val upd  = head + "800"            // ...800
+    return listOf(lc, base, upd).distinct()
 }
 
-/** Nimmt den „höchsten“ (zuletzt erstellten) Ordner als Primärordner. */
-fun pickPrimarySaveDir(activity: Activity, titleId: String): File? {
-    return findSaveDirsForTitle(activity, titleId).maxByOrNull { it.name.lowercase() }
+/** Alle Save-Ordner einer TitleID-Gruppe (Marker-Vererbung), Base/Update tolerant. */
+private fun listSaveGroupForTitle(activity: Activity, titleId: String): List<SaveFolderMeta> {
+    val candidates = hex16CandidatesForSaves(titleId)
+    val metas = listSaveFolders(activity)
+    return metas.filter { meta ->
+        val tid = meta.titleId ?: return@filter false
+        candidates.any { it.equals(tid, ignoreCase = true) }
+    }
+}
+
+/** Bevorzugt den Ordner mit TITLEID.txt; Fallback: lexikografisch kleinster der Gruppe. */
+private fun pickSaveDirWithMarker(activity: Activity, titleId: String): File? {
+    val group = listSaveGroupForTitle(activity, titleId)
+    val marker = group.firstOrNull { it.hasMarker }?.dir
+    if (marker != null) return marker
+    return group.minByOrNull { it.indexHex.lowercase(Locale.ROOT) }?.dir
 }
 
 /* =========================== Export ============================== */
@@ -95,7 +112,6 @@ private fun sanitizeFileName(s: String): String =
 /**
  * Schreibt eine ZIP im Format: ZIP enthält Ordner "TITLEID_UPPER/…" und darin
  * den reinen Inhalt des Ordners "0" (nicht den Ordner 0 selbst).
- * destUri kommt von ACTION_CREATE_DOCUMENT("application/zip").
  */
 fun exportSaveToZip(
     activity: Activity,
@@ -104,7 +120,7 @@ fun exportSaveToZip(
     onProgress: (ExportProgress) -> Unit
 ): ExportResult {
     val tidUpper = titleId.trim().uppercase(Locale.ROOT)
-    val primary = pickPrimarySaveDir(activity, titleId)
+    val primary = pickSaveDirWithMarker(activity, titleId)
         ?: return ExportResult(false, "Save folder not found. Start game once.")
 
     val folder0 = File(primary, "0")
@@ -112,7 +128,6 @@ fun exportSaveToZip(
         return ExportResult(false, "Missing '0' save folder.")
     }
 
-    // total bytes for progress
     val files = folder0.walkTopDown().filter { it.isFile }.toList()
     val total = files.sumOf { it.length() }
 
@@ -123,7 +138,7 @@ fun exportSaveToZip(
                 val buf = ByteArray(DEFAULT_BUFFER_SIZE)
 
                 fun putFile(f: File, rel: String) {
-                    val entryPath = "$tidUpper/$rel" // kein führendes "/"
+                    val entryPath = "$tidUpper/$rel"
                     val entry = ZipEntry(entryPath)
                     zos.putNextEntry(entry)
                     FileInputStream(f).use { inp ->
@@ -138,7 +153,6 @@ fun exportSaveToZip(
                     zos.closeEntry()
                 }
 
-                // alles aus 0/* hinein – Ordnerstruktur beibehalten
                 folder0.walkTopDown().forEach { f ->
                     if (f.isFile) {
                         val rel = f.relativeTo(folder0).invariantSeparatorsPath
@@ -154,17 +168,19 @@ fun exportSaveToZip(
     }
 }
 
-/** Hilfsname für CreateDocument: "<Name>_save_YYYY-MM-DD.zip" */
+/** Hilfsname für CreateDocument: "<Name>_save_YYYY-MM-DD.zip" (aus Marker-Ordner) */
 fun buildSuggestedExportName(activity: Activity, titleId: String): String {
-    val meta = pickPrimarySaveDir(activity, titleId)?.let { dir ->
-        val txt = File(dir, "TITLEID.txt")
-        val name = runCatching {
+    val primary = pickSaveDirWithMarker(activity, titleId)
+    val displayName = if (primary != null) {
+        val txt = File(primary, "TITLEID.txt")
+        runCatching {
             txt.takeIf { it.exists() }?.readLines(Charset.forName("UTF-8"))?.getOrNull(1)
-        }.getOrNull()
-        name ?: "Save"
-    } ?: "Save"
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: "Save"
+    } else {
+        "Save"
+    }
     val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-    return sanitizeFileName("${meta}_save_$date") + ".zip"
+    return sanitizeFileName("${displayName}_save_$date") + ".zip"
 }
 
 /* =========================== Import ============================== */
@@ -172,9 +188,34 @@ fun buildSuggestedExportName(activity: Activity, titleId: String): String {
 data class ImportProgress(val bytes: Long, val total: Long, val currentEntry: String)
 data class ImportResult(val ok: Boolean, val message: String)
 
+/* Helpers */
+
+private fun isHexTitleId(s: String): Boolean =
+    s.length == 16 && s.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+
+private fun topLevelSegment(path: String): String {
+    val p = path.replace('\\', '/').trim('/')
+    val idx = p.indexOf('/')
+    return if (idx >= 0) p.substring(0, idx) else p
+}
+
+private fun ensureInside(base: File, child: File): Boolean =
+    try {
+        val basePath = base.canonicalPath
+        val childPath = child.canonicalPath
+        childPath.startsWith(basePath + File.separator)
+    } catch (_: Throwable) { false }
+
+private fun clearDirectory(dir: File) {
+    if (!dir.isDirectory) return
+    dir.listFiles()?.forEach { f ->
+        if (f.isDirectory) f.deleteRecursively() else runCatching { f.delete() }
+    }
+}
+
 /**
- - Erwartet ZIP mit Struktur: TITLEID_UPPER/ (beliebige Tiefe).
- - Findet zugehörigen Save-Ordner per TITLEID.txt-Zuordnung und ersetzt den Inhalt von 0 und 1 */
+ * Erwartet ZIP mit Struktur: TITLEID_UPPER/…  – schreibt NUR in den Ordner mit TITLEID.txt.
+ */
 fun importSaveFromZip(
     activity: Activity,
     zipUri: Uri,
@@ -182,135 +223,117 @@ fun importSaveFromZip(
 ): ImportResult {
     val cr: ContentResolver = activity.contentResolver
 
-    // Gesamtlänge (falls vorhanden) für Progress
-    val total = runCatching {
-        cr.openAssetFileDescriptor(zipUri, "r")?.use { it.length }
-    }.getOrNull() ?: -1L
+    // TitelID-Ordner im ZIP finden
+    var titleIdFromZip: String? = null
+    var totalBytes = 0L
 
-    // 1) Top-Level-Verzeichnis (= TITLEID) ermitteln
-    var titleIdUpper: String? = null
-
-    // Wir lesen die ZIP zweimal nicht – stattdessen merken wir uns beim Streamen das erste Top-Level.
-    // Map: relPathInZip -> ByteArray? – brauchen wir nicht, wir streamen direkt in Files.
-
-    // 2) Zielordner finden, wenn TITLEID bekannt
-    fun findTargetDirs(tidUpper: String): List<File> {
-        // Suche per Marker (case-insensitive)
-        val dirs = findSaveDirsForTitle(activity, tidUpper)
-        if (dirs.isNotEmpty()) return dirs
-        // falls nicht gefunden: evtl. lower-case in TITLEID.txt gespeichert
-        val dirs2 = findSaveDirsForTitle(activity, tidUpper.lowercase(Locale.ROOT))
-        return dirs2
+    // Pass 1: Top-Level TitelID und Total ermitteln
+    runCatching {
+        cr.openInputStream(zipUri)?.use { ins ->
+            ZipInputStream(BufferedInputStream(ins)).use { zis ->
+                val tops = mutableSetOf<String>()
+                var ze = zis.nextEntry
+                while (ze != null) {
+                    val name = ze.name.replace('\\', '/')
+                    if (!ze.isDirectory) tops += topLevelSegment(name)
+                    ze = zis.nextEntry
+                }
+                titleIdFromZip = tops.firstOrNull { isHexTitleId(it) }
+            }
+        }
+    }.onFailure {
+        return ImportResult(false, "error importing save. invalid zip")
     }
 
-    // 3) 0/1 Ordner leeren & neu füllen
-    fun replaceZeroOne(rootDir: File, entries: List<Pair<String, () -> InputStream>>): Boolean {
-        val zero = File(rootDir, "0").apply { mkdirs() }
-        val one = File(rootDir, "1").apply { mkdirs() }
+    if (titleIdFromZip == null) return ImportResult(false, "error importing save. missing TITLEID folder")
+    val tidZip = titleIdFromZip!!.lowercase(Locale.ROOT)
 
-        // Inhalt löschen (nur Inhalt, nicht Ordner)
-        zero.listFiles()?.forEach { it.deleteRecursively() }
-        one.listFiles()?.forEach { it.deleteRecursively() }
-
-        val buf = ByteArray(DEFAULT_BUFFER_SIZE)
-        var bytes = 0L
-
-        fun writeAll(dstRoot: File) {
-            entries.forEach { (rel, open) ->
-                val dst = File(dstRoot, rel)
-                dst.parentFile?.mkdirs()
-                open().use { ins ->
-                    dst.outputStream().use { os ->
-                        var n = ins.read(buf)
-                        while (n > 0) {
-                            os.write(buf, 0, n)
-                            bytes += n
-                            onProgress(ImportProgress(bytes, total, rel))
-                            n = ins.read(buf)
-                        }
+    // Größe nur unterhalb /<TITLEID>/… summieren
+    runCatching {
+        cr.openInputStream(zipUri)?.use { ins ->
+            ZipInputStream(BufferedInputStream(ins)).use { zis ->
+                var ze = zis.nextEntry
+                while (ze != null) {
+                    val name = ze.name.replace('\\', '/')
+                    if (!ze.isDirectory && topLevelSegment(name).equals(tidZip, ignoreCase = true)) {
+                        if (ze.size >= 0) totalBytes += ze.size
                     }
+                    ze = zis.nextEntry
                 }
             }
         }
-
-        writeAll(zero)
-        writeAll(one)
-        return true
     }
 
-    return try {
-        val collected = mutableListOf<Pair<String, () -> InputStream>>() // relPath -> lazy stream
+    // Ziel: NUR der Marker-Ordner
+    val targetRoot = pickSaveDirWithMarker(activity, tidZip)
+        ?: pickSaveDirWithMarker(activity, tidZip.uppercase(Locale.ROOT))
+        ?: return ImportResult(false, "error importing save. start game once.")
 
-        cr.openInputStream(zipUri).use { raw ->
-            if (raw == null) return@use
-            ZipInputStream(raw).use { zis ->
-                var e = zis.nextEntry
-                val buf = ByteArray(DEFAULT_BUFFER_SIZE)
-                val cacheChunks = ArrayList<ByteArray>(4) // kleine Chunks pro Entry
+    // 0/1 vorbereiten (leeren)
+    val zero = File(targetRoot, "0").apply { mkdirs() }
+    val one  = File(targetRoot, "1").apply { mkdirs() }
+    clearDirectory(zero)
+    clearDirectory(one)
 
-                fun cacheToSupplier(): () -> InputStream {
-                    // ByteArray zusammenführen
-                    val totalLen = cacheChunks.sumOf { it.size }
-                    val data = ByteArray(totalLen)
-                    var pos = 0
-                    cacheChunks.forEach { chunk ->
-                        System.arraycopy(chunk, 0, data, pos, chunk.size)
-                        pos += chunk.size
-                    }
-                    cacheChunks.clear()
-                    return { data.inputStream() }
-                }
+    // Pass 2: extrahieren
+    var written = 0L
+    val buf = ByteArray(DEFAULT_BUFFER_SIZE)
 
-                while (e != null) {
-                    if (!e.isDirectory) {
-                        val name = e.name.replace('\\', '/')
-                        // Determine top-level
-                        val firstSlash = name.indexOf('/')
-                        if (firstSlash > 0 && titleIdUpper == null) {
-                            titleIdUpper = name.substring(0, firstSlash)
-                        }
-                        // Nur Dateien unter TITLEID/* mitnehmen (ohne führenden Ordnernamen)
-                        if (firstSlash > 0) {
-                            val rel = name.substring(firstSlash + 1) // Teil nach TITLEID/
-                            if (rel.isNotBlank()) {
-                                // Wir buffern die Entry-Daten im Speicher (sicher für mittlere Saves)
+    val ok = runCatching {
+        cr.openInputStream(zipUri)?.use { ins ->
+            ZipInputStream(BufferedInputStream(ins)).use { zis ->
+                var ze = zis.nextEntry
+                while (ze != null) {
+                    val entryNameRaw = ze.name.replace('\\', '/').trimStart('/')
+                    val top = topLevelSegment(entryNameRaw)
+
+                    if (!ze.isDirectory && top.equals(tidZip, ignoreCase = true)) {
+                        val rel = entryNameRaw.substring(top.length).trimStart('/')
+                        if (rel.isNotEmpty()) {
+                            val out0 = File(zero, rel)
+                            val out1 = File(one, rel)
+                            out0.parentFile?.mkdirs()
+                            out1.parentFile?.mkdirs()
+
+                            if (!ensureInside(zero, out0) || !ensureInside(one, out1)) {
+                                // Zip-Slip Schutz
+                                zis.closeEntry()
+                                ze = zis.nextEntry
+                                continue
+                            }
+
+                            // Einmal lesen, zweimal schreiben
+                            val os0 = out0.outputStream()
+                            val os1 = out1.outputStream()
+                            try {
                                 var n = zis.read(buf)
                                 while (n > 0) {
-                                    val chunk = buf.copyOf(n)
-                                    cacheChunks.add(chunk)
+                                    os0.write(buf, 0, n)
+                                    os1.write(buf, 0, n)
+                                    written += n
+                                    onProgress(ImportProgress(written, totalBytes, rel))
                                     n = zis.read(buf)
                                 }
-                                collected += rel to cacheToSupplier()
+                            } finally {
+                                runCatching { os0.close() }
+                                runCatching { os1.close() }
                             }
-                        } else {
-                            // Dateien direkt auf Top-Level ignorieren
-                            // (die Struktur MUSS TITLEID/* sein)
-                            var n = zis.read(buf)
-                            while (n > 0) { n = zis.read(buf) }
                         }
                     }
+
                     zis.closeEntry()
-                    e = zis.nextEntry
+                    ze = zis.nextEntry
                 }
             }
         }
-
-        val tidUpper = titleIdUpper?.trim()?.uppercase(Locale.ROOT)
-            ?: return ImportResult(false, "Invalid ZIP: missing top-level TITLEID")
-
-        val targets = findTargetDirs(tidUpper)
-        if (targets.isEmpty()) {
-            return ImportResult(false, "error importing save. start game once.")
-        }
-
-        // Ersetze in ALLEN zugehörigen Ordnern (falls ein Spiel 2 Save-Ordner hat)
-        targets.forEach { replaceZeroOne(it, collected) }
-
-        ImportResult(true, "save imported")
-    } catch (t: Throwable) {
-        Log.w("SaveFs", "importSaveFromZip failed: ${t.message}")
-        ImportResult(false, "error importing save. start game once.")
+        true
+    }.getOrElse {
+        Log.w("SaveFs", "importSaveFromZip failed: ${it.message}")
+        false
     }
+
+    return if (ok) ImportResult(true, "save imported")
+    else ImportResult(false, "error importing save. start game once.")
 }
 
 /* ========================= UI Helpers ============================ */

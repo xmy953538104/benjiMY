@@ -188,27 +188,28 @@ class HomeViews {
             val saveExportStatus = remember { mutableStateOf("") }
 
             val activity = LocalContext.current as? Activity
-            val gmSel = viewModel.mainViewModel?.selected
-            val currentTitleId = gmSel?.titleId ?: ""
 
             // Import: OpenDocument (ZIP)
             val importZipLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.OpenDocument()
             ) { uri: Uri? ->
-                if (uri != null && activity != null && currentTitleId.isNotEmpty()) {
+                val act = activity
+                // Guard auf ausgewähltes Spiel – optional
+                val tIdNow = viewModel.mainViewModel?.selected?.titleId.orEmpty()
+                if (uri != null && act != null && tIdNow.isNotEmpty()) {
                     saveImportBusy.value = true
                     saveImportProgress.value = 0f
                     saveImportStatus.value = "Starting…"
 
                     thread {
-                        val res = importSaveFromZip(activity, uri) { prog ->
+                        val res = importSaveFromZip(act, uri) { prog ->
                             val frac = if (prog.total > 0) prog.bytes.toFloat() / prog.total else 0f
                             saveImportProgress.value = frac.coerceIn(0f, 1f)
                             saveImportStatus.value = "Importing: ${prog.currentEntry}"
                         }
                         saveImportBusy.value = false
                         launchOnUiThread {
-                            Toast.makeText(activity, res.message, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(act, res.message, Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -218,13 +219,15 @@ class HomeViews {
             val exportZipLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.CreateDocument("application/zip")
             ) { uri: Uri? ->
-                if (uri != null && activity != null && currentTitleId.isNotEmpty()) {
+                val act = activity
+                val tIdNow = viewModel.mainViewModel?.selected?.titleId.orEmpty()
+                if (uri != null && act != null && tIdNow.isNotEmpty()) {
                     saveExportBusy.value = true
                     saveExportProgress.value = 0f
                     saveExportStatus.value = "Starting…"
 
                     thread {
-                        val res = exportSaveToZip(activity, currentTitleId, uri) { prog ->
+                        val res = exportSaveToZip(act, tIdNow, uri) { prog ->
                             val frac = if (prog.total > 0) prog.bytes.toFloat() / prog.total else 0f
                             saveExportProgress.value = frac.coerceIn(0f, 1f)
                             saveExportStatus.value = "Exporting: ${prog.currentPath}"
@@ -232,7 +235,7 @@ class HomeViews {
                         saveExportBusy.value = false
                         launchOnUiThread {
                             Toast.makeText(
-                                activity,
+                                act,
                                 if (res.ok) "save exported" else (res.error ?: "export failed"),
                                 Toast.LENGTH_SHORT
                             ).show()
@@ -246,7 +249,6 @@ class HomeViews {
             val shortcutName = remember { mutableStateOf("") }
 
             val context = LocalContext.current
-            //val activity = LocalContext.current as? Activity
 
             // NEW: Launcher für Amiibo (OpenDocument)
             val pickAmiiboLauncher = rememberLauncherForActivityResult(
@@ -699,7 +701,6 @@ class HomeViews {
                                 val tId = gm.titleId ?: ""
                                 val act = viewModel.activity
 
-
                                 val success = viewModel.mainViewModel.loadGame(
                                     gm,
                                     true,
@@ -734,7 +735,6 @@ class HomeViews {
                                             val gmSel = viewModel.mainViewModel!!.selected!!
                                             val tId = gmSel.titleId ?: ""
                                             val act = viewModel.activity
-
 
                                             thread {
                                                 showLoading.value = true
@@ -911,7 +911,6 @@ class HomeViews {
                                 }
                             }
 
-
                             Text("Manage Cheats", style = MaterialTheme.typography.titleLarge)
                             Text(
                                 text = gm?.titleName ?: "",
@@ -962,8 +961,6 @@ class HomeViews {
                                     }
                                 }
                             }
-
-
                         }
                     }
                 }
@@ -1063,12 +1060,13 @@ class HomeViews {
                         }
                     }
                 }
+
+                // --- Saves Bottom Sheet ---
                 if (openSavesDialog.value) {
                     ModalBottomSheet(
                         onDismissRequest = { openSavesDialog.value = false }
                     ) {
                         val act = activity
-                        val tId = currentTitleId
 
                         Column(Modifier.padding(16.dp)) {
                             Text("Save Manager", style = MaterialTheme.typography.titleLarge)
@@ -1080,8 +1078,10 @@ class HomeViews {
                             )
 
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                // Import-Button
                                 androidx.compose.material3.Button(
-                                    enabled = !saveImportBusy.value && !saveExportBusy.value && !tId.isNullOrEmpty(),
+                                    enabled = !saveImportBusy.value && !saveExportBusy.value &&
+                                        (viewModel.mainViewModel?.selected?.titleId?.isNotEmpty() == true),
                                     onClick = {
                                         saveImportProgress.value = 0f
                                         saveImportStatus.value = ""
@@ -1089,11 +1089,15 @@ class HomeViews {
                                     }
                                 ) { Text("Import ZIP") }
 
+                                // Export-Button
                                 androidx.compose.material3.Button(
-                                    enabled = !saveImportBusy.value && !saveExportBusy.value && !tId.isNullOrEmpty(),
+                                    enabled = !saveImportBusy.value && !saveExportBusy.value &&
+                                        (viewModel.mainViewModel?.selected?.titleId?.isNotEmpty() == true),
                                     onClick = {
-                                        if (act != null && tId.isNotEmpty()) {
-                                            val fname = suggestedCreateDocNameForExport(act, tId)
+                                        val actLocal = activity
+                                        val tIdNow = viewModel.mainViewModel?.selected?.titleId.orEmpty()
+                                        if (actLocal != null && tIdNow.isNotEmpty()) {
+                                            val fname = suggestedCreateDocNameForExport(actLocal, tIdNow)
                                             saveExportProgress.value = 0f
                                             saveExportStatus.value = ""
                                             exportZipLauncher.launch(fname)
@@ -1101,7 +1105,6 @@ class HomeViews {
                                     }
                                 ) { Text("Export ZIP") }
                             }
-
 
                             if (saveImportBusy.value) {
                                 Column(Modifier.padding(top = 12.dp)) {
@@ -1129,6 +1132,7 @@ class HomeViews {
                         }
                     }
                 }
+
                 // --- Shortcut-Dialog
                 if (showShortcutDialog.value) {
                     val gm = viewModel.mainViewModel?.selected
@@ -1240,7 +1244,6 @@ class HomeViews {
                                     val tId = gameModel.titleId ?: ""
                                     val act = viewModel.activity
 
-
                                     val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
                                         launchOnUiThread { viewModel.mainViewModel?.navigateToGame() }
@@ -1336,7 +1339,6 @@ class HomeViews {
                                     // NEW: Push Cheats vor dem Start
                                     val tId = gameModel.titleId ?: ""
                                     val act = viewModel.activity
-
 
                                     val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
