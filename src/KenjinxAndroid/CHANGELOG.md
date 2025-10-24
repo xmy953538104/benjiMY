@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.5g — 2025-10-24
+
+### Fixed
+- **Save Manager**: Fixed broken import/export.
+
 ## 2.0.5f — 2025-10-23
 
 ### Added
