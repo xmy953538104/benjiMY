@@ -1556,7 +1556,8 @@ class SettingViews {
                 VirtualControllerPreset.Layout2,
                 VirtualControllerPreset.Layout3,
                 VirtualControllerPreset.Layout4,
-                VirtualControllerPreset.Layout5
+                VirtualControllerPreset.Layout5,
+                VirtualControllerPreset.Layout6
             )
 
             DropdownSelector(
@@ -1570,6 +1571,7 @@ class SettingViews {
                         VirtualControllerPreset.Layout3 -> "Layout 3"
                         VirtualControllerPreset.Layout4 -> "Layout 4"
                         VirtualControllerPreset.Layout5 -> "Layout 5"
+                        VirtualControllerPreset.Layout6 -> "Layout 6"
                     }
                 },
                 onOptionSelected = onPresetSelected

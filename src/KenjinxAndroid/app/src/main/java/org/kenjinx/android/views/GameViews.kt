@@ -42,6 +42,7 @@ import org.kenjinx.android.GameController2
 import org.kenjinx.android.GameController3
 import org.kenjinx.android.GameController4
 import org.kenjinx.android.GameController5
+import org.kenjinx.android.GameController6
 import org.kenjinx.android.GameHost
 import org.kenjinx.android.Icons
 import org.kenjinx.android.MainActivity
@@ -175,6 +176,7 @@ class GameViews {
                         VirtualControllerPreset.Layout3  -> GameController3.Compose(mainViewModel)
                         VirtualControllerPreset.Layout4  -> GameController4.Compose(mainViewModel)
                         VirtualControllerPreset.Layout5  -> GameController5.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout6  -> GameController6.Compose(mainViewModel)
                     }
 
                     // --- Button at any corner/edge + transparency

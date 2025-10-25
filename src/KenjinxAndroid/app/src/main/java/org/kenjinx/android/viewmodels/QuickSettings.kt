@@ -26,7 +26,7 @@ class QuickSettings(val activity: Activity) {
 
     // --- Virtual Controller Preset
     enum class VirtualControllerPreset {
-        Default, Layout2, Layout3, Layout4, Layout5
+        Default, Layout2, Layout3, Layout4, Layout5, Layout6
     }
 
     var virtualControllerPreset: VirtualControllerPreset

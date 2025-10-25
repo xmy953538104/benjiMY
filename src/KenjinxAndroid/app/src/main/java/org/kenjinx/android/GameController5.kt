@@ -164,7 +164,9 @@ private fun generateConfig5(isLeft: Boolean): RadialGamePadConfig {
 
     if (isLeft) {
         return RadialGamePadConfig(
-            12,
+            /* ringSegments = */ 12,
+            /* Primary (Stick)  */
+            // IMPORTANT: pressButtonId -> DUMMY_LEFT_STICK_PRESS_ID, so that double tap does not trigger L3
             PrimaryDialConfig.Stick(
                 GamePadButtonInputId.LeftStick.ordinal,
                 DUMMY_LEFT_STICK_PRESS_ID,
@@ -173,8 +175,12 @@ private fun generateConfig5(isLeft: Boolean): RadialGamePadConfig {
                 null
             ),
             listOf(
+                // D-Pad
                 SecondaryDialConfig.Cross(
-                    10, 3, 2.5f, distance,
+                    /* sector */ 9,
+                    /* size   */ 5,
+                    /* gap    */ 2.1f,
+                    distance,
                     CrossConfig(
                         GamePadButtonInputId.DpadUp.ordinal,
                         CrossConfig.Shape.STANDARD,
@@ -186,91 +192,199 @@ private fun generateConfig5(isLeft: Boolean): RadialGamePadConfig {
                     ),
                     SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // Minus
                 SecondaryDialConfig.SingleButton(
-                    1, buttonScale, distance,
+                    /* sector */ 11,
+                    buttonScale,
+                    3f,
                     ButtonConfig(
-                        GamePadButtonInputId.Minus.ordinal, "-", true, null,
-                        "Minus", setOf(), true, null
+                        GamePadButtonInputId.Minus.ordinal,
+                        "-",
+                        true,
+                        null,
+                        "Minus",
+                        setOf(),
+                        true,
+                        null
                     ),
-                    null, SecondaryDialConfig.RotationProcessor()
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
                 ),
-                SecondaryDialConfig.DoubleButton(
-                    2, distance,
-                    ButtonConfig(
-                        GamePadButtonInputId.LeftShoulder.ordinal, "L", true, null,
-                        "LeftBumper", setOf(), true, null
-                    ),
-                    null, SecondaryDialConfig.RotationProcessor()
-                ),
+
+                // L-Bumper
                 SecondaryDialConfig.SingleButton(
-                    9, buttonScale, distance,
+                    /* sector */ 3,
+                    1.5f,
+                    1.0f,
                     ButtonConfig(
-                        GamePadButtonInputId.LeftTrigger.ordinal, "ZL", true, null,
-                        "LeftTrigger", setOf(), true, null
+                        GamePadButtonInputId.LeftShoulder.ordinal,
+                        "L",
+                        true,
+                        null,
+                        "LeftBumper",
+                        setOf(),
+                        true,
+                        null
                     ),
-                    null, SecondaryDialConfig.RotationProcessor()
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // ZL-Trigger
                 SecondaryDialConfig.SingleButton(
-                    1, buttonScale, 1.5f,
+                    /* sector */ 2,
+                    1.5f,
+                    1.1f,
                     ButtonConfig(
-                        GamePadButtonInputId.LeftStickButton.ordinal, "L3", true, null,
-                        "LeftStickButton", setOf(), true, null
+                        GamePadButtonInputId.LeftTrigger.ordinal,
+                        "ZL",
+                        true,
+                        null,
+                        "LeftTrigger",
+                        setOf(),
+                        true,
+                        null
                     ),
-                    null, SecondaryDialConfig.RotationProcessor()
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
                 ),
-            )
+
+                )
         )
     } else {
         return RadialGamePadConfig(
-            12,
+            /* ringSegments = */ 12,
+            /* Primary (ABXY) */
             PrimaryDialConfig.PrimaryButtons(
                 listOf(
-                    ButtonConfig(GamePadButtonInputId.A.ordinal, "A", true, null, "A", setOf(), true, null),
-                    ButtonConfig(GamePadButtonInputId.X.ordinal, "X", true, null, "X", setOf(), true, null),
-                    ButtonConfig(GamePadButtonInputId.Y.ordinal, "Y", true, null, "Y", setOf(), true, null),
-                    ButtonConfig(GamePadButtonInputId.B.ordinal, "B", true, null, "B", setOf(), true, null)
+                    ButtonConfig(
+                        GamePadButtonInputId.A.ordinal, "A", true, null, "A", setOf(), true, null
+                    ),
+                    ButtonConfig(
+                        GamePadButtonInputId.X.ordinal, "X", true, null, "X", setOf(), true, null
+                    ),
+                    ButtonConfig(
+                        GamePadButtonInputId.Y.ordinal, "Y", true, null, "Y", setOf(), true, null
+                    ),
+                    ButtonConfig(
+                        GamePadButtonInputId.B.ordinal, "B", true, null, "B", setOf(), true, null
+                    )
                 ),
-                null, 0f, true, null
+                null,
+                0f,
+                true,
+                null
             ),
             listOf(
+                // Right stick
+                // IMPORTANT: pressButtonId -> DUMMY_RIGHT_STICK_PRESS_ID, so that double tap does not trigger R3
                 SecondaryDialConfig.Stick(
-                    7, 2, 2f, distance,
+                    /* sector */ 6,
+                    /* size   */ 3,
+                    /* gap    */ 2.7f,
+                    distance,
                     GamePadButtonInputId.RightStick.ordinal,
                     DUMMY_RIGHT_STICK_PRESS_ID,
-                    null, setOf(), "RightStick",
+                    null,
+                    setOf(),
+                    "RightStick",
                     SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // Plus
                 SecondaryDialConfig.SingleButton(
-                    6, buttonScale, distance,
+                    /* sector */ 7,
+                    buttonScale,
+                    3f,
                     ButtonConfig(
-                        GamePadButtonInputId.Plus.ordinal, "+", true, null,
-                        "Plus", setOf(), true, null
+                        GamePadButtonInputId.Plus.ordinal,
+                        "+",
+                        true,
+                        null,
+                        "Plus",
+                        setOf(),
+                        true,
+                        null
                     ),
-                    null, SecondaryDialConfig.RotationProcessor()
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
                 ),
-                SecondaryDialConfig.DoubleButton(
-                    3, distance,
-                    ButtonConfig(
-                        GamePadButtonInputId.RightShoulder.ordinal, "R", true, null,
-                        "RightBumper", setOf(), true, null
-                    ),
-                    null, SecondaryDialConfig.RotationProcessor()
-                ),
+
+                // R-Bumper
                 SecondaryDialConfig.SingleButton(
-                    9, buttonScale, distance,
+                    /* sector */ 3,
+                    1.5f,
+                    1.0f,
                     ButtonConfig(
-                        GamePadButtonInputId.RightTrigger.ordinal, "ZR", true, null,
-                        "RightTrigger", setOf(), true, null
+                        GamePadButtonInputId.RightShoulder.ordinal,
+                        "R",
+                        true,
+                        null,
+                        "RightBumper",
+                        setOf(),
+                        true,
+                        null
                     ),
-                    null, SecondaryDialConfig.RotationProcessor()
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
                 ),
+
+                // ZR-Trigger
                 SecondaryDialConfig.SingleButton(
-                    5, buttonScale, 1.5f,
+                    /* sector */ 4,
+                    1.5f,
+                    1.1f,
                     ButtonConfig(
-                        GamePadButtonInputId.RightStickButton.ordinal, "R3", true, null,
-                        "RightStickButton", setOf(), true, null
+                        GamePadButtonInputId.RightTrigger.ordinal,
+                        "ZR",
+                        true,
+                        null,
+                        "RightTrigger",
+                        setOf(),
+                        true,
+                        null
                     ),
-                    null, SecondaryDialConfig.RotationProcessor()
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
+                ),
+
+                // R3 separat
+                SecondaryDialConfig.SingleButton(
+                    /* sector */ 3,
+                    1.1f,
+                    0f,
+                    ButtonConfig(
+                        GamePadButtonInputId.RightStickButton.ordinal,
+                        "R3",
+                        true,
+                        null,
+                        "RightStickButton",
+                        setOf(),
+                        true,
+                        null
+                    ),
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
+                ),
+
+                // L3 separat
+                SecondaryDialConfig.SingleButton(
+                    /* sector */ 4,
+                    1.1f,
+                    0f,
+                    ButtonConfig(
+                        GamePadButtonInputId.LeftStickButton.ordinal,
+                        "L3",
+                        true,
+                        null,
+                        "LeftStickButton",
+                        setOf(),
+                        true,
+                        null
+                    ),
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
                 ),
             )
         )

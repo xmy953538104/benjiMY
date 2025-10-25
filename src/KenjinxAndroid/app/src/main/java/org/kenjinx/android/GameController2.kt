@@ -189,9 +189,9 @@ private fun generateConfig2(isLeft: Boolean): RadialGamePadConfig {
             listOf(
                 // D-Pad
                 SecondaryDialConfig.Cross(
-                    /* sector */ 10,
-                    /* size   */ 3,
-                    /* gap    */ 1.5f,
+                    /* sector */ 9,
+                    /* size   */ 5,
+                    /* gap    */ 2.1f,
                     distance,
                     CrossConfig(
                         GamePadButtonInputId.DpadUp.ordinal,
@@ -227,7 +227,7 @@ private fun generateConfig2(isLeft: Boolean): RadialGamePadConfig {
                 // L-Bumper
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 2,
-                    distance,
+                    1f,
                     ButtonConfig(
                         GamePadButtonInputId.LeftShoulder.ordinal,
                         "L",
@@ -243,9 +243,8 @@ private fun generateConfig2(isLeft: Boolean): RadialGamePadConfig {
                 ),
 
                 // ZL-Trigger
-                SecondaryDialConfig.SingleButton(
-                    /* sector */ 3,
-                    buttonScale,
+                SecondaryDialConfig.DoubleButton(
+                    /* sector */ 2,
                     0.2f,
                     ButtonConfig(
                         GamePadButtonInputId.LeftTrigger.ordinal,
@@ -265,7 +264,7 @@ private fun generateConfig2(isLeft: Boolean): RadialGamePadConfig {
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 1,
                     buttonScale,
-                    1.5f,
+                    1.0f,
                     ButtonConfig(
                         GamePadButtonInputId.LeftStickButton.ordinal,
                         "L3",
@@ -309,9 +308,9 @@ private fun generateConfig2(isLeft: Boolean): RadialGamePadConfig {
                 // Right stick
                 // IMPORTANT: pressButtonId -> DUMMY_RIGHT_STICK_PRESS_ID, so that double tap does not trigger R3
                 SecondaryDialConfig.Stick(
-                    /* sector */ 7,
-                    /* size   */ 2,
-                    /* gap    */ 2f,
+                    /* sector */ 6,
+                    /* size   */ 3,
+                    /* gap    */ 2.7f,
                     distance,
                     GamePadButtonInputId.RightStick.ordinal,
                     DUMMY_RIGHT_STICK_PRESS_ID,
@@ -343,7 +342,7 @@ private fun generateConfig2(isLeft: Boolean): RadialGamePadConfig {
                 // R-Bumper
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 3,
-                    distance,
+                    1f,
                     ButtonConfig(
                         GamePadButtonInputId.RightShoulder.ordinal,
                         "R",
@@ -359,9 +358,8 @@ private fun generateConfig2(isLeft: Boolean): RadialGamePadConfig {
                 ),
 
                 // ZR-Trigger
-                SecondaryDialConfig.SingleButton(
+                SecondaryDialConfig.DoubleButton(
                     /* sector */ 3,
-                    buttonScale,
                     0.2f,
                     ButtonConfig(
                         GamePadButtonInputId.RightTrigger.ordinal,
@@ -381,7 +379,7 @@ private fun generateConfig2(isLeft: Boolean): RadialGamePadConfig {
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 5,
                     buttonScale,
-                    1.5f,
+                    1.0f,
                     ButtonConfig(
                         GamePadButtonInputId.RightStickButton.ordinal,
                         "R3",
