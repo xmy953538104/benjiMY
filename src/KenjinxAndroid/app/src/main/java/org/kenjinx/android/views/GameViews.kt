@@ -38,6 +38,10 @@ import androidx.compose.ui.draw.alpha
 import compose.icons.CssGgIcons
 import compose.icons.cssggicons.ToolbarBottom
 import org.kenjinx.android.GameController
+import org.kenjinx.android.GameController2
+import org.kenjinx.android.GameController3
+import org.kenjinx.android.GameController4
+import org.kenjinx.android.GameController5
 import org.kenjinx.android.GameHost
 import org.kenjinx.android.Icons
 import org.kenjinx.android.MainActivity
@@ -50,6 +54,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import android.net.Uri
 import android.widget.Toast
+import org.kenjinx.android.viewmodels.QuickSettings.VirtualControllerPreset
 
 
 class GameViews {
@@ -161,7 +166,16 @@ class GameViews {
                 }
 
                 if (!showLoading.value) {
-                    GameController.Compose(mainViewModel)
+                    // Aktuelles Preset aus QuickSettings holen (bei jeder Recomposition neu – so greift auch ein Wechsel nach dem Speichern)
+                    val preset = QuickSettings(mainViewModel.activity).virtualControllerPreset
+
+                    when (preset) {
+                        VirtualControllerPreset.Default -> GameController.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout2  -> GameController2.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout3  -> GameController3.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout4  -> GameController4.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout5  -> GameController5.Compose(mainViewModel)
+                    }
 
                     // --- Button at any corner/edge + transparency
                     Row(

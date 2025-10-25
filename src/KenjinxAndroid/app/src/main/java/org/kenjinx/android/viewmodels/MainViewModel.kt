@@ -9,7 +9,7 @@ import androidx.preference.PreferenceManager
 import com.anggrayudi.storage.extension.launchOnUiThread
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
-import org.kenjinx.android.GameController
+import org.kenjinx.android.IGameController
 import org.kenjinx.android.GameHost
 import org.kenjinx.android.Logging
 import org.kenjinx.android.MainActivity
@@ -31,7 +31,7 @@ class MainViewModel(val activity: MainActivity) {
     var physicalControllerManager: PhysicalControllerManager? = null
     var motionSensorManager: MotionSensorManager? = null
     var gameModel: GameModel? = null
-    var controller: GameController? = null
+    var controller: IGameController? = null
     var performanceManager: PerformanceManager? = null
     var selected: GameModel? = null
     val loadGameModel: MutableState<GameModel?> = mutableStateOf(null)
@@ -436,7 +436,7 @@ class MainViewModel(val activity: MainActivity) {
         frequenciesState?.let { PerformanceMonitor.getFrequencies(it) }
     }
 
-    fun setGameController(controller: GameController) {
+    fun setGameController(controller: IGameController) {
         this.controller = controller
     }
 

@@ -21,26 +21,24 @@ import com.swordfish.radialgamepad.library.config.PrimaryDialConfig
 import com.swordfish.radialgamepad.library.config.RadialGamePadConfig
 import com.swordfish.radialgamepad.library.config.SecondaryDialConfig
 import com.swordfish.radialgamepad.library.event.Event
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import org.kenjinx.android.viewmodels.MainViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
-
-typealias GamePad = RadialGamePad
-typealias GamePadConfig = RadialGamePadConfig
 
 // --- Dummy IDs to disconnect legacy L3/R3 (stick double tap/tap) ---
 private const val DUMMY_LEFT_STICK_PRESS_ID  = 10001
 private const val DUMMY_RIGHT_STICK_PRESS_ID = 10002
 
-class GameController(var activity: Activity) : IGameController {
+/**
+ * GameController2
+ * Layout 2 – aktuell identisch zum Default-Layout (GameController),
+ * als eigenständige Klasse für Preset-Umschaltung.
+ */
+class GameController2(var activity: Activity) : IGameController {
 
     companion object {
-        private fun init(context: Context, controller: GameController): View {
+        private fun init(context: Context, controller: GameController2): View {
             val inflater = LayoutInflater.from(context)
             val parent = FrameLayout(context)
             val view = inflater.inflate(R.layout.game_layout, parent, false)
@@ -54,19 +52,18 @@ class GameController(var activity: Activity) : IGameController {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
-                    val controller = GameController(viewModel.activity)
+                    val controller = GameController2(viewModel.activity)
                     val c = init(context, controller)
-                    viewModel.activity.lifecycleScope.apply {
-                        viewModel.activity.lifecycleScope.launch {
-                            val events = merge(
-                                controller.leftGamePad.events(),
-                                controller.rightGamePad.events()
-                            ).shareIn(viewModel.activity.lifecycleScope, SharingStarted.Lazily)
-                            events.safeCollect {
-                                controller.handleEvent(it)
-                            }
-                        }
+
+                    viewModel.activity.lifecycleScope.launch {
+                        val events = merge(
+                            controller.leftGamePad.events(),
+                            controller.rightGamePad.events()
+                        )
+                        // safeCollect kommt aus GameController.kt (bitte dort belassen)
+                        events.safeCollect { controller.handleEvent(it) }
                     }
+
                     controller.controllerView = c
                     viewModel.setGameController(controller)
                     controller.setVisible(QuickSettings(viewModel.activity).useVirtualController)
@@ -77,15 +74,15 @@ class GameController(var activity: Activity) : IGameController {
     }
 
     private var controllerView: View? = null
-    var leftGamePad: GamePad
-    var rightGamePad: GamePad
+    var leftGamePad: RadialGamePad
+    var rightGamePad: RadialGamePad
     var controllerId: Int = -1
     override val isVisible: Boolean
         get() = controllerView?.isVisible ?: false
 
     init {
-        leftGamePad = GamePad(generateConfig(true), 16f, activity)
-        rightGamePad = GamePad(generateConfig(false), 16f, activity)
+        leftGamePad = RadialGamePad(generateConfig2(true), 16f, activity)
+        rightGamePad = RadialGamePad(generateConfig2(false), 16f, activity)
 
         leftGamePad.primaryDialMaxSizeDp = 200f
         rightGamePad.primaryDialMaxSizeDp = 200f
@@ -172,17 +169,13 @@ class GameController(var activity: Activity) : IGameController {
     }
 }
 
-suspend fun <T> Flow<T>.safeCollect(block: suspend (T) -> Unit) {
-    this.catch { }
-        .collect { block(it) }
-}
-
-private fun generateConfig(isLeft: Boolean): GamePadConfig {
+// --- Lokale Kopie der Config-Erzeugung (Name = generateConfig2, um Konflikte zu vermeiden) ---
+private fun generateConfig2(isLeft: Boolean): RadialGamePadConfig {
     val distance = 0.3f
     val buttonScale = 1f
 
     if (isLeft) {
-        return GamePadConfig(
+        return RadialGamePadConfig(
             /* ringSegments = */ 12,
             /* Primary (Stick)  */
             // IMPORTANT: pressButtonId -> DUMMY_LEFT_STICK_PRESS_ID, so that double tap does not trigger L3
@@ -198,7 +191,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                 SecondaryDialConfig.Cross(
                     /* sector */ 10,
                     /* size   */ 3,
-                    /* gap    */ 2.5f,
+                    /* gap    */ 1.5f,
                     distance,
                     CrossConfig(
                         GamePadButtonInputId.DpadUp.ordinal,
@@ -214,9 +207,9 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
 
                 // Minus
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 1,
+                    /* sector */ 11,
                     buttonScale,
-                    distance,
+                    3f,
                     ButtonConfig(
                         GamePadButtonInputId.Minus.ordinal,
                         "-",
@@ -251,9 +244,9 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
 
                 // ZL-Trigger
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 9,
+                    /* sector */ 3,
                     buttonScale,
-                    distance,
+                    0.2f,
                     ButtonConfig(
                         GamePadButtonInputId.LeftTrigger.ordinal,
                         "ZL",
@@ -268,7 +261,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // NEW (remains): L3 as a separate button
+                // L3 separat
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 1,
                     buttonScale,
@@ -289,7 +282,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
             )
         )
     } else {
-        return GamePadConfig(
+        return RadialGamePadConfig(
             /* ringSegments = */ 12,
             /* Primary (ABXY) */
             PrimaryDialConfig.PrimaryButtons(
@@ -313,7 +306,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                 null
             ),
             listOf(
-                // Right stick (unchanged)
+                // Right stick
                 // IMPORTANT: pressButtonId -> DUMMY_RIGHT_STICK_PRESS_ID, so that double tap does not trigger R3
                 SecondaryDialConfig.Stick(
                     /* sector */ 7,
@@ -330,9 +323,9 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
 
                 // Plus
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 6,
+                    /* sector */ 7,
                     buttonScale,
-                    distance,
+                    3f,
                     ButtonConfig(
                         GamePadButtonInputId.Plus.ordinal,
                         "+",
@@ -367,9 +360,9 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
 
                 // ZR-Trigger
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 9,
+                    /* sector */ 3,
                     buttonScale,
-                    distance,
+                    0.2f,
                     ButtonConfig(
                         GamePadButtonInputId.RightTrigger.ordinal,
                         "ZR",
@@ -384,7 +377,7 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // NEW (remains): R3 as a separate button
+                // R3 separat
                 SecondaryDialConfig.SingleButton(
                     /* sector */ 5,
                     buttonScale,
