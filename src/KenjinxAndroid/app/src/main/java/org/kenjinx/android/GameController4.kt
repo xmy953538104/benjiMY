@@ -179,8 +179,8 @@ private fun generateConfig4(isLeft: Boolean, useSwitchLayout: Boolean): RadialGa
             listOf(
                 // D-Pad
                 SecondaryDialConfig.Cross(
-                    /* sector */ 9,
-                    /* size   */ 5,
+                    /* sector */ 10,
+                    /* size   */ 3,
                     /* gap    */ 2.1f,
                     distance,
                     CrossConfig(
@@ -197,9 +197,9 @@ private fun generateConfig4(isLeft: Boolean, useSwitchLayout: Boolean): RadialGa
 
                 // Minus
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 11,
+                    /* sector */ 9,
                     buttonScale,
-                    3f,
+                    0.3f,
                     ButtonConfig(
                         GamePadButtonInputId.Minus.ordinal,
                         "-",
@@ -297,9 +297,9 @@ private fun generateConfig4(isLeft: Boolean, useSwitchLayout: Boolean): RadialGa
 
                 // Plus
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 7,
+                    /* sector */ 9,
                     buttonScale,
-                    3f,
+                    0.3f,
                     ButtonConfig(
                         GamePadButtonInputId.Plus.ordinal,
                         "+",

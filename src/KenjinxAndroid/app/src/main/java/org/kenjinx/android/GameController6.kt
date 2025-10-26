@@ -286,7 +286,7 @@ private fun generateConfig6(isLeft: Boolean, useSwitchLayout: Boolean): GamePadC
                     /* sector */ 6,
                     /* size   */ 3,
                     /* gap    */ 2.5f,
-                    distance,
+                    0.7f,
                     GamePadButtonInputId.RightStick.ordinal,
                     DUMMY_RIGHT_STICK_PRESS_ID,
                     null,

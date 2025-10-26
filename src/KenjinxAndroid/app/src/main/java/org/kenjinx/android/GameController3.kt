@@ -201,9 +201,9 @@ private fun generateConfig3(isLeft: Boolean, useSwitchLayout: Boolean): RadialGa
 
                 // Minus
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 11,
+                    /* sector */ 9,
                     buttonScale,
-                    3f,
+                    0.3f,
                     ButtonConfig(
                         GamePadButtonInputId.Minus.ordinal,
                         "-",
@@ -319,9 +319,9 @@ private fun generateConfig3(isLeft: Boolean, useSwitchLayout: Boolean): RadialGa
 
                 // Plus
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 7,
+                    /* sector */ 9,
                     buttonScale,
-                    3f,
+                    0.3f,
                     ButtonConfig(
                         GamePadButtonInputId.Plus.ordinal,
                         "+",
