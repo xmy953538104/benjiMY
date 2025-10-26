@@ -84,8 +84,9 @@ class GameController(var activity: Activity) : IGameController {
         get() = controllerView?.isVisible ?: false
 
     init {
-        leftGamePad = GamePad(generateConfig(true), 16f, activity)
-        rightGamePad = GamePad(generateConfig(false), 16f, activity)
+        val useSwitchLayout = QuickSettings(activity).useSwitchLayout
+        leftGamePad = GamePad(generateConfig(true,  useSwitchLayout), 16f, activity)
+        rightGamePad = GamePad(generateConfig(false, useSwitchLayout), 16f, activity)
 
         leftGamePad.primaryDialMaxSizeDp = 200f
         rightGamePad.primaryDialMaxSizeDp = 200f
@@ -177,7 +178,7 @@ suspend fun <T> Flow<T>.safeCollect(block: suspend (T) -> Unit) {
         .collect { block(it) }
 }
 
-private fun generateConfig(isLeft: Boolean): GamePadConfig {
+private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadConfig {
     val distance = 0.3f
     val buttonScale = 1f
 
@@ -293,20 +294,23 @@ private fun generateConfig(isLeft: Boolean): GamePadConfig {
             /* ringSegments = */ 12,
             /* Primary (ABXY) */
             PrimaryDialConfig.PrimaryButtons(
-                listOf(
-                    ButtonConfig(
-                        GamePadButtonInputId.A.ordinal, "A", true, null, "A", setOf(), true, null
-                    ),
-                    ButtonConfig(
-                        GamePadButtonInputId.X.ordinal, "X", true, null, "X", setOf(), true, null
-                    ),
-                    ButtonConfig(
-                        GamePadButtonInputId.Y.ordinal, "Y", true, null, "Y", setOf(), true, null
-                    ),
-                    ButtonConfig(
-                        GamePadButtonInputId.B.ordinal, "B", true, null, "B", setOf(), true, null
+                if (useSwitchLayout) {
+                    // Switch/Nintendo: A=Right, X=Top, Y=Left, B=Bottom
+                    listOf(
+                        ButtonConfig(GamePadButtonInputId.A.ordinal, "A", true, null, "A", setOf(), true, null), // Right
+                        ButtonConfig(GamePadButtonInputId.X.ordinal, "X", true, null, "X", setOf(), true, null), // Top
+                        ButtonConfig(GamePadButtonInputId.Y.ordinal, "Y", true, null, "Y", setOf(), true, null), // Left
+                        ButtonConfig(GamePadButtonInputId.B.ordinal, "B", true, null, "B", setOf(), true, null)  // Bottom
                     )
-                ),
+                } else {
+                    // Xbox-Stil: B=Right, Y=Top, X=Left, A=Bottom
+                    listOf(
+                        ButtonConfig(GamePadButtonInputId.B.ordinal, "B", true, null, "B", setOf(), true, null), // Right
+                        ButtonConfig(GamePadButtonInputId.Y.ordinal, "Y", true, null, "Y", setOf(), true, null), // Top
+                        ButtonConfig(GamePadButtonInputId.X.ordinal, "X", true, null, "X", setOf(), true, null), // Left
+                        ButtonConfig(GamePadButtonInputId.A.ordinal, "A", true, null, "A", setOf(), true, null)  // Bottom
+                    )
+                },
                 null,
                 0f,
                 true,

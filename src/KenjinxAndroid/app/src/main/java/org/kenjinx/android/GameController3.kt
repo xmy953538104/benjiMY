@@ -80,8 +80,9 @@ class GameController3(var activity: Activity) : IGameController {
         get() = controllerView?.isVisible ?: false
 
     init {
-        leftGamePad = RadialGamePad(generateConfig3(true), 16f, activity)
-        rightGamePad = RadialGamePad(generateConfig3(false), 16f, activity)
+        val useSwitchLayout = QuickSettings(activity).useSwitchLayout
+        leftGamePad = RadialGamePad(generateConfig3(true,  useSwitchLayout), 16f, activity)
+        rightGamePad = RadialGamePad(generateConfig3(false, useSwitchLayout), 16f, activity)
 
         leftGamePad.primaryDialMaxSizeDp = 200f
         rightGamePad.primaryDialMaxSizeDp = 200f
@@ -163,7 +164,7 @@ class GameController3(var activity: Activity) : IGameController {
     }
 }
 
-private fun generateConfig3(isLeft: Boolean): RadialGamePadConfig {
+private fun generateConfig3(isLeft: Boolean, useSwitchLayout: Boolean): RadialGamePadConfig {
     val distance = 0.3f
     val buttonScale = 1f
 
@@ -220,7 +221,7 @@ private fun generateConfig3(isLeft: Boolean): RadialGamePadConfig {
                 // L-Bumper
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 2,
-                    1f,
+                    0.2f,
                     ButtonConfig(
                         GamePadButtonInputId.LeftShoulder.ordinal,
                         "L",
@@ -238,7 +239,7 @@ private fun generateConfig3(isLeft: Boolean): RadialGamePadConfig {
                 // ZL-Trigger
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 2,
-                    0.2f,
+                    1f,
                     ButtonConfig(
                         GamePadButtonInputId.LeftTrigger.ordinal,
                         "ZL",
@@ -278,20 +279,23 @@ private fun generateConfig3(isLeft: Boolean): RadialGamePadConfig {
             /* ringSegments = */ 12,
             /* Primary (ABXY) */
             PrimaryDialConfig.PrimaryButtons(
-                listOf(
-                    ButtonConfig(
-                        GamePadButtonInputId.A.ordinal, "A", true, null, "A", setOf(), true, null
-                    ),
-                    ButtonConfig(
-                        GamePadButtonInputId.X.ordinal, "X", true, null, "X", setOf(), true, null
-                    ),
-                    ButtonConfig(
-                        GamePadButtonInputId.Y.ordinal, "Y", true, null, "Y", setOf(), true, null
-                    ),
-                    ButtonConfig(
-                        GamePadButtonInputId.B.ordinal, "B", true, null, "B", setOf(), true, null
+                if (useSwitchLayout) {
+                    // Switch/Nintendo: A=Right, X=Top, Y=Left, B=Bottom
+                    listOf(
+                        ButtonConfig(GamePadButtonInputId.A.ordinal, "A", true, null, "A", setOf(), true, null), // Right
+                        ButtonConfig(GamePadButtonInputId.X.ordinal, "X", true, null, "X", setOf(), true, null), // Top
+                        ButtonConfig(GamePadButtonInputId.Y.ordinal, "Y", true, null, "Y", setOf(), true, null), // Left
+                        ButtonConfig(GamePadButtonInputId.B.ordinal, "B", true, null, "B", setOf(), true, null)  // Bottom
                     )
-                ),
+                } else {
+                    // Xbox-Stil: B=Right, Y=Top, X=Left, A=Bottom
+                    listOf(
+                        ButtonConfig(GamePadButtonInputId.B.ordinal, "B", true, null, "B", setOf(), true, null), // Right
+                        ButtonConfig(GamePadButtonInputId.Y.ordinal, "Y", true, null, "Y", setOf(), true, null), // Top
+                        ButtonConfig(GamePadButtonInputId.X.ordinal, "X", true, null, "X", setOf(), true, null), // Left
+                        ButtonConfig(GamePadButtonInputId.A.ordinal, "A", true, null, "A", setOf(), true, null)  // Bottom
+                    )
+                },
                 null,
                 0f,
                 true,
@@ -335,7 +339,7 @@ private fun generateConfig3(isLeft: Boolean): RadialGamePadConfig {
                 // R-Bumper
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 3,
-                    1f,
+                    0.2f,
                     ButtonConfig(
                         GamePadButtonInputId.RightShoulder.ordinal,
                         "R",
@@ -353,7 +357,7 @@ private fun generateConfig3(isLeft: Boolean): RadialGamePadConfig {
                 // ZR-Trigger
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 3,
-                    0.2f,
+                    1f,
                     ButtonConfig(
                         GamePadButtonInputId.RightTrigger.ordinal,
                         "ZR",
