@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.5h — 2025-10-27
+
+### Added
+- **Virtual Controller**: Added 6 new Layouts for Virtual Controllers, selectable in Input Settings.
+- **Rendering**: Added an option to diasable Threaded Rendering. This reduces Performance, but fixes crashes in some Games.
+
 ## 2.0.5g — 2025-10-24
 
 ### Fixed

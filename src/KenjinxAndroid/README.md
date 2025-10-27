@@ -13,8 +13,10 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.5f – Highlights
+## Version 2.0.5h – Highlights
 
+- **Virtual Controller**: Added 6 new Layouts for Virtual Controllers, selectable in Input Settings.
+- **Rendering**: Added an option to diasable Threaded Rendering. This reduces Performance, but fixes crashes in some Games.
 - **Save Manager**: Added a import/export function for saves as .zip. Compatible with Eden.
 - **Mods**: Added a Mod Manager with import/delete.
 - **XBox Controllers**: Fixed L2 / R2 not working.
