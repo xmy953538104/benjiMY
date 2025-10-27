@@ -11,18 +11,18 @@ namespace Ryujinx.Audio.Renderer.Dsp.Command
     {
         public bool Enabled { get; set; }
 
-        public int NodeId { get; }
+        public int NodeId { get; private set; }
 
         public CommandType CommandType => CommandType.Mix;
 
         public uint EstimatedProcessingTime { get; set; }
 
-        public ushort InputBufferIndex { get; }
-        public ushort OutputBufferIndex { get; }
+        public ushort InputBufferIndex { get; private set; }
+        public ushort OutputBufferIndex { get; private set; }
 
-        public float Volume { get; }
+        public float Volume { get; private set; }
 
-        public MixCommand(uint inputBufferIndex, uint outputBufferIndex, int nodeId, float volume)
+        public MixCommand Initialize(uint inputBufferIndex, uint outputBufferIndex, int nodeId, float volume)
         {
             Enabled = true;
             NodeId = nodeId;
@@ -31,6 +31,8 @@ namespace Ryujinx.Audio.Renderer.Dsp.Command
             OutputBufferIndex = (ushort)outputBufferIndex;
 
             Volume = volume;
+
+            return this;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
