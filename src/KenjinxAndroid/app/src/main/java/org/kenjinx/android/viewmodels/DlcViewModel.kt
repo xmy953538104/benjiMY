@@ -188,7 +188,7 @@ class DlcViewModel(val titleId: String) {
         }
     }
 
-    private fun saveChanges() {
+    fun saveChanges() {
         data?.apply {
             dlcItemsState?.forEach { item ->
                 for (container in this) {

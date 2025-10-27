@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Panorama
 import androidx.compose.material.icons.outlined.Settings
@@ -432,6 +433,23 @@ class SettingViews {
                                     },
                                     text = "Add Game Folder",
                                     icon = Icons.Default.Add,
+                                    modifier = Modifier.weight(1f),
+                                    isFullWidth = false,
+                                )
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ){
+                                ActionButton(
+                                    onClick = {
+                                        settingsViewModel.openUpdatesFolder()
+                                    },
+                                    text = "Select Updates/DLC Folder",
+                                    icon = Icons.Outlined.Folder,
                                     modifier = Modifier.weight(1f),
                                     isFullWidth = false,
                                 )

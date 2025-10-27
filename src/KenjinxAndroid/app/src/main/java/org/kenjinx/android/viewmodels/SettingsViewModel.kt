@@ -229,6 +229,30 @@ class SettingsViewModel(val activity: MainActivity) {
             )
     }
 
+    fun openUpdatesFolder() {
+        val path = sharedPref.getString("updatesFolder", "") ?: ""
+
+        activity.storageHelper!!.onFolderSelected = { _, folder ->
+            val p = folder.getAbsolutePath(activity)
+            sharedPref.edit {
+                putString("updatesFolder", p)
+            }
+            activity.storageHelper!!.onFolderSelected = previousFolderCallback
+            
+            // Trigger a reload of the game list to apply the new updates/DLC folder
+            MainActivity.mainViewModel?.homeViewModel?.requestReload()
+            MainActivity.mainViewModel?.homeViewModel?.ensureReloadIfNecessary()
+        }
+
+        if (path.isEmpty())
+            activity.storageHelper?.storage?.openFolderPicker()
+        else
+            activity.storageHelper?.storage?.openFolderPicker(
+                activity.storageHelper!!.storage.requestCodeFolderPicker,
+                FileFullPath(activity, path)
+            )
+    }
+
     fun selectKey(installState: MutableState<KeyInstallState>) {
         if (installState.value != KeyInstallState.File)
             return
