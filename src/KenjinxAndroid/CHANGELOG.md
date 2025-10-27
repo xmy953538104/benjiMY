@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.5i — 2025-10-27
+
+### Added
+- **Nightly Patches**: added some nightly patches from Kenji-NX. All Credits to KeatonTheBot, LotP, Coxxs, GreemDev, Xam
+- **DLCs/Updates**: Autoload title updates and dlc from selected folder. Credits to Jochem Kuipers.
+
 ## 2.0.5h — 2025-10-27
 
 ### Added
