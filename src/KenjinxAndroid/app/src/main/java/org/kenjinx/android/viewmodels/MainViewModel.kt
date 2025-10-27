@@ -131,13 +131,16 @@ class MainViewModel(val activity: MainActivity) {
             settings.overrideSettings(forceNceAndPptc)
         }
 
+        // 0=Auto, 1=SingleThread, 2=Threaded
+        val backendMode = if (settings.disableThreadedRendering) 1 else 2
+
         var success = KenjinxNative.graphicsInitialize(
             enableMacroHLE = settings.enableMacroHLE,
             enableShaderCache = settings.enableShaderCache,
             enableTextureRecompression = settings.enableTextureRecompression,
             rescale = settings.resScale,
             maxAnisotropy = settings.maxAnisotropy,
-            backendThreading = org.kenjinx.android.BackendThreading.Auto.ordinal
+            backendThreading = backendMode
         )
 
         if (!success)
@@ -241,13 +244,16 @@ class MainViewModel(val activity: MainActivity) {
 
         val settings = QuickSettings(activity)
 
+        // 0=Auto, 1=SingleThread, 2=Threaded
+        val backendMode = if (settings.disableThreadedRendering) 1 else 2
+
         var success = KenjinxNative.graphicsInitialize(
             enableMacroHLE = settings.enableMacroHLE,
             enableShaderCache = settings.enableShaderCache,
             enableTextureRecompression = settings.enableTextureRecompression,
             rescale = settings.resScale,
             maxAnisotropy = settings.maxAnisotropy,
-            backendThreading = org.kenjinx.android.BackendThreading.Auto.ordinal
+            backendThreading = backendMode
         )
 
         if (!success)

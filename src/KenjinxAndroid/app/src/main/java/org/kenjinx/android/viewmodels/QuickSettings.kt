@@ -82,6 +82,9 @@ class QuickSettings(val activity: Activity) {
     var enableDebugLogs: Boolean
     var enableGraphicsLogs: Boolean
 
+    // --- NEU: Threaded Rendering Toggle (persistiert)
+    var disableThreadedRendering: Boolean
+
     private var sharedPref: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
 
     init {
@@ -101,7 +104,7 @@ class QuickSettings(val activity: Activity) {
         val oriValue = sharedPref.getInt("orientationPreference", ActivityInfo.SCREEN_ORIENTATION_SENSOR)
         orientationPreference = OrientationPreference.fromValue(oriValue)
 
-        // --- NEU: Overlay Settings laden
+        // --- Overlay Settings laden
         overlayMenuPosition = OverlayMenuPosition.entries[
             sharedPref.getInt("overlayMenuPosition", OverlayMenuPosition.BottomMiddle.ordinal)
         ]
@@ -142,6 +145,9 @@ class QuickSettings(val activity: Activity) {
         enableTraceLogs = sharedPref.getBoolean("enableStubLogs", false)
         enableDebugLogs = sharedPref.getBoolean("enableDebugLogs", false)
         enableGraphicsLogs = sharedPref.getBoolean("enableGraphicsLogs", false)
+
+        // --- NEU laden
+        disableThreadedRendering = sharedPref.getBoolean("disableThreadedRendering", false)
     }
 
     fun save() {
@@ -161,7 +167,7 @@ class QuickSettings(val activity: Activity) {
             // --- Save orientation
             putInt("orientationPreference", orientationPreference.value)
 
-            // --- NEU: Overlay Settings speichern
+            // --- Overlay Settings speichern
             putInt("overlayMenuPosition", overlayMenuPosition.ordinal)
             putFloat("overlayMenuOpacity", overlayMenuOpacity.coerceIn(0f, 1f))
 
@@ -198,6 +204,9 @@ class QuickSettings(val activity: Activity) {
             putBoolean("enableDebugLogs", enableDebugLogs)
             putBoolean("enableGraphicsLogs", enableGraphicsLogs)
             putInt("virtualControllerPreset", virtualControllerPreset.ordinal)
+
+            // --- NEU speichern
+            putBoolean("disableThreadedRendering", disableThreadedRendering)
         }
     }
 

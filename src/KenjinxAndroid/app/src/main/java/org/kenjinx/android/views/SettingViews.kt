@@ -47,6 +47,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,8 +71,8 @@ import org.kenjinx.android.viewmodels.DataResetState
 import org.kenjinx.android.viewmodels.FirmwareInstallState
 import org.kenjinx.android.viewmodels.KeyInstallState
 import org.kenjinx.android.viewmodels.MainViewModel
-import org.kenjinx.android.viewmodels.MemoryConfiguration
 import org.kenjinx.android.viewmodels.SettingsViewModel
+import org.kenjinx.android.viewmodels.MemoryConfiguration
 import org.kenjinx.android.viewmodels.MemoryManagerMode
 import org.kenjinx.android.viewmodels.VSyncMode
 import org.kenjinx.android.widgets.ActionButton
@@ -90,6 +91,9 @@ import org.kenjinx.android.SystemLanguage
 import org.kenjinx.android.RegionCode
 
 import org.kenjinx.android.viewmodels.QuickSettings.VirtualControllerPreset
+
+// >>> NEU: KenjinxNative für das Live-Umschalten des Threading-Backends
+import org.kenjinx.android.KenjinxNative
 
 class SettingViews {
     companion object {
@@ -163,6 +167,12 @@ class SettingViews {
             val overlayOpacity = remember {
                 mutableFloatStateOf(QuickSettings(mainViewModel.activity).overlayMenuOpacity.coerceIn(0f, 1f))
             }
+
+            // --- NEU: Disable Threaded Rendering (aus QuickSettings laden)
+            val disableThreadedRendering = remember {
+                mutableStateOf(QuickSettings(mainViewModel.activity).disableThreadedRendering)
+            }
+            val threadToggleInitialized = remember { mutableStateOf(false) }
 
             if (!loaded.value) {
                 settingsViewModel.initializeState(
@@ -1337,6 +1347,34 @@ class SettingViews {
                             enableShaderCache.SwitchSelector(label = "Shader Cache")
                             enableTextureRecompression.SwitchSelector(label = "Texture Recompression")
                             enableMacroHLE.SwitchSelector(label = "Macro HLE")
+
+                            // --- NEU: Toggle für Single-Thread-Renderer
+                            disableThreadedRendering.SwitchSelector(label = "Disable Threaded Rendering")
+
+                            // Reaktion auf Toggle: persistieren + sanftes Reconfigure
+                            LaunchedEffect(disableThreadedRendering.value) {
+                                if (!threadToggleInitialized.value) {
+                                    threadToggleInitialized.value = true
+                                } else {
+                                    val qs = QuickSettings(mainViewModel.activity)
+                                    qs.disableThreadedRendering = disableThreadedRendering.value
+                                    qs.save()
+
+                                    val mode = if (disableThreadedRendering.value) 1 /*Single*/ else 2 /*Threaded*/
+
+                                    thread {
+                                        try {
+                                            KenjinxNative.graphicsSetPresentEnabled(false)
+                                            KenjinxNative.deviceWaitForGpuDone(500)
+                                            KenjinxNative.graphicsSetBackendThreading(mode)
+                                            KenjinxNative.deviceRecreateSwapchain()
+                                        } finally {
+                                            KenjinxNative.graphicsSetPresentEnabled(true)
+                                        }
+                                    }
+                                }
+                            }
+
                             stretchToFullscreen.SwitchSelector(label = "Stretch to Fullscreen")
                             ResolutionScaleDropdown(
                                 selectedScale = resScale.floatValue,
