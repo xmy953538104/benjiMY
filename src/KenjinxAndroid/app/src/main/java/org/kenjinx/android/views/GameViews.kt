@@ -55,6 +55,11 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.LocalConfiguration
 import org.kenjinx.android.viewmodels.QuickSettings.VirtualControllerPreset
 
 
@@ -64,7 +69,7 @@ class GameViews {
         fun Main() {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
+                color = Color.Black
             ) {
                 GameView(mainViewModel = MainActivity.mainViewModel!!)
             }
@@ -72,16 +77,68 @@ class GameViews {
 
         @Composable
         fun GameView(mainViewModel: MainViewModel) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                AndroidView(
+            val cfg = LocalConfiguration.current
+            val isLandscape = cfg.screenWidthDp >= cfg.screenHeightDp
+            val isLarge = (cfg.smallestScreenWidthDp >= 600) || (cfg.screenWidthDp >= 900)
+
+            // Setting aus den Preferences (wird beim Game-Start gelesen)
+            val stretch = QuickSettings(mainViewModel.activity).stretchToFullscreen
+
+            // Standard-Ratio (Switch 16:9). Wenn du später dynamisch aus dem Renderer lesen willst,
+            // kannst du gameAspect hier zur Laufzeit aktualisieren.
+            val gameAspect = 16f / 9f
+
+            if (stretch) {
+                // Vollbild strecken (keine Letterbox), oben verankert
+                Box(
                     modifier = Modifier.fillMaxSize(),
-                    factory = { context ->
-                        GameHost(context, mainViewModel)
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .align(Alignment.TopCenter),
+                        factory = { context -> GameHost(context, mainViewModel) }
+                    )
+                    GameOverlay(mainViewModel)
+                }
+            } else {
+                // Letterbox beibehalten, aber oben fixieren. Phones: smart-fit,
+                // Tablets/Foldables in Landscape: erzwinge fitWidth (wie gewünscht).
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val containerAspect = maxWidth.value / maxHeight.value
+
+                    val useFitWidth =
+                        if (isLandscape && isLarge) true
+                        else containerAspect < gameAspect
+
+                    val fitModifier =
+                        if (useFitWidth) {
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(gameAspect)
+                                .align(Alignment.TopCenter)
+                        } else {
+                            Modifier
+                                .fillMaxHeight()
+                                .aspectRatio(gameAspect)
+                                .align(Alignment.TopCenter)
+                        }
+
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        AndroidView(
+                            modifier = fitModifier,
+                            factory = { context -> GameHost(context, mainViewModel) }
+                        )
+                        GameOverlay(mainViewModel)
                     }
-                )
-                GameOverlay(mainViewModel)
+                }
             }
         }
+
 
         @OptIn(ExperimentalMaterial3Api::class)
         @Composable
