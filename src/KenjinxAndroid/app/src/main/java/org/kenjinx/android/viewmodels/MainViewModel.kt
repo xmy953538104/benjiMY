@@ -1,6 +1,7 @@
 package org.kenjinx.android.viewmodels
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavHostController
@@ -51,6 +52,13 @@ class MainViewModel(val activity: MainActivity) {
     private var showLoading: MutableState<Boolean>? = null
     private var refreshUser: MutableState<Boolean>? = null
 
+    // Default Game Folder
+    var defaultGameFolderUri: Uri? = null
+        set(value) {
+            field = value
+            val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+            prefs.edit().putString("defaultGameFolderUri", value?.toString() ?: "").apply()
+        }
     var gameHost: GameHost? = null
         set(value) {
             field = value
@@ -62,6 +70,12 @@ class MainViewModel(val activity: MainActivity) {
 
     init {
         performanceManager = PerformanceManager(activity)
+
+        val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+        val saved = prefs.getString("defaultGameFolderUri", "") ?: ""
+        if (saved.isNotEmpty()) {
+            defaultGameFolderUri = Uri.parse(saved)
+        }
     }
 
     fun refreshFirmwareVersion() {

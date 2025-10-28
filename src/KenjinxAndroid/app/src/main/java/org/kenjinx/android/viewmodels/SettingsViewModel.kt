@@ -214,6 +214,9 @@ class SettingsViewModel(val activity: MainActivity) {
             sharedPref.edit {
                 putString("gameFolder", p)
             }
+            runCatching {
+                MainActivity.mainViewModel?.defaultGameFolderUri = folder.uri
+            }
             activity.storageHelper!!.onFolderSelected = previousFolderCallback
         }
 

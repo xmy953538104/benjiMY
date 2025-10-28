@@ -2,6 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Android 11+ Package Visibility: was diese App sehen/ansprechen darf -->
+    <queries>
+        <!-- Falls andere Flavors/Starter beteiligt sind, hier sichtbar machen -->
+        <package android:name="org.kenjinx.android"/>
+
+        <!-- Allgemein: LAUNCHER-Activities und ACTION_VIEW-Dateien auflösbar machen -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <uses-feature
         android:name="android.hardware.audio.output"
         android:required="true" />
@@ -58,9 +70,18 @@
             <category android:name="android.intent.category.DEFAULT" />
         </intent-filter>
         -->
+
+        <!-- Shortcut-Wizard Activity (transparent, frei drehbar) -->
+        <activity
+            android:name=".ShortcutWizardActivity"
+            android:exported="false"
+            android:theme="@style/Theme.KenjinxAndroid.Transparent"
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="org.kenjinx.android.fileprovider"
+            android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
