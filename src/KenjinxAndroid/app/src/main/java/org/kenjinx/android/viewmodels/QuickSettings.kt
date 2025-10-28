@@ -63,6 +63,9 @@ class QuickSettings(val activity: Activity) {
     var enableDebugLogs: Boolean
     var enableGraphicsLogs: Boolean
 
+    // --- NEU: Threaded Rendering Toggle (persistiert)
+    var disableThreadedRendering: Boolean
+
     private var sharedPref: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
 
     init {
@@ -108,6 +111,9 @@ class QuickSettings(val activity: Activity) {
         enableTraceLogs = sharedPref.getBoolean("enableStubLogs", false)
         enableDebugLogs = sharedPref.getBoolean("enableDebugLogs", false)
         enableGraphicsLogs = sharedPref.getBoolean("enableGraphicsLogs", false)
+
+        // --- NEU laden
+        disableThreadedRendering = sharedPref.getBoolean("disableThreadedRendering", false)
     }
 
     fun save() {
@@ -151,6 +157,9 @@ class QuickSettings(val activity: Activity) {
             putBoolean("enableTraceLogs", enableTraceLogs)
             putBoolean("enableDebugLogs", enableDebugLogs)
             putBoolean("enableGraphicsLogs", enableGraphicsLogs)
+
+            // --- NEU speichern
+            putBoolean("disableThreadedRendering", disableThreadedRendering)
         }
     }
 
