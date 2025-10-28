@@ -55,7 +55,7 @@ namespace Ryujinx.Ava.UI.Helpers
 
             await Task.Run(async () =>
             {
-                while (true)
+                do
                 {
                     if (!_isWaitingForInput)
                     {
@@ -65,12 +65,8 @@ namespace Ryujinx.Ava.UI.Helpers
                     await Task.Delay(10);
 
                     assigner.ReadInput();
-
-                    if (assigner.IsAnyButtonPressed() || assigner.ShouldCancel() || (keyboard != null && keyboard.IsPressed(Key.Escape)))
-                    {
-                        break;
-                    }
                 }
+                while (!assigner.IsAnyButtonPressed() && !assigner.ShouldCancel() && (keyboard == null || !keyboard.IsPressed(Key.Escape)));
             });
 
             await Dispatcher.UIThread.InvokeAsync(() =>

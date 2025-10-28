@@ -157,12 +157,7 @@ namespace Ryujinx.Graphics.Vulkan
                 }
             }
 
-            if ((_masks[endIndex] & endMask) != 0)
-            {
-                return true;
-            }
-
-            return false;
+            return (_masks[endIndex] & endMask) != 0;
         }
 
         public bool Set(int bit)

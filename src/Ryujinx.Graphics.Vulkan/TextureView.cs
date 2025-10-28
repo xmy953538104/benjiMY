@@ -869,22 +869,12 @@ namespace Ryujinx.Graphics.Vulkan
 
         private int GetBufferDataLength(int length)
         {
-            if (NeedsD24S8Conversion())
-            {
-                return length * 2;
-            }
-
-            return length;
+            return NeedsD24S8Conversion() ? length * 2 : length;
         }
 
         private Format GetCompatibleGalFormat(Format format)
         {
-            if (NeedsD24S8Conversion())
-            {
-                return Format.D32FloatS8Uint;
-            }
-
-            return format;
+            return NeedsD24S8Conversion() ? Format.D32FloatS8Uint : format;
         }
 
         private void CopyDataToBuffer(Span<byte> storage, ReadOnlySpan<byte> input)
@@ -1079,12 +1069,7 @@ namespace Ryujinx.Graphics.Vulkan
         private static int AlignUpNpot(int size, int alignment)
         {
             int remainder = size % alignment;
-            if (remainder == 0)
-            {
-                return size;
-            }
-
-            return size + (alignment - remainder);
+            return remainder == 0 ? size : size + (alignment - remainder);
         }
 
         public void SetStorage(BufferRange buffer)

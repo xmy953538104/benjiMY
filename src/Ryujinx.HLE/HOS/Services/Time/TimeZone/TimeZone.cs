@@ -210,12 +210,7 @@ namespace Ryujinx.HLE.HOS.Services.Time.TimeZone
             }
             while (char.IsDigit(c));
 
-            if (num < min)
-            {
-                return false;
-            }
-
-            return true;
+            return num >= min;
         }
 
         private static bool GetSeconds(ReadOnlySpan<byte> name, ref int namePosition, out int seconds)

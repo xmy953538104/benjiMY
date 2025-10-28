@@ -536,12 +536,9 @@ namespace Ryujinx.Graphics.Vulkan
 
         private static TextureView CreateDepthOrStencilView(TextureView depthStencilTexture, DepthStencilMode depthStencilMode)
         {
-            if (depthStencilTexture.Info.DepthStencilMode == depthStencilMode)
-            {
-                return depthStencilTexture;
-            }
-
-            return (TextureView)depthStencilTexture.CreateView(new TextureCreateInfo(
+            return depthStencilTexture.Info.DepthStencilMode == depthStencilMode
+                ? depthStencilTexture
+                : (TextureView)depthStencilTexture.CreateView(new TextureCreateInfo(
                 depthStencilTexture.Info.Width,
                 depthStencilTexture.Info.Height,
                 depthStencilTexture.Info.Depth,
@@ -1449,18 +1446,15 @@ namespace Ryujinx.Graphics.Vulkan
                 };
             }
 
-            if (componentSize == 4)
-            {
-                return componentsCount switch
+            return componentSize == 4
+                ? componentsCount switch
                 {
                     1 => Format.R32Uint,
                     2 => Format.R32G32Uint,
                     4 => Format.R32G32B32A32Uint,
                     _ => throw new ArgumentException($"Invalid components count {componentsCount}."),
-                };
-            }
-
-            throw new ArgumentException($"Invalid component size {componentSize}.");
+                }
+                : throw new ArgumentException($"Invalid component size {componentSize}.");
         }
 
         public void ConvertIndexBufferIndirect(

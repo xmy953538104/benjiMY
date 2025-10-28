@@ -249,12 +249,7 @@ namespace Ryujinx.Graphics.Shader.Translation.Optimizations
 
             Operand src2 = GetMasked16Source(mulOp.GetSource(1));
 
-            if (src2.Type != y.Type || src2.Value != y.Value)
-            {
-                return false;
-            }
-
-            return true;
+            return src2.Type == y.Type && src2.Value == y.Value;
         }
 
         private static bool TryMatchHighTimesHigh(Operation operation, Operand x, Operand lowTimesHighResult)

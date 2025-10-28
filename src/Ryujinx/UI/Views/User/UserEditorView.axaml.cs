@@ -57,14 +57,7 @@ namespace Ryujinx.Ava.UI.Views.User
                 ChangePictureButton.IsVisible = !_isNewUser;
                 IdLabel.IsVisible = _profile != null;
                 IdText.IsVisible = _profile != null;
-                if (!_isNewUser && IsDeletable)
-                {
-                    DeleteButton.IsVisible = true;
-                }
-                else
-                {
-                    DeleteButton.IsVisible = false;
-                }
+                DeleteButton.IsVisible = !_isNewUser && IsDeletable;
             }
         }
 

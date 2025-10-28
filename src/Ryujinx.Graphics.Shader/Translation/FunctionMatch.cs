@@ -406,12 +406,7 @@ namespace Ryujinx.Graphics.Shader.Translation
                 ulong rawOp = opInfo.RawOpCode;
                 T op = Unsafe.As<ulong, T>(ref rawOp);
 
-                if (!_match(op))
-                {
-                    return false;
-                }
-
-                return true;
+                return _match(op);
             }
         }
 

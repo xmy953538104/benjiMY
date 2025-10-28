@@ -109,13 +109,8 @@ namespace Ryujinx.Audio.Renderer.Server.Splitter
 
             int i = 0;
 
-            while (true)
+            while (!temp.IsNull)
             {
-                if (temp.IsNull)
-                {
-                    break;
-                }
-
                 SplitterDestination next = temp.Next;
 
                 action(temp, i++);

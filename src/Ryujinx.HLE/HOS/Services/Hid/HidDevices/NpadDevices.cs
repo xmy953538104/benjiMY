@@ -117,12 +117,7 @@ namespace Ryujinx.HLE.HOS.Services.Hid
                 }
             }
 
-            if (configuredCount < playerMin || configuredCount > playerMax || primaryIndex == PlayerIndex.Unknown)
-            {
-                return false;
-            }
-
-            return true;
+            return configuredCount >= playerMin && configuredCount <= playerMax && primaryIndex != PlayerIndex.Unknown;
         }
 
         public void Configure(params ReadOnlySpan<ControllerConfig> configs)

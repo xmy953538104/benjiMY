@@ -67,12 +67,7 @@ namespace Ryujinx.HLE.HOS.Services.Nv.NvDrvServices.NvHostAsGpu.Types
             // Check for overlap with already mapped buffers.
             Range map = BinarySearchLt(_maps, mapEnd);
 
-            if (map != null && map.End > address)
-            {
-                return false;
-            }
-
-            return true;
+            return map == null || map.End <= address;
         }
 
         public void AddMap(ulong gpuVa, ulong size, ulong physicalAddress, bool vaAllocated)

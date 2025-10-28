@@ -159,7 +159,7 @@ namespace ARMeilleure.Common
 
                 _sparseFill = new MemoryBlock(268435456ul, MemoryAllocationFlags.Mirrorable); //low Power TC uses size: 65536ul
 
-                ulong bottomLevelSize = (1ul << levels.Last().Length) * (ulong)sizeof(TEntry);
+                ulong bottomLevelSize = (1ul << levels[^1].Length) * (ulong)sizeof(TEntry);
 
                 _fillBottomLevel = new SparseMemoryBlock(bottomLevelSize, null, _sparseFill);
                 _fillBottomLevelPtr = (TEntry*)_fillBottomLevel.Block.Pointer;
@@ -208,7 +208,7 @@ namespace ARMeilleure.Common
         /// <param name="size"></param>
         public void SignalCodeRange(ulong address, ulong size)
         {
-            AddressTableLevel bottom = Levels.Last();
+            AddressTableLevel bottom = Levels[^1];
             ulong bottomLevelEntries = 1ul << bottom.Length;
 
             ulong entryIndex = address >> bottom.Index;
@@ -400,7 +400,7 @@ namespace ARMeilleure.Common
                 }
                 else
                 {
-                    block = _sparseReserved.Last().Block;
+                    block = _sparseReserved[^1].Block;
 
                     if (_sparseReservedOffset == block.Block.Size)
                     {

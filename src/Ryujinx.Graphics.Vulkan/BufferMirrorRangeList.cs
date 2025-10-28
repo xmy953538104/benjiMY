@@ -157,12 +157,7 @@ namespace Ryujinx.Graphics.Vulkan
         public readonly bool OverlapsWith(int offset, int size)
         {
             var list = _ranges;
-            if (list == null)
-            {
-                return false;
-            }
-
-            return BinarySearch(list, offset, size) >= 0;
+            return list == null ? false : BinarySearch(list, offset, size) >= 0;
         }
 
         public readonly List<Range> FindOverlaps(int offset, int size)

@@ -91,12 +91,7 @@ namespace Ryujinx.Audio.Backends.SoundIo
 
                 stream = device.CreateOutStream();
 
-                if (stream == null || backendDisconnected)
-                {
-                    return false;
-                }
-
-                return true;
+                return stream != null && !backendDisconnected;
             }
             catch
             {

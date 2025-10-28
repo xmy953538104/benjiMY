@@ -66,12 +66,7 @@ namespace Ryujinx.Graphics.Vulkan
             _queryCountHistory[_queryCountHistoryIndex]++;
 
             // Interrupt render passes to flush queries, so that early results arrive sooner.
-            if (++_queryCount == InitialQueryCountForFlush)
-            {
-                return true;
-            }
-
-            return false;
+            return ++_queryCount == InitialQueryCountForFlush;
         }
 
         public int GetRemainingQueries()
@@ -81,12 +76,9 @@ namespace Ryujinx.Graphics.Vulkan
                 _remainingQueries = 16;
             }
 
-            if (_queryCount < InitialQueryCountForFlush)
-            {
-                return Math.Min(InitialQueryCountForFlush - _queryCount, _remainingQueries);
-            }
-
-            return _remainingQueries;
+            return _queryCount < InitialQueryCountForFlush
+                ? Math.Min(InitialQueryCountForFlush - _queryCount, _remainingQueries)
+                : _remainingQueries;
         }
 
         public bool ShouldFlushQuery()

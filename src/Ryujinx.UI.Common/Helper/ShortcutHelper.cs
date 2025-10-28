@@ -1,3 +1,4 @@
+using Gommon;
 using Ryujinx.Common;
 using Ryujinx.Common.Configuration;
 using ShellLink;
@@ -132,7 +133,7 @@ namespace Ryujinx.UI.Common.Helper
                 argsList.Add($"\"{CommandLineState.BaseDirPathArg}\"");
             }
 
-            if (appFilePath.ToLower().EndsWith(".xci"))
+            if (appFilePath.EndsWithIgnoreCase(".xci"))
             {
                 argsList.Add("--application-id");
                 argsList.Add($"\"{applicationId}\"");

@@ -92,12 +92,7 @@ namespace Ryujinx.Audio.Renderer.Server.MemoryPool
         /// <returns>True if the <see cref="CpuAddress"/> is contained inside the <see cref="MemoryPoolInfo"/>.</returns>
         public readonly bool Contains(CpuAddress targetCpuAddress, ulong size)
         {
-            if (CpuAddress <= targetCpuAddress && size + targetCpuAddress <= Size + CpuAddress)
-            {
-                return true;
-            }
-
-            return false;
+            return CpuAddress <= targetCpuAddress && size + targetCpuAddress <= Size + CpuAddress;
         }
 
         /// <summary>

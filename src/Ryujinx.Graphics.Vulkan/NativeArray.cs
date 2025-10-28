@@ -17,12 +17,7 @@ namespace Ryujinx.Graphics.Vulkan
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int Checked(int index)
         {
-            if ((uint)index >= (uint)Length)
-            {
-                throw new IndexOutOfRangeException();
-            }
-
-            return index;
+            return (uint)index >= (uint)Length ? throw new IndexOutOfRangeException() : index;
         }
 
         public NativeArray(int length)

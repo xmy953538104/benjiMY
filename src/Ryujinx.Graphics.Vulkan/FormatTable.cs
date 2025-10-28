@@ -179,12 +179,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         public static Format GetFormat(VkFormat format)
         {
-            if (!_reverseMap.TryGetValue(format, out Format result))
-            {
-                return Format.B8G8R8A8Unorm;
-            }
-
-            return result;
+            return !_reverseMap.TryGetValue(format, out Format result) ? Format.B8G8R8A8Unorm : result;
         }
 
         public static Format ConvertRgba8SrgbToUnorm(Format format)

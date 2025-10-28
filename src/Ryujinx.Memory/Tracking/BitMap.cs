@@ -98,12 +98,7 @@ namespace Ryujinx.Memory.Tracking
                 }
             }
 
-            if ((Masks[endIndex] & endMask) != 0)
-            {
-                return true;
-            }
-
-            return false;
+            return (Masks[endIndex] & endMask) != 0;
         }
 
         /// <summary>

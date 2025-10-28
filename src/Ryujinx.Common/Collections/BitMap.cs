@@ -116,12 +116,7 @@ namespace Ryujinx.Common.Collections
                 }
             }
 
-            if ((_masks[endIndex] & endMask) != 0)
-            {
-                return true;
-            }
-
-            return false;
+            return (_masks[endIndex] & endMask) != 0;
         }
 
         /// <summary>

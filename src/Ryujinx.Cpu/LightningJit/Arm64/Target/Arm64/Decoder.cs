@@ -93,9 +93,7 @@ namespace Ryujinx.Cpu.LightningJit.Arm64.Target.Arm64
 
         private static void SplitBlocks(List<Block> blocks, List<ulong> branchTargets)
         {
-            int btIndex = 0;
-
-            while (btIndex < branchTargets.Count)
+            for (int btIndex = 0; btIndex < branchTargets.Count; btIndex++)
             {
                 for (int blockIndex = 0; blockIndex < blocks.Count && btIndex < branchTargets.Count; blockIndex++)
                 {
@@ -131,7 +129,6 @@ namespace Ryujinx.Cpu.LightningJit.Arm64.Target.Arm64
                 }
 
                 Debug.Assert(btIndex < int.MaxValue);
-                btIndex++;
             }
         }
 

@@ -241,14 +241,9 @@ namespace Ryujinx.Graphics.Vulkan
             return new MemoryAllocation(this, newBlock, deviceMemory, GetHostPointer(newBlock, newBlockOffset), newBlockOffset, size);
         }
 
-        private static IntPtr GetHostPointer(Block block, ulong offset)
+        private static nint GetHostPointer(Block block, ulong offset)
         {
-            if (block.HostPointer == IntPtr.Zero)
-            {
-                return IntPtr.Zero;
-            }
-
-            return (IntPtr)((nuint)block.HostPointer + offset);
+            return block.HostPointer == nint.Zero ? nint.Zero : (nint)((nuint)block.HostPointer + offset);
         }
 
         public void Free(Block block, ulong offset, ulong size)

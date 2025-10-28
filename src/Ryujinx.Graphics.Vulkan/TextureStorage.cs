@@ -445,12 +445,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         private int GetBufferDataLength(int length)
         {
-            if (NeedsD24S8Conversion())
-            {
-                return length * 2;
-            }
-
-            return length;
+            return NeedsD24S8Conversion() ? length * 2 : length;
         }
 
         private bool NeedsD24S8Conversion()

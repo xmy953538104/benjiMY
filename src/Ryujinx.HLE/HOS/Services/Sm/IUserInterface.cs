@@ -1,3 +1,4 @@
+using Gommon;
 using Ryujinx.Common.Logging;
 using Ryujinx.HLE.HOS.Ipc;
 using Ryujinx.HLE.HOS.Kernel;
@@ -64,7 +65,7 @@ namespace Ryujinx.HLE.HOS.Services.Sm
 
             string name = ReadName(context);
 
-            if (name == string.Empty)
+            if (string.IsNullOrEmpty(name))
             {
                 return ResultCode.InvalidName;
             }

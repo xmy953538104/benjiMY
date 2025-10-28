@@ -62,12 +62,7 @@ namespace Ryujinx.Graphics.Vulkan
                 return false;
             }
 
-            if (!SequenceEqual<Format>(AttachmentFormats.AsSpan(), other.AttachmentFormats.AsSpan(), ColorBlendAttachmentStateCount + (HasDepthStencil ? 1u : 0u)))
-            {
-                return false;
-            }
-
-            return true;
+            return SequenceEqual<Format>(AttachmentFormats.AsSpan(), other.AttachmentFormats.AsSpan(), ColorBlendAttachmentStateCount + (HasDepthStencil ? 1u : 0u));
         }
 
         private static bool SequenceEqual<T>(ReadOnlySpan<T> x, ReadOnlySpan<T> y, uint count) where T : unmanaged

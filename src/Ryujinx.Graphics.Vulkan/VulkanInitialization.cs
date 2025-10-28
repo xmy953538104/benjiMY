@@ -220,12 +220,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         private static bool IsPreferredAndSuitableDevice(Vk api, VulkanPhysicalDevice physicalDevice, SurfaceKHR surface, string preferredGpuId)
         {
-            if (physicalDevice.Id != preferredGpuId)
-            {
-                return false;
-            }
-
-            return IsSuitableDevice(api, physicalDevice, surface);
+            return physicalDevice.Id != preferredGpuId ? false : IsSuitableDevice(api, physicalDevice, surface);
         }
 
         private static bool IsSuitableDevice(Vk api, VulkanPhysicalDevice physicalDevice, SurfaceKHR surface)

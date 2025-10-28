@@ -38,7 +38,7 @@ namespace Ryujinx.HLE.Generators
 
         public void DecreaseIndentation()
         {
-            if (_currentIndentCount - 1 >= 0)
+            if (_currentIndentCount >= 1)
             {
                 _currentIndentCount--;
             }

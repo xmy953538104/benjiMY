@@ -150,7 +150,7 @@ namespace Ryujinx.UI.Common.Helper
                 }
             }
 
-            if (TimeSpan.TryParse(valueSplit.Last(), out TimeSpan parsedTimeSpan))
+            if (TimeSpan.TryParse(valueSplit[^1], out TimeSpan parsedTimeSpan))
             {
                 returnTimeSpan = returnTimeSpan.Add(parsedTimeSpan);
             }

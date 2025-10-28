@@ -470,12 +470,9 @@ namespace Ryujinx.Graphics.Vulkan
         {
             int mappingSize = Math.Min(size, Size - offset);
 
-            if (_map != IntPtr.Zero)
-            {
-                return new Span<byte>((void*)(_map + offset), mappingSize);
-            }
-
-            throw new InvalidOperationException("The buffer is not host mapped.");
+            return _map != nint.Zero
+                ? new Span<byte>((void*)(_map + offset), mappingSize)
+                : throw new InvalidOperationException("The buffer is not host mapped.");
         }
 
         public bool RemoveOverlappingMirrors(int offset, int size)

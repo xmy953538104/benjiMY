@@ -554,12 +554,9 @@ namespace Ryujinx.Graphics.Vulkan
             
             bool isCompute = sources.Length == 1 && sources[0].Stage == ShaderStage.Compute;
 
-            if (info.State.HasValue || isCompute)
-            {
-                return new ShaderCollection(this, _device, sources, info.ResourceLayout, info.State ?? default, info.FromCache);
-            }
-
-            return new ShaderCollection(this, _device, sources, info.ResourceLayout);
+            return info.State.HasValue || isCompute
+                ? new ShaderCollection(this, _device, sources, info.ResourceLayout, info.State ?? default, info.FromCache)
+                : new ShaderCollection(this, _device, sources, info.ResourceLayout);
         }
 
         internal ShaderCollection CreateProgramWithMinimalLayout(ShaderSource[] sources, ResourceLayout resourceLayout, SpecDescription[] specDescription = null)
@@ -574,12 +571,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         public ITexture CreateTexture(TextureCreateInfo info)
         {
-            if (info.Target == Target.TextureBuffer)
-            {
-                return new TextureBuffer(this, info);
-            }
-
-            return CreateTextureView(info);
+            return info.Target == Target.TextureBuffer ? new TextureBuffer(this, info) : CreateTextureView(info);
         }
 
         public ITextureArray CreateTextureArray(int size, bool isBuffer)
@@ -858,12 +850,9 @@ namespace Ryujinx.Graphics.Vulkan
             uint driverVersionRaw = properties.DriverVersion;
 
             // NVIDIA differ from the standard here and uses a different format.
-            if (properties.VendorID == 0x10DE)
-            {
-                return $"{(driverVersionRaw >> 22) & 0x3FF}.{(driverVersionRaw >> 14) & 0xFF}.{(driverVersionRaw >> 6) & 0xFF}.{driverVersionRaw & 0x3F}";
-            }
-
-            return ParseStandardVulkanVersion(driverVersionRaw);
+            return properties.VendorID == 0x10DE
+                ? $"{(driverVersionRaw >> 22) & 0x3FF}.{(driverVersionRaw >> 14) & 0xFF}.{(driverVersionRaw >> 6) & 0xFF}.{driverVersionRaw & 0x3F}"
+                : ParseStandardVulkanVersion(driverVersionRaw);
         }
 
         internal PrimitiveTopology TopologyRemap(PrimitiveTopology topology)

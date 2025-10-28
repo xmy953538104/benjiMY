@@ -171,12 +171,7 @@ namespace Ryujinx.Graphics.Shader.CodeGen.Glsl.Instructions
                 // This is sort of a special case, if this is a negative constant,
                 // and it is consumed by a unary operation, we need to put on the parenthesis,
                 // as in GLSL a sequence like --2 or ~-1 is not valid.
-                if (IsNegativeConst(node) && pInfo.Type == InstType.OpUnary)
-                {
-                    return true;
-                }
-
-                return false;
+                return IsNegativeConst(node) && pInfo.Type == InstType.OpUnary;
             }
 
             if ((pInfo.Type & (InstType.Call | InstType.Special)) != 0)

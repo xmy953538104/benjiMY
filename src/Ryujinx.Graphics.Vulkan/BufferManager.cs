@@ -414,62 +414,34 @@ namespace Ryujinx.Graphics.Vulkan
 
         public Auto<DisposableBufferView> CreateView(BufferHandle handle, VkFormat format, int offset, int size, Action invalidateView)
         {
-            if (TryGetBuffer(handle, out var holder))
-            {
-                return holder.CreateView(format, offset, size, invalidateView);
-            }
-
-            return null;
+            return TryGetBuffer(handle, out BufferHolder holder) ? holder.CreateView(format, offset, size, invalidateView) : null;
         }
 
         public Auto<DisposableBuffer> GetBuffer(CommandBuffer commandBuffer, BufferHandle handle, bool isWrite, bool isSSBO = false)
         {
-            if (TryGetBuffer(handle, out var holder))
-            {
-                return holder.GetBuffer(commandBuffer, isWrite, isSSBO);
-            }
-
-            return null;
+            return TryGetBuffer(handle, out BufferHolder holder) ? holder.GetBuffer(commandBuffer, isWrite, isSSBO) : null;
         }
 
         public Auto<DisposableBuffer> GetBuffer(CommandBuffer commandBuffer, BufferHandle handle, int offset, int size, bool isWrite)
         {
-            if (TryGetBuffer(handle, out var holder))
-            {
-                return holder.GetBuffer(commandBuffer, offset, size, isWrite);
-            }
-
-            return null;
+            return TryGetBuffer(handle, out BufferHolder holder) ? holder.GetBuffer(commandBuffer, offset, size, isWrite) : null;
         }
 
         public Auto<DisposableBuffer> GetBufferI8ToI16(CommandBufferScoped cbs, BufferHandle handle, int offset, int size)
         {
-            if (TryGetBuffer(handle, out var holder))
-            {
-                return holder.GetBufferI8ToI16(cbs, offset, size);
-            }
-
-            return null;
+            return TryGetBuffer(handle, out BufferHolder holder) ? holder.GetBufferI8ToI16(cbs, offset, size) : null;
         }
 
         public Auto<DisposableBuffer> GetAlignedVertexBuffer(CommandBufferScoped cbs, BufferHandle handle, int offset, int size, int stride, int alignment)
         {
-            if (TryGetBuffer(handle, out var holder))
-            {
-                return holder.GetAlignedVertexBuffer(cbs, offset, size, stride, alignment);
-            }
-
-            return null;
+            return TryGetBuffer(handle, out BufferHolder holder) ? holder.GetAlignedVertexBuffer(cbs, offset, size, stride, alignment) : null;
         }
 
         public Auto<DisposableBuffer> GetBufferTopologyConversion(CommandBufferScoped cbs, BufferHandle handle, int offset, int size, IndexBufferPattern pattern, int indexSize)
         {
-            if (TryGetBuffer(handle, out var holder))
-            {
-                return holder.GetBufferTopologyConversion(cbs, offset, size, pattern, indexSize);
-            }
-
-            return null;
+            return TryGetBuffer(handle, out BufferHolder holder)
+                ? holder.GetBufferTopologyConversion(cbs, offset, size, pattern, indexSize)
+                : null;
         }
 
         public (Auto<DisposableBuffer>, Auto<DisposableBuffer>) GetBufferTopologyConversionIndirect(
@@ -621,12 +593,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         public PinnedSpan<byte> GetData(BufferHandle handle, int offset, int size)
         {
-            if (TryGetBuffer(handle, out var holder))
-            {
-                return holder.GetData(offset, size);
-            }
-
-            return new PinnedSpan<byte>();
+            return TryGetBuffer(handle, out BufferHolder holder) ? holder.GetData(offset, size) : new PinnedSpan<byte>();
         }
 
         public void SetData<T>(BufferHandle handle, int offset, ReadOnlySpan<T> data) where T : unmanaged

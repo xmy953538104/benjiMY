@@ -276,12 +276,7 @@ namespace Ryujinx.Graphics.Gpu.Shader.DiskCache
             string tocFilePath = Path.Combine(_basePath, SharedTocFileName);
             string dataFilePath = Path.Combine(_basePath, SharedDataFileName);
 
-            if (!File.Exists(tocFilePath) || !File.Exists(dataFilePath) || !_guestStorage.TocFileExists() || !_guestStorage.DataFileExists())
-            {
-                return false;
-            }
-
-            return true;
+            return File.Exists(tocFilePath) && File.Exists(dataFilePath) && _guestStorage.TocFileExists() && _guestStorage.DataFileExists();
         }
 
         /// <summary>

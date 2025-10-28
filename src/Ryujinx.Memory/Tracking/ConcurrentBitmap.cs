@@ -108,12 +108,7 @@ namespace Ryujinx.Memory.Tracking
 
             long endValue = Interlocked.Read(ref Masks[endIndex]);
 
-            if ((endValue & endMask) != 0)
-            {
-                return true;
-            }
-
-            return false;
+            return (endValue & endMask) != 0;
         }
 
         /// <summary>
