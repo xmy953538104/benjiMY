@@ -88,6 +88,18 @@ import org.kenjinx.android.viewmodels.HomeViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.widgets.SimpleAlertDialog
 
+// NEW: Cheats
+import org.kenjinx.android.cheats.CheatPrefs
+import org.kenjinx.android.cheats.CheatItem
+import org.kenjinx.android.cheats.loadCheatsFromDisk
+import org.kenjinx.android.cheats.applyCheatSelectionOnDisk
+import org.kenjinx.android.cheats.importCheatTxt
+
+// NEW: Mods
+import org.kenjinx.android.cheats.listMods
+import org.kenjinx.android.cheats.deleteMod
+import org.kenjinx.android.cheats.importModsZip
+
 class HomeViews {
     companion object {
         const val ListImageSize = 150
@@ -124,7 +136,127 @@ class HomeViews {
             var isFabVisible by remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
 
+            // NEW: Cheats UI state
+            val openCheatsDialog = remember { mutableStateOf(false) }
+            val cheatsForSelected = remember { mutableStateOf(listOf<CheatItem>()) }
+            val enabledCheatKeys = remember { mutableStateOf(mutableSetOf<String>()) }
+
+            // NEW: Mods UI state
+            val openModsDialog = remember { mutableStateOf(false) }
+            val modsForSelected = remember { mutableStateOf(listOf<String>()) }
+            val importProgress = remember { mutableStateOf(0f) }
+            val importBusy = remember { mutableStateOf(false) }
+            val importStatusText = remember { mutableStateOf("") }
+
+            // Shortcut-Dialog-State
+            val showShortcutDialog = remember { mutableStateOf(false) }
+            val shortcutName = remember { mutableStateOf("") }
+
             val context = LocalContext.current
+            val activity = LocalContext.current as? Activity
+
+            // NEW: Cheats Import (.txt)
+            val importCheatLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                val act = viewModel.activity
+                val titleId = gm?.titleId ?: ""
+                if (uri != null && act != null && titleId.isNotEmpty()) {
+                    // nur .txt akzeptieren
+                    val okExt = runCatching {
+                        DocumentFile.fromSingleUri(act, uri)?.name?.lowercase()?.endsWith(".txt") == true
+                    }.getOrElse { false }
+                    if (!okExt) {
+                        Toast.makeText(act, "Please select a .txt file", Toast.LENGTH_SHORT).show()
+                        return@rememberLauncherForActivityResult
+                    }
+
+                    val res = importCheatTxt(act, titleId, uri)
+                    if (res.isSuccess) {
+                        Toast.makeText(act, "Imported: ${res.getOrNull()?.name}", Toast.LENGTH_SHORT).show()
+                        // danach Liste aktualisieren
+                        cheatsForSelected.value = loadCheatsFromDisk(act, titleId)
+                    } else {
+                        Toast.makeText(act, "Import failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            // NEW: Launcher for Mods
+            val pickModZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                val act = viewModel.activity
+                val titleId = gm?.titleId ?: ""
+                if (uri != null && act != null && titleId.isNotEmpty()) {
+                    // Persist permission (lesen)
+                    try {
+                        act.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: Exception) {}
+
+                    importBusy.value = true
+                    importProgress.value = 0f
+                    importStatusText.value = "Starting…"
+
+                    thread {
+                        val res = importModsZip(
+                            act,
+                            titleId,
+                            uri
+                        ) { prog ->
+                            importProgress.value = prog.fraction
+                            importStatusText.value = if (prog.currentEntry.isNotEmpty())
+                                "Copying: ${prog.currentEntry}"
+                            else
+                                "Copying… ${(prog.fraction * 100).toInt()}%"
+                        }
+
+                        // Liste aktualisieren
+                        modsForSelected.value = listMods(act, titleId)
+                        importBusy.value = false
+
+                        launchOnUiThread {
+                            val msg = if (res.ok)
+                                "Imported: ${res.imported.joinToString(", ")}"
+                            else
+                                "Import failed"
+                            Toast.makeText(act, msg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                }
+            }
+
+
+            // Launcher for "Custom icon" (OpenDocument)
+            val pickImageLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                if (uri != null && gm != null && activity != null) {
+                    val bmp = runCatching {
+                        context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) }
+                    }.getOrNull()
+
+                    val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
+                    val gameUri = resolveGameUri(gm)
+                    if (gameUri != null) {
+                        ShortcutUtils.persistReadWrite(activity, gameUri)
+
+                        ShortcutUtils.pinShortcutForGame(
+                            activity = activity,
+                            gameUri = gameUri,
+                            label = label,
+                            iconBitmap = bmp
+                        ) {
+
+                        }
+                    } else {
+                        showError.value = "Shortcut failed (no game URI found)."
+                    }
+                }
+            }
 
             val nestedScrollConnection = remember {
                 object : NestedScrollConnection {
@@ -241,7 +373,7 @@ class HomeViews {
                                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                                 }
 
-                        }
+                            }
 
                             OutlinedTextField(
                                 value = query.value,
@@ -256,13 +388,13 @@ class HomeViews {
                                 singleLine = true,
                                 shape = RoundedCornerShape(8.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        disabledContainerColor = Color.Transparent,
-                                        errorContainerColor = Color.Transparent,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    )
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    errorContainerColor = Color.Transparent,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                )
                             )
                         }
                     },
@@ -386,8 +518,15 @@ class HomeViews {
 
                             thread {
                                 showLoading.value = true
+
+                                // NEW: Push Cheats vor dem Start (Auto-Start Pfad)
+                                val gm = viewModel.mainViewModel.loadGameModel.value!!
+                                val tId = gm.titleId ?: ""
+                                val act = viewModel.activity
+
+
                                 val success = viewModel.mainViewModel.loadGame(
-                                    viewModel.mainViewModel.loadGameModel.value!!,
+                                    gm,
                                     true,
                                     viewModel.mainViewModel.forceNceAndPptc.value
                                 )
@@ -415,10 +554,17 @@ class HomeViews {
                                 if (showAppActions.value) {
                                     IconButton(onClick = {
                                         if (viewModel.mainViewModel?.selected != null) {
+
+                                            // NEW: Push Cheats vor dem Start (Run-Button)
+                                            val gmSel = viewModel.mainViewModel!!.selected!!
+                                            val tId = gmSel.titleId ?: ""
+                                            val act = viewModel.activity
+
+
                                             thread {
                                                 showLoading.value = true
                                                 val success = viewModel.mainViewModel.loadGame(
-                                                    viewModel.mainViewModel.selected!!
+                                                    gmSel
                                                 )
                                                 if (success == 1) {
                                                     launchOnUiThread {
@@ -489,6 +635,39 @@ class HomeViews {
                                                     openDlcDialog.value = true
                                                 }
                                             )
+                                            // NEW: Manage Cheats
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Manage Cheats") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    val gm = viewModel.mainViewModel?.selected
+                                                    val act = viewModel.activity
+                                                    if (gm != null && !gm.titleId.isNullOrEmpty() && act != null) {
+                                                        val titleId = gm.titleId!!
+                                                        cheatsForSelected.value = loadCheatsFromDisk(act, titleId)
+                                                        enabledCheatKeys.value = CheatPrefs(act).getEnabled(titleId)
+                                                        openCheatsDialog.value = true
+                                                    } else {
+                                                        showError.value = "No title selected."
+                                                    }
+                                                }
+                                            )
+                                            // NEW: Manage Mods
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Manage Mods") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    val gm = viewModel.mainViewModel?.selected
+                                                    val act = viewModel.activity
+                                                    if (gm != null && !gm.titleId.isNullOrEmpty() && act != null) {
+                                                        val titleId = gm.titleId!!
+                                                        modsForSelected.value = listMods(act, titleId)
+                                                        openModsDialog.value = true
+                                                    } else {
+                                                        showError.value = "No title selected."
+                                                    }
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -499,6 +678,258 @@ class HomeViews {
                             selectedModel.value = null
                         }
                     )
+
+                // --- Cheats Bottom Sheet ---
+                if (openCheatsDialog.value) {
+                    ModalBottomSheet(
+                        onDismissRequest = { openCheatsDialog.value = false }
+                    ) {
+                        val gm = viewModel.mainViewModel?.selected
+                        val act = viewModel.activity
+                        val titleId = gm?.titleId ?: ""
+
+                        Column(Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // LINKS: Import .txt
+                                TextButton(onClick = {
+                                    importCheatLauncher.launch(arrayOf("text/plain", "text/*", "*/*"))
+                                }) { Text("Import .txt") }
+
+                                // RECHTS: Cancel + Save
+                                Row {
+                                    TextButton(onClick = { openCheatsDialog.value = false }) { Text("Cancel") }
+                                    TextButton(onClick = {
+                                        val act2 = act
+                                        if (act2 != null && titleId.isNotEmpty()) {
+                                            CheatPrefs(act2).setEnabled(titleId, enabledCheatKeys.value)
+                                            applyCheatSelectionOnDisk(act2, titleId, enabledCheatKeys.value)
+                                            cheatsForSelected.value = loadCheatsFromDisk(act2, titleId)
+                                        }
+                                        openCheatsDialog.value = false
+                                    }) { Text("Save") }
+                                }
+                            }
+
+
+                            Text("Manage Cheats", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = gm?.titleName ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            if (cheatsForSelected.value.isEmpty()) {
+                                Text("No cheats found for this title.")
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 12.dp)
+                                ) {
+                                    items(cheatsForSelected.value) { cheat ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column(
+                                                Modifier
+                                                    .weight(1f)
+                                                    .padding(end = 12.dp)
+                                            ) {
+                                                Text(cheat.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                                Text(
+                                                    cheat.buildId,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                )
+                                            }
+                                            val checked = enabledCheatKeys.value.contains(cheat.key)
+                                            androidx.compose.material3.Switch(
+                                                checked = checked,
+                                                onCheckedChange = { isOn ->
+                                                    enabledCheatKeys.value =
+                                                        enabledCheatKeys.value.toMutableSet().apply {
+                                                            if (isOn) add(cheat.key) else remove(cheat.key)
+                                                        }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+
+                        }
+                    }
+                }
+
+                // --- Mods Bottom Sheet ---
+                if (openModsDialog.value) {
+                    ModalBottomSheet(
+                        onDismissRequest = { openModsDialog.value = false }
+                    ) {
+                        val gm = viewModel.mainViewModel?.selected
+                        val act = viewModel.activity
+                        val titleId = gm?.titleId ?: ""
+
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Manage Mods", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = gm?.titleName ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            // Import-Zeile
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    enabled = !importBusy.value,
+                                    onClick = { pickModZipLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }
+                                ) { Text("Import .zip") }
+                            }
+
+                            // Progress
+                            if (importBusy.value) {
+                                androidx.compose.material3.LinearProgressIndicator(
+                                    progress = { importProgress.value },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                )
+                                Text(
+                                    importStatusText.value,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
+
+                            // Liste der Mods
+                            if (modsForSelected.value.isEmpty()) {
+                                Text("No mods found for this title.")
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 12.dp)
+                                ) {
+                                    items(modsForSelected.value) { modName ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(modName, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            Row {
+                                                TextButton(
+                                                    onClick = {
+                                                        val a = act
+                                                        if (a != null && titleId.isNotEmpty()) {
+                                                            thread {
+                                                                val ok = deleteMod(a, titleId, modName)
+                                                                if (ok) {
+                                                                    modsForSelected.value = listMods(a, titleId)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                ) { Text("Delete") }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = { openModsDialog.value = false }) { Text("Close") }
+                            }
+                        }
+                    }
+                }
+                // --- Shortcut-Dialog
+                if (showShortcutDialog.value) {
+                    val gm = viewModel.mainViewModel?.selected
+                    AlertDialog(
+                        onDismissRequest = { showShortcutDialog.value = false },
+                        title = { Text("Create shortcut") },
+                        text = {
+                            Column {
+                                OutlinedTextField(
+                                    value = shortcutName.value,
+                                    onValueChange = { shortcutName.value = it },
+                                    label = { Text("Name") },
+                                    singleLine = true
+                                )
+                                Text(
+                                    text = "Choose icon:",
+                                    modifier = Modifier.padding(top = 12.dp)
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp)
+                                ) {
+                                    TextButton(onClick = {
+                                        // App icon (Grid image)
+                                        if (gm != null && activity != null) {
+                                            val gameUri = resolveGameUri(gm)
+                                            if (gameUri != null) {
+                                                // persist rights for the game file
+                                                ShortcutUtils.persistReadWrite(activity, gameUri)
+
+                                                val bmp = decodeGameIcon(gm)
+                                                val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
+
+                                                ShortcutUtils.pinShortcutForGame(
+                                                    activity = activity,
+                                                    gameUri = gameUri,
+                                                    label = label,
+                                                    iconBitmap = bmp
+                                                ) { }
+                                                showShortcutDialog.value = false
+                                            } else {
+                                                showShortcutDialog.value = false
+                                            }
+                                        } else {
+                                            showShortcutDialog.value = false
+                                        }
+                                    }) { Text("App icon") }
+
+                                    TextButton(onClick = {
+                                        // Custom icon: open picker
+                                        pickImageLauncher.launch(arrayOf("image/*"))
+                                        showShortcutDialog.value = false
+                                    }) { Text("Custom icon") }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showShortcutDialog.value = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
+                }
 
                 // --- Version badge bottom left above the entire content
                 VersionBadge(
@@ -540,6 +971,12 @@ class HomeViews {
                             ) {
                                 thread {
                                     showLoading.value = true
+
+                                    // NEW: Push Cheats vor dem Start
+                                    val tId = gameModel.titleId ?: ""
+                                    val act = viewModel.activity
+
+
                                     val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
                                         launchOnUiThread { viewModel.mainViewModel?.navigateToGame() }
@@ -631,6 +1068,12 @@ class HomeViews {
                             ) {
                                 thread {
                                     showLoading.value = true
+
+                                    // NEW: Push Cheats vor dem Start
+                                    val tId = gameModel.titleId ?: ""
+                                    val act = viewModel.activity
+
+
                                     val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
                                         launchOnUiThread { viewModel.mainViewModel?.navigateToGame() }
