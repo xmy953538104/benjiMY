@@ -1,3 +1,4 @@
+// src/KenjinxAndroid/app/src/main/java/org/kenjinx/android/GameController4.kt
 package org.kenjinx.android
 
 import android.app.Activity
@@ -21,26 +22,22 @@ import com.swordfish.radialgamepad.library.config.PrimaryDialConfig
 import com.swordfish.radialgamepad.library.config.RadialGamePadConfig
 import com.swordfish.radialgamepad.library.config.SecondaryDialConfig
 import com.swordfish.radialgamepad.library.event.Event
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import org.kenjinx.android.viewmodels.MainViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
 
-typealias GamePad = RadialGamePad
-typealias GamePadConfig = RadialGamePadConfig
-
-// --- Dummy IDs to disconnect legacy L3/R3 (stick double tap/tap) ---
 private const val DUMMY_LEFT_STICK_PRESS_ID  = 10001
 private const val DUMMY_RIGHT_STICK_PRESS_ID = 10002
 
-class GameController(var activity: Activity) : IGameController {
+/**
+ * GameController4
+ * Layout 4 – aktuell identisch zum Default-Layout, als eigenständige Klasse.
+ */
+class GameController4(var activity: Activity) : IGameController {
 
     companion object {
-        private fun init(context: Context, controller: GameController): View {
+        private fun init(context: Context, controller: GameController4): View {
             val inflater = LayoutInflater.from(context)
             val parent = FrameLayout(context)
             val view = inflater.inflate(R.layout.game_layout, parent, false)
@@ -54,19 +51,17 @@ class GameController(var activity: Activity) : IGameController {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
-                    val controller = GameController(viewModel.activity)
+                    val controller = GameController4(viewModel.activity)
                     val c = init(context, controller)
-                    viewModel.activity.lifecycleScope.apply {
-                        viewModel.activity.lifecycleScope.launch {
-                            val events = merge(
-                                controller.leftGamePad.events(),
-                                controller.rightGamePad.events()
-                            ).shareIn(viewModel.activity.lifecycleScope, SharingStarted.Lazily)
-                            events.safeCollect {
-                                controller.handleEvent(it)
-                            }
-                        }
+
+                    viewModel.activity.lifecycleScope.launch {
+                        val events = merge(
+                            controller.leftGamePad.events(),
+                            controller.rightGamePad.events()
+                        )
+                        events.safeCollect { controller.handleEvent(it) }
                     }
+
                     controller.controllerView = c
                     viewModel.setGameController(controller)
                     controller.setVisible(QuickSettings(viewModel.activity).useVirtualController)
@@ -77,16 +72,16 @@ class GameController(var activity: Activity) : IGameController {
     }
 
     private var controllerView: View? = null
-    var leftGamePad: GamePad
-    var rightGamePad: GamePad
+    var leftGamePad: RadialGamePad
+    var rightGamePad: RadialGamePad
     var controllerId: Int = -1
     override val isVisible: Boolean
         get() = controllerView?.isVisible ?: false
 
     init {
         val useSwitchLayout = QuickSettings(activity).useSwitchLayout
-        leftGamePad = GamePad(generateConfig(true,  useSwitchLayout), 16f, activity)
-        rightGamePad = GamePad(generateConfig(false, useSwitchLayout), 16f, activity)
+        leftGamePad = RadialGamePad(generateConfig4(true,  useSwitchLayout), 16f, activity)
+        rightGamePad = RadialGamePad(generateConfig4(false, useSwitchLayout), 16f, activity)
 
         leftGamePad.primaryDialMaxSizeDp = 200f
         rightGamePad.primaryDialMaxSizeDp = 200f
@@ -116,20 +111,15 @@ class GameController(var activity: Activity) : IGameController {
         controllerId.apply {
             when (ev) {
                 is Event.Button -> {
-                    // Ignore legacy L3/R3 via stick press (double tap)
-                    if (ev.id == DUMMY_LEFT_STICK_PRESS_ID || ev.id == DUMMY_RIGHT_STICK_PRESS_ID) {
-                        return
-                    }
+                    if (ev.id == DUMMY_LEFT_STICK_PRESS_ID || ev.id == DUMMY_RIGHT_STICK_PRESS_ID) return
                     when (ev.action) {
                         KeyEvent.ACTION_UP   -> KenjinxNative.inputSetButtonReleased(ev.id, this)
                         KeyEvent.ACTION_DOWN -> KenjinxNative.inputSetButtonPressed(ev.id, this)
                     }
                 }
-
                 is Event.Direction -> {
                     when (ev.id) {
                         GamePadButtonInputId.DpadUp.ordinal -> {
-                            // Horizontal
                             if (ev.xAxis > 0) {
                                 KenjinxNative.inputSetButtonPressed(GamePadButtonInputId.DpadRight.ordinal, this)
                                 KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadLeft.ordinal, this)
@@ -140,7 +130,6 @@ class GameController(var activity: Activity) : IGameController {
                                 KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadLeft.ordinal, this)
                                 KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadRight.ordinal, this)
                             }
-                            // Vertical
                             if (ev.yAxis < 0) {
                                 KenjinxNative.inputSetButtonPressed(GamePadButtonInputId.DpadUp.ordinal, this)
                                 KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadDown.ordinal, this)
@@ -152,14 +141,12 @@ class GameController(var activity: Activity) : IGameController {
                                 KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.DpadUp.ordinal, this)
                             }
                         }
-
                         GamePadButtonInputId.LeftStick.ordinal -> {
                             val setting = QuickSettings(activity)
                             val x = MathUtils.clamp(ev.xAxis * setting.controllerStickSensitivity, -1f, 1f)
                             val y = MathUtils.clamp(ev.yAxis * setting.controllerStickSensitivity, -1f, 1f)
                             KenjinxNative.inputSetStickAxis(1, x, -y, this)
                         }
-
                         GamePadButtonInputId.RightStick.ordinal -> {
                             val setting = QuickSettings(activity)
                             val x = MathUtils.clamp(ev.xAxis * setting.controllerStickSensitivity, -1f, 1f)
@@ -173,17 +160,12 @@ class GameController(var activity: Activity) : IGameController {
     }
 }
 
-suspend fun <T> Flow<T>.safeCollect(block: suspend (T) -> Unit) {
-    this.catch { }
-        .collect { block(it) }
-}
-
-private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadConfig {
+private fun generateConfig4(isLeft: Boolean, useSwitchLayout: Boolean): RadialGamePadConfig {
     val distance = 0.3f
     val buttonScale = 1f
 
     if (isLeft) {
-        return GamePadConfig(
+        return RadialGamePadConfig(
             /* ringSegments = */ 12,
             /* Primary (Stick)  */
             // IMPORTANT: pressButtonId -> DUMMY_LEFT_STICK_PRESS_ID, so that double tap does not trigger L3
@@ -199,7 +181,7 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
                 SecondaryDialConfig.Cross(
                     /* sector */ 10,
                     /* size   */ 3,
-                    /* gap    */ 2.5f,
+                    /* gap    */ 2.1f,
                     distance,
                     CrossConfig(
                         GamePadButtonInputId.DpadUp.ordinal,
@@ -215,9 +197,9 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
 
                 // Minus
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 1,
+                    /* sector */ 9,
                     buttonScale,
-                    distance,
+                    0.3f,
                     ButtonConfig(
                         GamePadButtonInputId.Minus.ordinal,
                         "-",
@@ -235,7 +217,7 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
                 // L-Bumper
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 2,
-                    distance,
+                    1.2f,
                     ButtonConfig(
                         GamePadButtonInputId.LeftShoulder.ordinal,
                         "L",
@@ -251,10 +233,9 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
                 ),
 
                 // ZL-Trigger
-                SecondaryDialConfig.SingleButton(
-                    /* sector */ 9,
-                    buttonScale,
-                    distance,
+                SecondaryDialConfig.DoubleButton(
+                    /* sector */ 2,
+                    2f,
                     ButtonConfig(
                         GamePadButtonInputId.LeftTrigger.ordinal,
                         "ZL",
@@ -269,28 +250,10 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // NEW (remains): L3 as a separate button
-                SecondaryDialConfig.SingleButton(
-                    /* sector */ 1,
-                    buttonScale,
-                    1.5f,
-                    ButtonConfig(
-                        GamePadButtonInputId.LeftStickButton.ordinal,
-                        "L3",
-                        true,
-                        null,
-                        "LeftStickButton",
-                        setOf(),
-                        true,
-                        null
-                    ),
-                    null,
-                    SecondaryDialConfig.RotationProcessor()
-                ),
-            )
+                )
         )
     } else {
-        return GamePadConfig(
+        return RadialGamePadConfig(
             /* ringSegments = */ 12,
             /* Primary (ABXY) */
             PrimaryDialConfig.PrimaryButtons(
@@ -317,12 +280,12 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
                 null
             ),
             listOf(
-                // Right stick (unchanged)
+                // Right stick
                 // IMPORTANT: pressButtonId -> DUMMY_RIGHT_STICK_PRESS_ID, so that double tap does not trigger R3
                 SecondaryDialConfig.Stick(
-                    /* sector */ 7,
-                    /* size   */ 2,
-                    /* gap    */ 2f,
+                    /* sector */ 6,
+                    /* size   */ 3,
+                    /* gap    */ 2.7f,
                     distance,
                     GamePadButtonInputId.RightStick.ordinal,
                     DUMMY_RIGHT_STICK_PRESS_ID,
@@ -334,9 +297,9 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
 
                 // Plus
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 6,
+                    /* sector */ 9,
                     buttonScale,
-                    distance,
+                    0.3f,
                     ButtonConfig(
                         GamePadButtonInputId.Plus.ordinal,
                         "+",
@@ -354,7 +317,7 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
                 // R-Bumper
                 SecondaryDialConfig.DoubleButton(
                     /* sector */ 3,
-                    distance,
+                    1.2f,
                     ButtonConfig(
                         GamePadButtonInputId.RightShoulder.ordinal,
                         "R",
@@ -370,10 +333,9 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
                 ),
 
                 // ZR-Trigger
-                SecondaryDialConfig.SingleButton(
-                    /* sector */ 9,
-                    buttonScale,
-                    distance,
+                SecondaryDialConfig.DoubleButton(
+                    /* sector */ 3,
+                    2f,
                     ButtonConfig(
                         GamePadButtonInputId.RightTrigger.ordinal,
                         "ZR",
@@ -388,17 +350,36 @@ private fun generateConfig(isLeft: Boolean, useSwitchLayout: Boolean): GamePadCo
                     SecondaryDialConfig.RotationProcessor()
                 ),
 
-                // NEW (remains): R3 as a separate button
+                // R3 separat
                 SecondaryDialConfig.SingleButton(
-                    /* sector */ 5,
+                    /* sector */ 3,
                     buttonScale,
-                    1.5f,
+                    0f,
                     ButtonConfig(
                         GamePadButtonInputId.RightStickButton.ordinal,
                         "R3",
                         true,
                         null,
                         "RightStickButton",
+                        setOf(),
+                        true,
+                        null
+                    ),
+                    null,
+                    SecondaryDialConfig.RotationProcessor()
+                ),
+
+                // L3 separat
+                SecondaryDialConfig.SingleButton(
+                    /* sector */ 4,
+                    buttonScale,
+                    0f,
+                    ButtonConfig(
+                        GamePadButtonInputId.LeftStickButton.ordinal,
+                        "L3",
+                        true,
+                        null,
+                        "LeftStickButton",
                         setOf(),
                         true,
                         null

@@ -89,6 +89,8 @@ import org.kenjinx.android.viewmodels.QuickSettings.OverlayMenuPosition // ← N
 import org.kenjinx.android.SystemLanguage
 import org.kenjinx.android.RegionCode
 
+import org.kenjinx.android.viewmodels.QuickSettings.VirtualControllerPreset
+
 class SettingViews {
     companion object {
         const val EXPANSTION_TRANSITION_DURATION = 450
@@ -129,6 +131,9 @@ class SettingViews {
             val isGrid = remember { mutableStateOf(true) }
             val useSwitchLayout = remember { mutableStateOf(true) }
             val enableMotion = remember { mutableStateOf(true) }
+            val vcPreset = remember {
+                mutableStateOf(QuickSettings(mainViewModel.activity).virtualControllerPreset)
+            }
             val enablePerformanceMode = remember { mutableStateOf(true) }
             val controllerStickSensitivity = remember { mutableFloatStateOf(1.0f) }
             val enableStubLogs = remember { mutableStateOf(true) }
@@ -1224,6 +1229,17 @@ class SettingViews {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             useVirtualController.SwitchSelector(label = "Use Virtual Controller")
                             useSwitchLayout.SwitchSelector(label = "Use Switch Controller Layout")
+                            if (useVirtualController.value) {
+                                VirtualControllerPresetDropdown(
+                                    selectedPreset = vcPreset.value,
+                                    onPresetSelected = { preset ->
+                                        vcPreset.value = preset
+                                        val qs = QuickSettings(mainViewModel.activity)
+                                        qs.virtualControllerPreset = preset
+                                        qs.save() // sofort persistieren, wie bei Overlay-Settings
+                                    }
+                                )
+                            }
 
                             val interactionSource: MutableInteractionSource = remember { MutableInteractionSource() }
 
@@ -1503,8 +1519,6 @@ class SettingViews {
             )
         }
 
-        // ---- Existing dropdowns ----
-
         // ---- Dropdown for orientation ----
         @Composable
         fun OrientationDropdown(
@@ -1532,7 +1546,38 @@ class SettingViews {
             )
         }
 
-        // ---- Existing dropdowns ----
+        @Composable
+        fun VirtualControllerPresetDropdown(
+            selectedPreset: VirtualControllerPreset,
+            onPresetSelected: (VirtualControllerPreset) -> Unit
+        ) {
+            val options = listOf(
+                VirtualControllerPreset.Default,
+                VirtualControllerPreset.Layout2,
+                VirtualControllerPreset.Layout3,
+                VirtualControllerPreset.Layout4,
+                VirtualControllerPreset.Layout5,
+                VirtualControllerPreset.Layout6
+            )
+
+            DropdownSelector(
+                label = "Controller Layout",
+                selectedValue = selectedPreset,
+                options = options,
+                getDisplayText = { opt ->
+                    when (opt) {
+                        VirtualControllerPreset.Default -> "Default"
+                        VirtualControllerPreset.Layout2 -> "Layout 2"
+                        VirtualControllerPreset.Layout3 -> "Layout 3"
+                        VirtualControllerPreset.Layout4 -> "Layout 4"
+                        VirtualControllerPreset.Layout5 -> "Layout 5"
+                        VirtualControllerPreset.Layout6 -> "Layout 6"
+                    }
+                },
+                onOptionSelected = onPresetSelected
+            )
+        }
+
 
         @Composable
         fun MemoryModeDropdown(

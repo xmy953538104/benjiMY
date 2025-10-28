@@ -24,6 +24,13 @@ class QuickSettings(val activity: Activity) {
         BottomMiddle, BottomLeft, BottomRight, TopMiddle, TopLeft, TopRight
     }
 
+    // --- Virtual Controller Preset
+    enum class VirtualControllerPreset {
+        Default, Layout2, Layout3, Layout4, Layout5, Layout6
+    }
+
+    var virtualControllerPreset: VirtualControllerPreset
+
     var orientationPreference: OrientationPreference
 
     // --- Overlay Settings
@@ -94,6 +101,9 @@ class QuickSettings(val activity: Activity) {
         resScale = sharedPref.getFloat("resScale", 1f)
         maxAnisotropy = sharedPref.getFloat("maxAnisotropy", 0f)
         useVirtualController = sharedPref.getBoolean("useVirtualController", true)
+        virtualControllerPreset = VirtualControllerPreset.entries[
+            sharedPref.getInt("virtualControllerPreset", VirtualControllerPreset.Default.ordinal)
+        ]
         isGrid = sharedPref.getBoolean("isGrid", true)
         useSwitchLayout = sharedPref.getBoolean("useSwitchLayout", true)
         enableMotion = sharedPref.getBoolean("enableMotion", true)
@@ -151,6 +161,7 @@ class QuickSettings(val activity: Activity) {
             putBoolean("enableTraceLogs", enableTraceLogs)
             putBoolean("enableDebugLogs", enableDebugLogs)
             putBoolean("enableGraphicsLogs", enableGraphicsLogs)
+            putInt("virtualControllerPreset", virtualControllerPreset.ordinal)
         }
     }
 
