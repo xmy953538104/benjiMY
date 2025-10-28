@@ -15,7 +15,8 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ## Version 2.0.5i – Highlights
 
-- **Nightly Patches**: added some nightly patches from Kenji-NX. All Credits to KeatonTheBot, LotP, Coxxs, GreemDev, Xam
+- **Tablets/Foldable**: Fixed Gamescreen for Tablets and Foldables.
+- **Nightly Patches**: added some nightly patches from Kenji-NX. All Credits to KeatonTheBot, LotP, Coxxs, GreemDev, Xam, TechDunk.
 - **DLCs/Updates**: Autoload title updates and dlc from selected folder. Credits to Jochem Kuipers.
 - **Virtual Controller**: Added 6 new Layouts for Virtual Controllers, selectable in Input Settings.
 - **Rendering**: Added an option to diasable Threaded Rendering. This reduces Performance, but fixes crashes in some Games.

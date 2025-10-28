@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.5j — 2025-10-27
+
+### Added
+- **NMinor Performance Patches**: Credits to TechDunk.
+
+### Fixed
+- **Tablets/Foldable**: Fixed Gamescreen for Tablets and Foldables.
+
 ## 2.0.5i — 2025-10-27
 
 ### Added
