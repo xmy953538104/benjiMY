@@ -29,8 +29,13 @@ import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.viewmodels.GameModel
 import org.kenjinx.android.views.MainView
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.hardware.display.DisplayManager
+import android.net.Uri
 import android.view.Surface
+import androidx.preference.PreferenceManager
+import java.io.File
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : BaseActivity() {
     private var physicalControllerManager: PhysicalControllerManager =
@@ -149,6 +154,11 @@ class MainActivity : BaseActivity() {
         var mainViewModel: MainViewModel? = null
         var AppPath: String = ""
         var StorageHelper: SimpleStorageHelper? = null
+
+        const val EXTRA_BOOT_PATH = "bootPath"
+        const val EXTRA_FORCE_NCE_PPTC = "forceNceAndPptc"
+        const val EXTRA_TITLE_ID = "titleId"
+        const val EXTRA_TITLE_NAME = "titleName"
 
         @JvmStatic
         fun frameEnded() {
@@ -316,19 +326,50 @@ class MainActivity : BaseActivity() {
     private fun handleIntent() {
         when (storedIntent.action) {
             Intent.ACTION_VIEW, "org.kenjinx.android.LAUNCH_GAME" -> {
-                val bootPath = storedIntent.getStringExtra("bootPath")
-                val forceNceAndPptc = storedIntent.getBooleanExtra("forceNceAndPptc", false)
+                val bootPathExtra = storedIntent.getStringExtra(EXTRA_BOOT_PATH)
+                val forceNceAndPptc = storedIntent.getBooleanExtra(EXTRA_FORCE_NCE_PPTC, false)
+                val titleId = storedIntent.getStringExtra(EXTRA_TITLE_ID) ?: ""
+                val titleName = storedIntent.getStringExtra(EXTRA_TITLE_NAME) ?: ""
+                val dataUri: Uri? = storedIntent.data
 
-                if (bootPath != null) {
-                    val uri = bootPath.toUri()
-                    val documentFile = DocumentFile.fromSingleUri(this, uri)
+                val chosenUri: Uri? = when {
+                    !bootPathExtra.isNullOrEmpty() -> bootPathExtra.toUri()
+                    dataUri != null -> dataUri
+                    else -> null
+                }
 
-                    if (documentFile != null) {
-                        val gameModel = GameModel(documentFile, this)
+                if (chosenUri != null) {
+                    val doc = when (chosenUri.scheme?.lowercase()) {
+                        "content" -> DocumentFile.fromSingleUri(this, chosenUri)
+                        "file" -> chosenUri.path?.let { File(it) }?.let { DocumentFile.fromFile(it) }
+                        else -> {
+                            chosenUri.path?.let { File(it) }?.takeIf { it.exists() }?.let { DocumentFile.fromFile(it) }
+                                ?: DocumentFile.fromSingleUri(this, chosenUri)
+                        }
+                    }
+
+                    if (doc != null && doc.exists()) {
+                        val gameModel = GameModel(doc, this)
                         gameModel.getGameInfo()
                         mainViewModel?.loadGameModel?.value = gameModel
                         mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
                         mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
+                        storedIntent = Intent()
+                        return
+                    } else {
+                        Log.w("ShortcutDebug", "DocumentFile not found or not accessible: $chosenUri")
+                    }
+                }
+
+                if (titleId.isNotEmpty() || titleName.isNotEmpty()) {
+                    resolveGameByTitleIdOrName(titleId, titleName)?.let { doc ->
+                        val gameModel = GameModel(doc, this)
+                        gameModel.getGameInfo()
+                        mainViewModel?.loadGameModel?.value = gameModel
+                        mainViewModel?.bootPath?.value = "gameItem_${gameModel.titleName}"
+                        mainViewModel?.forceNceAndPptc?.value = forceNceAndPptc
+                        storedIntent = Intent()
+                        return
                     }
                 }
             }
@@ -345,6 +386,83 @@ class MainActivity : BaseActivity() {
         }
         rotLog("applyOrientationPreference: rot=$rot → ${deg(rot)}°, pref=${pref.name}")
         try { KenjinxNative.setSurfaceRotationByAndroidRotation(rot) } catch (_: Throwable) {}
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val rot = this.display?.rotation
+        val old = lastKnownRotation
+        lastKnownRotation = rot
+
+        rotLog("onConfigurationChanged: display.rotation=$rot → ${deg(rot)}°")
+
+        try { KenjinxNative.setSurfaceRotationByAndroidRotation(rot) } catch (_: Throwable) {}
+
+        val pref = QuickSettings(this).orientationPreference
+        val shouldPropagate =
+            pref == QuickSettings.OrientationPreference.Sensor ||
+                pref == QuickSettings.OrientationPreference.SensorLandscape
+
+        if (shouldPropagate && isGameRunning) {
+            handler.post { try { mainViewModel?.gameHost?.onOrientationOrSizeChanged(rot) } catch (_: Throwable) {} }
+        }
+
+        if (pref == QuickSettings.OrientationPreference.SensorLandscape && old != null && rot != null) {
+            val isSideFlip = (old == Surface.ROTATION_90 && rot == Surface.ROTATION_270) ||
+                (old == Surface.ROTATION_270 && rot == Surface.ROTATION_90)
+            if (isSideFlip) doOrientationPulse(rot)
+        }
+    }
+
+    // --- Helper for Shortcut-Fallback ---
+    private fun resolveGameByTitleIdOrName(titleIdHex: String?, displayName: String?): DocumentFile? {
+        val gamesRoot = getDefaultGamesTree() ?: return null
+        for (child in gamesRoot.listFiles()) {
+            if (!child.isFile) continue
+            if (!displayName.isNullOrBlank()) {
+                val n = child.name ?: ""
+                if (n.contains(displayName, ignoreCase = true)) return child
+            }
+            if (!titleIdHex.isNullOrBlank()) {
+                val tid = getTitleIdFast(child)
+                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) return child
+            }
+        }
+        if (!titleIdHex.isNullOrBlank()) {
+            for (child in gamesRoot.listFiles()) {
+                if (!child.isFile) continue
+                val tid = getTitleIdFast(child)
+                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) return child
+            }
+        }
+        return null
+    }
+
+    private fun getDefaultGamesTree(): DocumentFile? {
+        val vm = mainViewModel
+        if (vm?.defaultGameFolderUri != null) {
+            return DocumentFile.fromTreeUri(this, vm.defaultGameFolderUri!!)
+        }
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val legacyPath = prefs.getString("gameFolder", null)
+        if (!legacyPath.isNullOrEmpty()) {
+            // Ohne SAF-URI kein Tree-Listing möglich
+        }
+        return null
+    }
+
+    private fun getTitleIdFast(file: DocumentFile): String? {
+        val name = file.name ?: return null
+        val dot = name.lastIndexOf('.')
+        if (dot <= 0 || dot >= name.length - 1) return null
+        val ext = name.substring(dot + 1).lowercase()
+        return try {
+            contentResolver.openFileDescriptor(file.uri, "r")?.use { pfd ->
+                val info = org.kenjinx.android.viewmodels.GameInfo()
+                KenjinxNative.deviceGetGameInfo(pfd.fd, ext, info)
+                info.TitleId?.lowercase()
+            }
+        } catch (_: Exception) { null }
     }
 
     fun shutdownAndRestart() {

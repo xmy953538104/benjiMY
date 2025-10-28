@@ -95,6 +95,10 @@ interface KenjinxNativeJna : Library {
     fun deviceResize(width: Int, height: Int)
     // Set window handle after each query
     fun deviceSetWindowHandle(handle: Long)
+    // Amiibo
+    fun amiiboLoadBin(bytes: ByteArray, length: Int): Boolean
+    fun amiiboClear()
+
 }
 
 val jnaInstance: KenjinxNativeJna = Native.load(

@@ -7,6 +7,9 @@ using Ryujinx.HLE.HOS.Services.Hid;
 using Ryujinx.HLE.HOS.Services.Hid.HidServer;
 using Ryujinx.HLE.HOS.Services.Nfc.Nfp.NfpManager;
 using Ryujinx.Horizon.Common;
+using Ryujinx.HLE.Kenjinx;
+using System.Security.Cryptography;
+using Ryujinx.Common.Logging;
 using System;
 using System.Buffers.Binary;
 using System.Globalization;
@@ -142,7 +145,26 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
                 {
                     context.Device.System.NfpDevices[i].State = NfpDeviceState.SearchingForTag;
 
+                    if (KenjinxAmiiboShim.TryConsume(out var tagBytes))
+                    {
+                        var dev = context.Device.System.NfpDevices[i];
+
+                        if (TryGetFigureIdFrom1Dc(tagBytes, out var fid, out var raw))
+                        {
+                            dev.AmiiboId = fid;
+                            Logger.Info?.PrintMsg(LogClass.ServiceNfp, $"Kenjinx: raw@1DC={raw} → FigureID={fid}");
+                        }
+                        else
+                        {
+                            dev.AmiiboId = MakeAmiiboIdFromBytes(tagBytes);
+                            Logger.Info?.PrintMsg(LogClass.ServiceNfp, $"Kenjinx: FigureID={dev.AmiiboId} (fallback, keine 1DC-Bytes)");
+                        }
+
+                        dev.UseRandomUuid = false;
+                        dev.State = NfpDeviceState.TagFound;
+                    }
                     break;
+
                 }
             }
             _cancelTokenSource = new CancellationTokenSource();
@@ -155,7 +177,30 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
                         break;
                     }
 
+                    for (int d = 0; d < context.Device.System.NfpDevices.Count; d++)
+                    {
+                        var dev = context.Device.System.NfpDevices[d];
+
+                        if (dev.State == NfpDeviceState.SearchingForTag && KenjinxAmiiboShim.TryConsume(out var tagBytesLoop))
+                        {
+                            if (TryGetFigureIdFrom1Dc(tagBytesLoop, out var fid, out var raw))
+                            {
+                                dev.AmiiboId = fid;
+                                Logger.Info?.PrintMsg(LogClass.ServiceNfp, $"Kenjinx: raw@1DC={raw} → FigureID={fid}");
+                            }
+                            else
+                            {
+                                dev.AmiiboId = MakeAmiiboIdFromBytes(tagBytesLoop);
+                                Logger.Info?.PrintMsg(LogClass.ServiceNfp, $"Kenjinx: FigureID={dev.AmiiboId} (fallback, keine 1DC-Bytes)");
+                            }
+
+                            dev.UseRandomUuid = false;
+                            dev.State = NfpDeviceState.TagFound;
+                        }
+                    }
+
                     for (int i = 0; i < context.Device.System.NfpDevices.Count; i++)
+
                     {
                         if (context.Device.System.NfpDevices[i].State == NfpDeviceState.TagFound)
                         {
@@ -196,8 +241,53 @@ namespace Ryujinx.HLE.HOS.Services.Nfc.Nfp
                     break;
                 }
             }
+
+            KenjinxAmiiboShim.Clear();
+
             return ResultCode.Success;
         }
+
+        private static bool TryGetFigureIdFrom1Dc(byte[] data, out string figureId, out string debugRaw)
+        {
+            figureId = string.Empty;
+            debugRaw = string.Empty;
+
+            const int off = 0x1DC;
+            const int len = 8;
+
+            if (data == null || data.Length < off + len)
+            {
+                return false;
+            }
+
+            var s = data.AsSpan(off, len);
+
+            debugRaw = $"{s[0]:X2}-{s[1]:X2}-{s[2]:X2}-{s[3]:X2}-{s[4]:X2}-{s[5]:X2}-{s[6]:X2}-{s[7]:X2}";
+
+            figureId =
+                $"{s[0]:x2}{s[1]:x2}{s[2]:x2}{s[3]:x2}{s[4]:x2}{s[5]:x2}{s[6]:x2}{s[7]:x2}";
+
+            return true;
+        }
+
+        private static string MakeAmiiboIdFromBytes(byte[] data)
+        {
+            if (data == null || data.Length == 0) return "0000000000000000";
+
+            using var sha = SHA1.Create();
+            var hash = sha.ComputeHash(data); // 20 Bytes
+            char[] buf = new char[16];
+            for (int i = 0, k = 0; i < 8; i++)
+            {
+                byte b = hash[i];
+                buf[k++] = GetHex((b >> 4) & 0xF);
+                buf[k++] = GetHex(b & 0xF);
+            }
+            return new string(buf);
+        }
+
+        private static char GetHex(int v) => (char)(v < 10 ? ('0' + v) : ('a' + (v - 10)));
+
 
         [CommandCmif(5)]
         // Mount(bytes<8, 4>, u32, u32)
