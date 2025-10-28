@@ -65,6 +65,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.concurrent.thread
+import kotlin.math.roundToInt
 import org.kenjinx.android.MainActivity
 import org.kenjinx.android.providers.DocumentProvider
 import org.kenjinx.android.viewmodels.DataImportState
@@ -141,6 +142,12 @@ class SettingViews {
             }
             val enablePerformanceMode = remember { mutableStateOf(true) }
             val controllerStickSensitivity = remember { mutableFloatStateOf(1.0f) }
+
+            // --- NEU: Controller Scale (0.5 .. 1.5), direkt aus QuickSettings laden
+            val controllerScale = remember {
+                mutableFloatStateOf(QuickSettings(mainViewModel.activity).controllerScale)
+            }
+
             val enableStubLogs = remember { mutableStateOf(true) }
             val enableInfoLogs = remember { mutableStateOf(true) }
             val enableWarningLogs = remember { mutableStateOf(true) }
@@ -259,6 +266,7 @@ class SettingViews {
                                     regionCode
                                 )
 
+                                // Controller Scale wird separat direkt in QuickSettings gespeichert.
                                 if (!isNavigating.value) {
                                     isNavigating.value = true
                                     mainViewModel.navController?.popBackStack()
@@ -1264,9 +1272,71 @@ class SettingViews {
                                         vcPreset.value = preset
                                         val qs = QuickSettings(mainViewModel.activity)
                                         qs.virtualControllerPreset = preset
-                                        qs.save() // sofort persistieren, wie bei Overlay-Settings
+                                        qs.save() // sofort persistieren
                                     }
                                 )
+
+                                // --- NEU: Controller Scale Slider (0.5x .. 1.5x) ---
+                                val interactionSourceScale: MutableInteractionSource = remember { MutableInteractionSource() }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(56.dp)
+                                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        text = "Controller Scale (${(controllerScale.floatValue * 100f).roundToInt()}%)",
+                                        modifier = Modifier.align(Alignment.CenterVertically)
+                                    )
+                                    Slider(
+                                        modifier = Modifier.width(250.dp),
+                                        value = controllerScale.floatValue,
+                                        onValueChange = { v ->
+                                            val clamped = v.coerceIn(0.5f, 1.5f)
+                                            controllerScale.floatValue = clamped
+                                            // Live auf den aktiven Virtual Controller anwenden (per Reflection)
+                                            mainViewModel.controller?.let { c ->
+                                                try {
+                                                    val m = c::class.java.getMethod("setScale", Float::class.javaPrimitiveType)
+                                                    m.invoke(c, clamped)
+                                                } catch (_: Throwable) { /* ignorieren, falls Layout ohne setScale */ }
+                                            }
+                                        },
+                                        valueRange = 0.5f..1.5f,
+                                        steps = 19,
+                                        interactionSource = interactionSourceScale,
+                                        thumb = {
+                                            Label(
+                                                label = {
+                                                    PlainTooltip(
+                                                        modifier = Modifier
+                                                            .sizeIn(45.dp, 25.dp)
+                                                            .wrapContentWidth()
+                                                    ) {
+                                                        Text("${(controllerScale.floatValue * 100f).roundToInt()}%")
+                                                    }
+                                                },
+                                                interactionSource = interactionSourceScale
+                                            ) {
+                                                Icon(
+                                                    imageVector = org.kenjinx.android.Icons.circle(
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    ),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(ButtonDefaults.IconSize),
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        },
+                                        onValueChangeFinished = {
+                                            // Persistieren
+                                            val qs = QuickSettings(mainViewModel.activity)
+                                            qs.controllerScale = controllerScale.floatValue.coerceIn(0.5f, 1.5f)
+                                            qs.save()
+                                        }
+                                    )
+                                }
                             }
 
                             val interactionSource: MutableInteractionSource = remember { MutableInteractionSource() }

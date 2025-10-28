@@ -29,10 +29,6 @@ import org.kenjinx.android.viewmodels.QuickSettings
 private const val DUMMY_LEFT_STICK_PRESS_ID  = 10001
 private const val DUMMY_RIGHT_STICK_PRESS_ID = 10002
 
-/**
- * GameController5
- * Layout 5 – aktuell identisch zum Default-Layout, als eigenständige Klasse.
- */
 class GameController5(var activity: Activity) : IGameController {
 
     companion object {
@@ -40,8 +36,31 @@ class GameController5(var activity: Activity) : IGameController {
             val inflater = LayoutInflater.from(context)
             val parent = FrameLayout(context)
             val view = inflater.inflate(R.layout.game_layout, parent, false)
-            view.findViewById<FrameLayout>(R.id.leftcontainer)!!.addView(controller.leftGamePad)
-            view.findViewById<FrameLayout>(R.id.rightcontainer)!!.addView(controller.rightGamePad)
+
+            val leftContainer  = view.findViewById<FrameLayout>(R.id.leftcontainer)!!
+            val rightContainer = view.findViewById<FrameLayout>(R.id.rightcontainer)!!
+
+            leftContainer.addView(controller.leftGamePad)
+            rightContainer.addView(controller.rightGamePad)
+
+            leftContainer.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                val scale = QuickSettings(controller.activity).controllerScale.coerceIn(0.5f, 1.5f)
+                v.pivotX = 0f
+                v.pivotY = v.height.toFloat()
+                v.scaleX = scale
+                v.scaleY = scale
+            }
+            rightContainer.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                val scale = QuickSettings(controller.activity).controllerScale.coerceIn(0.5f, 1.5f)
+                v.pivotX = v.width.toFloat()
+                v.pivotY = v.height.toFloat()
+                v.scaleX = scale
+                v.scaleY = scale
+            }
+
+            leftContainer.post { leftContainer.requestLayout() }
+            rightContainer.post { rightContainer.requestLayout() }
+
             return view
         }
 

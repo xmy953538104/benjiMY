@@ -30,11 +30,6 @@ import org.kenjinx.android.viewmodels.QuickSettings
 private const val DUMMY_LEFT_STICK_PRESS_ID  = 10001
 private const val DUMMY_RIGHT_STICK_PRESS_ID = 10002
 
-/**
- * GameController2
- * Layout 2 – aktuell identisch zum Default-Layout (GameController),
- * als eigenständige Klasse für Preset-Umschaltung.
- */
 class GameController2(var activity: Activity) : IGameController {
 
     companion object {
@@ -42,8 +37,31 @@ class GameController2(var activity: Activity) : IGameController {
             val inflater = LayoutInflater.from(context)
             val parent = FrameLayout(context)
             val view = inflater.inflate(R.layout.game_layout, parent, false)
-            view.findViewById<FrameLayout>(R.id.leftcontainer)!!.addView(controller.leftGamePad)
-            view.findViewById<FrameLayout>(R.id.rightcontainer)!!.addView(controller.rightGamePad)
+
+            val leftContainer  = view.findViewById<FrameLayout>(R.id.leftcontainer)!!
+            val rightContainer = view.findViewById<FrameLayout>(R.id.rightcontainer)!!
+
+            leftContainer.addView(controller.leftGamePad)
+            rightContainer.addView(controller.rightGamePad)
+
+            leftContainer.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                val scale = QuickSettings(controller.activity).controllerScale.coerceIn(0.5f, 1.5f)
+                v.pivotX = 0f
+                v.pivotY = v.height.toFloat()
+                v.scaleX = scale
+                v.scaleY = scale
+            }
+            rightContainer.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                val scale = QuickSettings(controller.activity).controllerScale.coerceIn(0.5f, 1.5f)
+                v.pivotX = v.width.toFloat()
+                v.pivotY = v.height.toFloat()
+                v.scaleX = scale
+                v.scaleY = scale
+            }
+
+            leftContainer.post { leftContainer.requestLayout() }
+            rightContainer.post { rightContainer.requestLayout() }
+
             return view
         }
 
@@ -60,7 +78,6 @@ class GameController2(var activity: Activity) : IGameController {
                             controller.leftGamePad.events(),
                             controller.rightGamePad.events()
                         )
-                        // safeCollect kommt aus GameController.kt (bitte dort belassen)
                         events.safeCollect { controller.handleEvent(it) }
                     }
 
@@ -72,6 +89,7 @@ class GameController2(var activity: Activity) : IGameController {
             )
         }
     }
+
 
     private var controllerView: View? = null
     var leftGamePad: RadialGamePad

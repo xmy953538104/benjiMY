@@ -72,6 +72,10 @@ class QuickSettings(val activity: Activity) {
     var enableMotion: Boolean
     var enablePerformanceMode: Boolean
     var controllerStickSensitivity: Float
+
+    // --- NEU: Controller Scale (0.5f..1.5f, Default 1.0f)
+    var controllerScale: Float
+
     var enableStubLogs: Boolean
     var enableInfoLogs: Boolean
     var enableWarningLogs: Boolean
@@ -136,6 +140,10 @@ class QuickSettings(val activity: Activity) {
         enableMotion = sharedPref.getBoolean("enableMotion", true)
         enablePerformanceMode = sharedPref.getBoolean("enablePerformanceMode", true)
         controllerStickSensitivity = sharedPref.getFloat("controllerStickSensitivity", 1.0f)
+
+        // --- NEU laden: Controller Scale
+        controllerScale = sharedPref.getFloat("controllerScale", 1.0f).coerceIn(0.5f, 1.5f)
+
         enableStubLogs = sharedPref.getBoolean("enableStubLogs", false)
         enableInfoLogs = sharedPref.getBoolean("enableInfoLogs", true)
         enableWarningLogs = sharedPref.getBoolean("enableWarningLogs", true)
@@ -194,6 +202,10 @@ class QuickSettings(val activity: Activity) {
             putBoolean("enableMotion", enableMotion)
             putBoolean("enablePerformanceMode", enablePerformanceMode)
             putFloat("controllerStickSensitivity", controllerStickSensitivity)
+
+            // --- NEU speichern: Controller Scale
+            putFloat("controllerScale", controllerScale.coerceIn(0.5f, 1.5f))
+
             putBoolean("enableStubLogs", enableStubLogs)
             putBoolean("enableInfoLogs", enableInfoLogs)
             putBoolean("enableWarningLogs", enableWarningLogs)
