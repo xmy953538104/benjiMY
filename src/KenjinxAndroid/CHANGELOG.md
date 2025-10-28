@@ -1,9 +1,14 @@
 # Changelog
 
+## 2.0.5k — 2025-10-28
+
+### Added
+- **Virtual Controller**: Added Controller Scale Slider.
+
 ## 2.0.5j — 2025-10-27
 
 ### Added
-- **NMinor Performance Patches**: Credits to TechDunk.
+- **Minor Performance Optimizations**: Credits to TechDunk.
 
 ### Fixed
 - **Tablets/Foldable**: Fixed Gamescreen for Tablets and Foldables.
