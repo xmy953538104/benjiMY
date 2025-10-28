@@ -88,6 +88,9 @@ import org.kenjinx.android.viewmodels.HomeViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.widgets.SimpleAlertDialog
 
+// NEW: Saves
+import org.kenjinx.android.saves.*
+
 class HomeViews {
     companion object {
         const val ListImageSize = 150
@@ -124,7 +127,199 @@ class HomeViews {
             var isFabVisible by remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
 
+            // Save Manager State
+            val openSavesDialog = remember { mutableStateOf(false) }
+            val saveImportBusy = remember { mutableStateOf(false) }
+            val saveExportBusy = remember { mutableStateOf(false) }
+            val saveImportProgress = remember { mutableStateOf(0f) }
+            val saveExportProgress = remember { mutableStateOf(0f) }
+            val saveImportStatus = remember { mutableStateOf("") }
+            val saveExportStatus = remember { mutableStateOf("") }
+
+            val activity = LocalContext.current as? Activity
+            val gmSel = viewModel.mainViewModel?.selected
+            val currentTitleId = gmSel?.titleId ?: ""
+
+            // Import: OpenDocument (ZIP)
+            val importZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                if (uri != null && activity != null && currentTitleId.isNotEmpty()) {
+                    saveImportBusy.value = true
+                    saveImportProgress.value = 0f
+                    saveImportStatus.value = "Starting…"
+
+                    thread {
+                        val res = importSaveFromZip(activity, uri) { prog ->
+                            val frac = if (prog.total > 0) prog.bytes.toFloat() / prog.total else 0f
+                            saveImportProgress.value = frac.coerceIn(0f, 1f)
+                            saveImportStatus.value = "Importing: ${prog.currentEntry}"
+                        }
+                        saveImportBusy.value = false
+                        launchOnUiThread {
+                            Toast.makeText(activity, res.message, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+
+            // Export: CreateDocument (ZIP)
+            val exportZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.CreateDocument("application/zip")
+            ) { uri: Uri? ->
+                if (uri != null && activity != null && currentTitleId.isNotEmpty()) {
+                    saveExportBusy.value = true
+                    saveExportProgress.value = 0f
+                    saveExportStatus.value = "Starting…"
+
+                    thread {
+                        val res = exportSaveToZip(activity, currentTitleId, uri) { prog ->
+                            val frac = if (prog.total > 0) prog.bytes.toFloat() / prog.total else 0f
+                            saveExportProgress.value = frac.coerceIn(0f, 1f)
+                            saveExportStatus.value = "Exporting: ${prog.currentPath}"
+                        }
+                        saveExportBusy.value = false
+                        launchOnUiThread {
+                            Toast.makeText(
+                                activity,
+                                if (res.ok) "save exported" else (res.error ?: "export failed"),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            }
+
             val context = LocalContext.current
+            //val activity = LocalContext.current as? Activity
+
+            // NEW: Launcher für Amiibo (OpenDocument)
+            val pickAmiiboLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                if (uri != null && activity != null) {
+                    try {
+                        activity.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) {}
+                    val name = DocumentFile.fromSingleUri(activity, uri)?.name ?: "amiibo.bin"
+                    val qs = QuickSettings(activity)
+                    when (pendingSlot.value) {
+                        1 -> { qs.amiibo1Uri = uri.toString(); qs.amiibo1Name = name }
+                        2 -> { qs.amiibo2Uri = uri.toString(); qs.amiibo2Name = name }
+                        3 -> { qs.amiibo3Uri = uri.toString(); qs.amiibo3Name = name }
+                        4 -> { qs.amiibo4Uri = uri.toString(); qs.amiibo4Name = name }
+                        5 -> { qs.amiibo5Uri = uri.toString(); qs.amiibo5Name = name }
+                    }
+                    qs.save()
+                    Toast.makeText(activity, "Amiibo saved to slot ${pendingSlot.value}", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            // NEW: Cheats Import (.txt)
+            val importCheatLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                val act = viewModel.activity
+                val titleId = gm?.titleId ?: ""
+                if (uri != null && act != null && titleId.isNotEmpty()) {
+                    // nur .txt akzeptieren
+                    val okExt = runCatching {
+                        DocumentFile.fromSingleUri(act, uri)?.name?.lowercase()?.endsWith(".txt") == true
+                    }.getOrElse { false }
+                    if (!okExt) {
+                        Toast.makeText(act, "Please select a .txt file", Toast.LENGTH_SHORT).show()
+                        return@rememberLauncherForActivityResult
+                    }
+
+                    val res = importCheatTxt(act, titleId, uri)
+                    if (res.isSuccess) {
+                        Toast.makeText(act, "Imported: ${res.getOrNull()?.name}", Toast.LENGTH_SHORT).show()
+                        // danach Liste aktualisieren
+                        cheatsForSelected.value = loadCheatsFromDisk(act, titleId)
+                    } else {
+                        Toast.makeText(act, "Import failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            // NEW: Launcher for Mods
+            val pickModZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                val act = viewModel.activity
+                val titleId = gm?.titleId ?: ""
+                if (uri != null && act != null && titleId.isNotEmpty()) {
+                    // Persist permission (lesen)
+                    try {
+                        act.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: Exception) {}
+
+                    modsImportBusy.value = true
+                    modsImportProgress.value = 0f
+                    modsImportStatusText.value = "Starting…"
+
+                    thread {
+                        val res = importModsZip(
+                            act,
+                            titleId,
+                            uri
+                        ) { prog ->
+                            modsImportProgress.value = prog.fraction
+                            modsImportStatusText.value = if (prog.currentEntry.isNotEmpty())
+                                "Copying: ${prog.currentEntry}"
+                            else
+                                "Copying… ${(prog.fraction * 100).toInt()}%"
+                        }
+
+                        // Liste aktualisieren
+                        modsForSelected.value = listMods(act, titleId)
+                        modsImportBusy.value = false
+
+                        launchOnUiThread {
+                            val msg = if (res.ok)
+                                "Imported: ${res.imported.joinToString(", ")}"
+                            else
+                                "Import failed"
+                            Toast.makeText(act, msg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                }
+            }
+
+
+            // Launcher for "Custom icon" (OpenDocument)
+            val pickImageLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                if (uri != null && gm != null && activity != null) {
+                    val bmp = runCatching {
+                        context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) }
+                    }.getOrNull()
+
+                    val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
+                    val gameUri = resolveGameUri(gm)
+                    if (gameUri != null) {
+                        ShortcutUtils.persistReadWrite(activity, gameUri)
+
+                        ShortcutUtils.pinShortcutForGame(
+                            activity = activity,
+                            gameUri = gameUri,
+                            label = label,
+                            iconBitmap = bmp
+                        ) {
+
+                        }
+                    } else {
+                        showError.value = "Shortcut failed (no game URI found)."
+                    }
+                }
+            }
 
             val nestedScrollConnection = remember {
                 object : NestedScrollConnection {
