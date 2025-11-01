@@ -62,14 +62,14 @@ namespace LibKenjinx
             else if (graphicsBackend == GraphicsBackend.Vulkan)
             {
                 // Prefer the platform-provided Vulkan loader (if present), fall back to default.
-                var api = VulkanLoader?.GetApi() ?? Vk.GetApi();
+                var api = VulkanLoader?.GetApi() ?? Silk.NET.Vulkan.Vk.GetApi();
 
                 Renderer = new VulkanRenderer(
                     api,
                     (instance, _) =>
                     {
-                        // use provided CreateSurface delegate (Android path will create ANativeWindow surface)
-                        return new SurfaceKHR(createSurfaceFunc == null ? null : (ulong?)createSurfaceFunc(instance.Handle));
+                        // Use provided CreateSurface delegate (Android path will create ANativeWindow surface)
+                        return new Silk.NET.Vulkan.SurfaceKHR(createSurfaceFunc == null ? null : (ulong?)createSurfaceFunc(instance.Handle));
                     },
                     () => requiredExtensions,
                     null);
@@ -226,7 +226,7 @@ namespace LibKenjinx
             _swapBuffersCallback = swapBuffersCallback;
         }
 
-        // ===== Convenience-Wrapper für Vulkan re-attach (von JNI nutzbar) =====
+        // ===== Convenience wrapper for Vulkan re-attach (usable from JNI) =====
         public static bool TryReattachSurface()
         {
             if (Renderer is VulkanRenderer vr)

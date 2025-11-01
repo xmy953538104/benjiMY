@@ -60,7 +60,7 @@ class MainActivity : BaseActivity() {
     var storageHelper: SimpleStorageHelper? = null
     lateinit var uiHandler: UiHandler
 
-    // Persistenz für Zombie-Erkennung
+    // Persistence for zombie detection
     private val PREFS = "emu_core"
     private val KEY_EMU_RUNNING = "emu_running"
 
@@ -297,7 +297,7 @@ class MainActivity : BaseActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // Apply alignment
+        // Apply orientation preference
         applyOrientationPreference()
 
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
@@ -361,9 +361,9 @@ class MainActivity : BaseActivity() {
 
     // --- Audio foreground/background gating ---
     private fun setAudioForegroundState(inForeground: Boolean) {
-        // bevorzugt: pausieren statt nur muten
+        // Prefer: pause instead of just mute
         try { KenjinxNative.audioSetPaused(!inForeground) } catch (_: Throwable) {}
-        // fallback: Master-Mute
+        // Fallback: master mute
         try { KenjinxNative.audioSetMuted(!inForeground) } catch (_: Throwable) {}
     }
 
@@ -392,7 +392,7 @@ class MainActivity : BaseActivity() {
             setPresentEnabled(false, "onStop")
             try { KenjinxNative.detachWindow() } catch (_: Throwable) {}
         }
-        // WICHTIG: Bindung sicher lösen (verhindert Leak)
+        // IMPORTANT: unbind safely (prevents leak)
         try { mainViewModel?.gameHost?.shutdownBinding() } catch (_: Throwable) {}
     }
 
@@ -472,7 +472,7 @@ class MainActivity : BaseActivity() {
 
         if (hasFocus && isActive) {
             setAudioForegroundState(true)
-            // NEU: zuerst sicherstellen, dass die Bindung existiert
+            // NEW: first ensure that the binding exists
             try { mainViewModel?.gameHost?.ensureServiceStartedAndBound() } catch (_: Throwable) {}
 
             setPresentEnabled(false, "focus gained → pre-rebind")
@@ -506,7 +506,7 @@ class MainActivity : BaseActivity() {
         try { displayManager.unregisterDisplayListener(displayListener) } catch (_: Throwable) {}
         try { unregisterReceiver(serviceStopReceiver) } catch (_: Throwable) {}
 
-        // NEU: Bindung aufräumen (verhindert Leak beim Task-Swipe)
+        // NEW: clean up binding (prevents leak when swiping away the task)
         try { mainViewModel?.gameHost?.shutdownBinding() } catch (_: Throwable) {}
     }
 
@@ -617,7 +617,7 @@ class MainActivity : BaseActivity() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         val legacyPath = prefs.getString("gameFolder", null)
         if (!legacyPath.isNullOrEmpty()) {
-            // Ohne SAF-URI kein Tree-Listing möglich
+            // Without a SAF URI, tree listing is not possible
         }
         return null
     }
@@ -649,7 +649,7 @@ class MainActivity : BaseActivity() {
     override fun onDestroy() {
         handler.removeCallbacks(enablePresentWhenReady)
         handler.removeCallbacks(reattachWindowWhenReady)
-        // NEU: falls die Activity stirbt → Bindung garantiert lösen
+        // NEW: if the activity dies → ensure unbinding
         try { mainViewModel?.gameHost?.shutdownBinding() } catch (_: Throwable) {}
         super.onDestroy()
     }

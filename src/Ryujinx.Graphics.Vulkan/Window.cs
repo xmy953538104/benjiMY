@@ -43,7 +43,7 @@ namespace Ryujinx.Graphics.Vulkan
         private ScalingFilter _currentScalingFilter;
         private bool _colorSpacePassthroughEnabled;
 
-        // Gate für alle vk*Surface*-Queries
+        // Gate for all vk*Surface* queries
         private volatile bool _allowSurfaceQueries = true;
 
         public unsafe Window(VulkanRenderer gd, SurfaceKHR surface, PhysicalDevice physicalDevice, Device device)
@@ -221,7 +221,7 @@ namespace Ryujinx.Graphics.Vulkan
                 var surfaceFormat = ChooseSwapSurfaceFormat(surfaceFormats, _colorSpacePassthroughEnabled);
                 var extent = ChooseSwapExtent(capabilities);
 
-                // Guard gegen 0x0-Extent direkt nach Resume
+                // Guard against 0x0 extent right after resume
                 if (extent.Width == 0 || extent.Height == 0)
                 {
                     _swapchainIsDirty = true;
@@ -239,10 +239,10 @@ namespace Ryujinx.Graphics.Vulkan
                 var usage = ImageUsageFlags.ColorAttachmentBit | ImageUsageFlags.TransferDstBit;
                 if (!PlatformInfo.IsBionic)
                 {
-                    usage |= ImageUsageFlags.StorageBit; // nur Desktop erlaubt Storage für swapchain
+                    usage |= ImageUsageFlags.StorageBit; // desktop only: allow storage on swapchain
                 }
 
-                // Auf Android: Identity; sonst der vom Treiber empfohlene CurrentTransform
+                // On Android: use identity; otherwise use the driver-recommended CurrentTransform
                 var preTransform = PlatformInfo.IsBionic
                     ? SurfaceTransformFlagsKHR.IdentityBitKhr
                     : capabilities.CurrentTransform;
@@ -411,7 +411,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         public unsafe override void Present(ITexture texture, ImageCrop crop, Action swapBuffersCallback)
         {
-            // Falls Surface bereits neu ist, Queries aber noch gesperrt → freigeben.
+            // If the surface is already new but queries are still disabled → re-enable them.
             if (!_allowSurfaceQueries && _surface.Handle != 0)
             {
                 _allowSurfaceQueries = true;
@@ -423,7 +423,7 @@ namespace Ryujinx.Graphics.Vulkan
                 return;
             }
 
-            // Wenn Größe noch nicht da ist, Swapchain später neu aufbauen
+            // If size is not yet available, rebuild swapchain later
             if (_width <= 0 || _height <= 0)
             {
                 RecreateSwapchain();
@@ -431,7 +431,7 @@ namespace Ryujinx.Graphics.Vulkan
                 return;
             }
 
-            // Lazy-Init/Recovery
+            // Lazy init / recovery
             if (_swapchain.Handle == 0 || _imageAvailableSemaphores == null || _renderFinishedSemaphores == null)
             {
                 try { CreateSwapchain(); } catch { /* try again next frame */ }
@@ -473,7 +473,7 @@ namespace Ryujinx.Graphics.Vulkan
                 }
                 else if (acquireResult == Result.ErrorSurfaceLostKhr)
                 {
-                    // Im Hintergrund nicht sofort neu erstellen – freigeben und zurück
+                    // In background do not recreate immediately—release and return
                     _gd.ReleaseSurface();
                     swapBuffersCallback?.Invoke();
                     return;
@@ -491,13 +491,13 @@ namespace Ryujinx.Graphics.Vulkan
 
             var cbs = _gd.CommandBufferPool.Rent();
 
-            // --- Layout/Stages je nach Pfad korrekt setzen ---
-            bool allowStorageDst = !PlatformInfo.IsBionic; // Android: kein Storage auf Swapchain
+            // --- Set layout/stages correctly depending on path ---
+            bool allowStorageDst = !PlatformInfo.IsBionic; // Android: no storage on swapchain
             bool useComputeDst = allowStorageDst && _scalingFilter != null;
 
             if (useComputeDst)
             {
-                // Compute schreibt in das Swapchain-Image → General + ShaderWrite
+                // Compute writes to the swapchain image → General + ShaderWrite
                 Transition(
                     cbs.CommandBuffer,
                     swapchainImage,
@@ -510,7 +510,7 @@ namespace Ryujinx.Graphics.Vulkan
             }
             else
             {
-                // Renderpass schreibt in das Swapchain-Image → ColorAttachmentOptimal
+                // Render pass writes to the swapchain image → ColorAttachmentOptimal
                 Transition(
                     cbs.CommandBuffer,
                     swapchainImage,
@@ -616,7 +616,7 @@ namespace Ryujinx.Graphics.Vulkan
                     true);
             }
 
-            // Transition zu Present – Stages/Access je nach vorherigem Pfad
+            // Transition to Present — stages/access depending on previous path
             if (useComputeDst)
             {
                 Transition(
@@ -643,7 +643,7 @@ namespace Ryujinx.Graphics.Vulkan
             }
 
             var waitSems = new Silk.NET.Vulkan.Semaphore[] { _imageAvailableSemaphores[semaphoreIndex] };
-            var waitStages = new PipelineStageFlags[] { PipelineStageFlags.ColorAttachmentOutputBit }; // wichtig auf Android
+            var waitStages = new PipelineStageFlags[] { PipelineStageFlags.ColorAttachmentOutputBit }; // important on Android
             var signalSems = new Silk.NET.Vulkan.Semaphore[] { _renderFinishedSemaphores[semaphoreIndex] };
             _gd.CommandBufferPool.Return(cbs, waitSems, waitStages, signalSems);
 
@@ -835,8 +835,8 @@ namespace Ryujinx.Graphics.Vulkan
             // We don't need to use width and height as we can get the size from the surface.
             _swapchainIsDirty = true;
 
-            // Nach Resume sicherstellen, dass Surface-Queries wieder erlaubt sind,
-            // falls vorher OnSurfaceLost() das Gate geschlossen hat.
+            // After resume, ensure surface queries are enabled again
+            // if OnSurfaceLost() previously closed the gate.
             if (_surface.Handle != 0)
             {
                 SetSurfaceQueryAllowed(true);
@@ -846,7 +846,7 @@ namespace Ryujinx.Graphics.Vulkan
         public override void ChangeVSyncMode(VSyncMode vSyncMode)
         {
             _vSyncMode = vSyncMode;
-            //present mode may change, so mark the swapchain for recreation
+            // Present mode may change, so mark the swapchain for recreation
             _swapchainIsDirty = true;
         }
 
@@ -904,7 +904,7 @@ namespace Ryujinx.Graphics.Vulkan
         {
             lock (_gd.SurfaceLock)
             {
-                // harte Aufräumaktion, damit nach Resume nichts „altes“ übrig ist
+                // Hard cleanup so nothing stale remains after resume
                 _swapchainIsDirty = true;
                 SetSurfaceQueryAllowed(false);
 
@@ -953,7 +953,7 @@ namespace Ryujinx.Graphics.Vulkan
                 }
 
                 _surface = new SurfaceKHR(0);
-                _width = _height = 0; // erzwingt späteren sauberen Recreate-Pfad
+                _width = _height = 0; // forces a clean recreate path later
             }
         }
 

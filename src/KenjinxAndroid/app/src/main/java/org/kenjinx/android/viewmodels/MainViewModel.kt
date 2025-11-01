@@ -188,7 +188,7 @@ class MainViewModel(val activity: MainActivity) {
         runBlocking {
             semaphore.acquire()
             launchOnUiThread {
-                // We are only able to initialize the emulation context on the main thread
+                // We can only initialize the emulation context on the main thread
                 val tzId = TimeZone.getDefault().id
                 success = KenjinxNative.deviceInitialize(
                     settings.memoryManagerMode.ordinal,
@@ -300,7 +300,7 @@ class MainViewModel(val activity: MainActivity) {
         runBlocking {
             semaphore.acquire()
             launchOnUiThread {
-                // We are only able to initialize the emulation context on the main thread
+                // We can only initialize the emulation context on the main thread
                 val tzId = TimeZone.getDefault().id
                 success = KenjinxNative.deviceInitialize(
                     settings.memoryManagerMode.ordinal,

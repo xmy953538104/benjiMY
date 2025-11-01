@@ -20,7 +20,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Foreground-Service für stabile Emulation im Hintergrund.
+ * Foreground service for stable emulation in the background.
  * Manifest: android:foregroundServiceType="mediaPlayback"
  */
 class EmulationService : Service() {
@@ -41,7 +41,7 @@ class EmulationService : Service() {
     private lateinit var executor: ExecutorService
     private var future: Future<*>? = null
     private val running = AtomicBoolean(false)
-    // Nur wenn eine Emulation wirklich lief, dürfen wir nativ „hard close“ machen
+    // Only if an emulation actually ran, we are allowed to perform a native “hard close”
     private val startedOnce = AtomicBoolean(false)
 
     override fun onCreate() {
@@ -70,7 +70,7 @@ class EmulationService : Service() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
         try { future?.cancel(true) } catch (_: Throwable) {}
-        // Nur schließen, wenn zuvor gestartet
+        // Only close if it was previously started
         hardCloseNativeIfStarted("onTaskRemoved")
         running.set(false)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -87,17 +87,17 @@ class EmulationService : Service() {
         try { sendBroadcast(Intent(ACTION_STOPPED).setPackage(packageName)) } catch (_: Throwable) {}
     }
 
-    // ---- Steuerung via Binder ----
+    // ---- Control via Binder ----
 
     private fun startEmulation(runLoopBlock: () -> Unit) {
-        // Nur einen RunLoop zulassen
+        // Allow only a single run loop
         if (!running.compareAndSet(false, true)) return
 
         future = executor.submit {
             try {
-                // *** Kein Preflight-HardClose mehr! *** (crasht beim allerersten Start)
+                // *** No preflight hard-close anymore! *** (crashes on the very first start)
                 startedOnce.set(true)
-                runLoopBlock()   // blockiert bis Emulation endet
+                runLoopBlock()   // blocks until emulation ends
             } finally {
                 startedOnce.set(false)
                 running.set(false)
@@ -125,12 +125,12 @@ class EmulationService : Service() {
         stopSelf()
     }
 
-    // ---- Native Cleanup nur wenn jemals gestartet ----
+    // ---- Native cleanup only if it was ever started ----
     private fun hardCloseNativeIfStarted(reason: String) {
         if (!startedOnce.get()) return
         try { KenjinxNative.detachWindow() } catch (_: Throwable) {}
         try { KenjinxNative.deviceCloseEmulation() } catch (_: Throwable) {}
-        // KEIN graphicsSetPresentEnabled(false) hier – führt bei kaltem Start zu NRE in VulkanRenderer.ReleaseSurface()
+        // NO graphicsSetPresentEnabled(false) here — causes NRE in VulkanRenderer.ReleaseSurface() on a cold start
         // android.util.Log.d("EmuService", "hardCloseNativeIfStarted: $reason")
     }
 

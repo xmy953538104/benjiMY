@@ -99,7 +99,7 @@ interface KenjinxNativeJna : Library {
     fun amiiboLoadBin(bytes: ByteArray, length: Int): Boolean
     fun amiiboClear()
 
-    // AUDIO (neu): direkte JNA-Brücke zu C#-Exports
+    // AUDIO (new): direct JNA bridge to C# exports
     fun audioSetPaused(paused: Boolean)
     fun audioSetMuted(muted: Boolean)
 }
@@ -115,7 +115,7 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
     fun loggingSetEnabled(logLevel: LogLevel, enabled: Boolean) =
         loggingSetEnabled(logLevel.ordinal, enabled)
 
-    // --- Rendering: Single-Thread-Option & sichere Wrapper --------------------
+    // --- Rendering: single-thread option & safe wrappers --------------------
 
     // 0 = Auto, 1 = SingleThread (Disable Threaded), 2 = Threaded
     private const val THREADING_AUTO = 0
@@ -142,7 +142,7 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
         try { jnaInstance.graphicsSetPresentEnabled(enabled) } catch (_: Throwable) { /* ignore */ }
     }
 
-    // Sichere deviceResize-Implementierung (reines Rendering)
+    // Safe deviceResize implementation (rendering-only)
     override fun deviceResize(width: Int, height: Int) {
         try {
             graphicsRendererSetSize(width, height)
@@ -150,7 +150,7 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
         } catch (_: Throwable) { /* ignore */ }
     }
 
-    // Robustes graphicsInitialize mit QCOM-Heuristik + Fallback → SingleThread
+    // Robust graphicsInitialize with QCOM heuristic + fallback → SingleThread
     override fun graphicsInitialize(
         rescale: Float,
         maxAnisotropy: Float,
@@ -165,8 +165,8 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
         val requested = backendThreading
         val isQcom = "qcom".equals(android.os.Build.HARDWARE, true)
 
-        // Heuristik: Auf QCOM bei „Auto“ zunächst SingleThread probieren,
-        // explizit gesetzte Werte bleiben unberührt.
+        // Heuristic: On QCOM with “Auto”, first try SingleThread;
+        // explicitly set values remain untouched.
         val firstChoice =
             if (isQcom && requested == THREADING_AUTO) THREADING_SINGLE else requested
 
@@ -212,7 +212,7 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
         }
     }
 
-    // --- optionale Wrapper für Audio (safer logging) ---
+    // --- optional wrappers for audio (safer logging) ---
     override fun audioSetPaused(paused: Boolean) {
         try { jnaInstance.audioSetPaused(paused) }
         catch (t: Throwable) { Log.w("KenjinxNative", "audioSetPaused unavailable", t) }

@@ -957,7 +957,7 @@ namespace LibKenjinx
 
         // ===== PresentAllowed / Surface Control (JNI) =====
 
-        // alias für ältere Aufrufe, falls vorhanden
+        // alias for older calls, if present
         [UnmanagedCallersOnly(EntryPoint = "graphicsRendererSetPresent")]
         public static void JniGraphicsRendererSetPresent(bool enabled)
         {
@@ -975,7 +975,7 @@ namespace LibKenjinx
             }
         }
 
-        // neuer Name: passt zu KenjinxNative.graphicsSetPresentEnabled(...)
+        // new name: matches KenjinxNative.graphicsSetPresentEnabled(...)
         [UnmanagedCallersOnly(EntryPoint = "graphicsSetPresentEnabled")]
         public static void JniGraphicsSetPresentEnabled(bool enabled)
         {
@@ -1003,7 +1003,7 @@ namespace LibKenjinx
             }
         }
 
-        // von MainActivity/GameHost benutzt
+        // used by MainActivity/GameHost
         [UnmanagedCallersOnly(EntryPoint = "reattachWindowIfReady")]
         public static bool JniReattachWindowIfReady()
         {

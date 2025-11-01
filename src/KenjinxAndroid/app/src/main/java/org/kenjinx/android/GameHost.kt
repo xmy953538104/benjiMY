@@ -40,7 +40,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // ---- Foreground-Service Binding ----
+    // ---- Foreground service binding ----
     private var emuBound = false
     private var emuBinder: EmulationService.LocalBinder? = null
     private var _startedViaService = false
@@ -52,7 +52,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
             emuBound = true
             ghLog("EmulationService bound")
 
-            // Falls Start bereits vorbereitet wurde und noch kein Loop läuft → jetzt im Service starten
+            // If startup is already prepared and no loop is running yet → start it in the service now
             if (_isStarted && !_startedViaService && _guestThread == null) {
                 startRunLoopInService()
             }
@@ -66,7 +66,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
         }
     }
 
-    // Resize-Stabilizer
+    // Resize stabilizer
     private var stabilizerActive = false
 
     // last known Android rotation (0,1,2,3)
@@ -143,7 +143,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         ghLog("surfaceCreated")
-        // Früh binden, damit der Service schon steht, bevor wir starten
+        // Bind early so the service is ready before we start
         ensureServiceStartedAndBound()
         rebindNativeWindow(force = true)
     }
@@ -152,26 +152,26 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
         ghLog("surfaceChanged ${width}x$height")
         if (_isClosed) return
 
-        // IMMER neu binden – auch wenn die Größe gleich bleibt
+        // ALWAYS rebind—even if the size stays the same
         rebindNativeWindow(force = true)
 
         val sizeChanged = (_width != width || _height != height)
         _width = width
         _height = height
 
-        // Service sicherstellen & Renderstart
+        // Ensure service is running & start rendering
         ensureServiceStartedAndBound()
         start(holder)
 
-        // Resize stabilisieren (übernimmt plausibles final size set)
+        // Stabilize resize (applies plausible final size)
         startStabilizedResize(expectedRotation = lastRotation)
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         ghLog("surfaceDestroyed → shutdownBinding()")
-        // Immer binden lösen (verhindert Leaks beim Task-Swipe)
+        // Always unbind (prevents leaks when swiping away the task)
         shutdownBinding()
-        // Eigentliche Emu-Beendigung passiert via close() / Exit Game
+        // Actual emulation shutdown happens via close() / Exit Game
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
@@ -214,12 +214,12 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
     private fun start(surfaceHolder: SurfaceHolder) {
         if (_isStarted) return
 
-        // NICHT gleich _isStarted = true → erst alles vorbereiten
+        // Do NOT set _isStarted = true immediately → prepare everything first
         rebindNativeWindow(force = true)
 
         game = if (mainViewModel.isMiiEditorLaunched) null else mainViewModel.gameModel
 
-        // Input initialisieren
+        // Initialize input
         KenjinxNative.inputInitialize(width, height)
         _inputInitialized = true
 
@@ -235,7 +235,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
             KenjinxNative.setSurfaceRotationByAndroidRotation(currentRot ?: 0)
             try { KenjinxNative.deviceSetWindowHandle(currentWindowHandle) } catch (_: Throwable) {}
 
-            // Sanfter Kick nur wenn Renderer READY **und** Input init
+            // Gentle kick only when renderer is READY **and** input is initialized
             if (width > 0 && height > 0 &&
                 MainActivity.mainViewModel?.rendererReady == true &&
                 _inputInitialized
@@ -247,10 +247,10 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
         val qs = org.kenjinx.android.viewmodels.QuickSettings(mainViewModel.activity)
         try { KenjinxNative.graphicsSetFullscreenStretch(qs.stretchToFullscreen) } catch (_: Throwable) {}
 
-        // Host gilt nun als „gestartet“
+        // Host is now considered 'started'
         _isStarted = true
 
-        // Immer bevorzugt im Service starten; wenn Bind noch nicht fertig → kurz warten, dann fallback
+        // Prefer starting in the service; if binding isn't ready yet → wait briefly, then fall back
         if (emuBound) {
             startRunLoopInService()
         } else {
@@ -260,7 +260,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
                 if (emuBound) {
                     startRunLoopInService()
                 } else {
-                    // Fallback: lokaler Thread (sollte selten passieren)
+                    // Fallback: local thread (should be rare)
                     ghLog("Fallback: starting RunLoop in local thread")
                     _guestThread = thread(start = true, name = "KenjinxGuest") { runGame() }
                 }
@@ -303,7 +303,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
 
         KenjinxNative.uiHandlerSetResponse(false, "")
 
-        // Emulation im Service stoppen (falls dort gestartet)
+        // Stop emulation in the service (if started there)
         try {
             if (emuBound && _startedViaService) {
                 emuBinder?.stopEmulation {
@@ -312,14 +312,14 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
             }
         } catch (_: Throwable) { }
 
-        // Fallback: lokaler Thread beenden
+        // Fallback: stop local thread
         try { _updateThread?.join(200) } catch (_: Throwable) {}
         try { _renderingThreadWatcher?.join(200) } catch (_: Throwable) {}
 
-        // Bindung lösen
+        // Unbind
         shutdownBinding()
 
-        // Service explizit beenden (falls noch läuft)
+        // Explicitly stop the service (if still running)
         try {
             mainViewModel.activity.stopService(Intent(mainViewModel.activity, EmulationService::class.java))
         } catch (_: Throwable) { }
@@ -429,7 +429,7 @@ class GameHost(context: Context?, private val mainViewModel: MainViewModel) : Su
 
                 attempts++
 
-                // 1 stabiler Tick oder max. 12 Versuche
+                // One stable tick or max. 12 attempts
                 if ((stableCount >= 1 || attempts >= 12) && w > 0 && h > 0) {
                     ghLog("resize stabilized after $attempts ticks → ${w}x$h")
                     safeSetSize(w, h)

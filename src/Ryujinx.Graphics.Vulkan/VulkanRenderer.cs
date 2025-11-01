@@ -28,7 +28,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         private bool _initialized;
 
-        // JNI/Lifecycle-Flag
+        // JNI / lifecycle flag
         internal volatile bool PresentAllowed = true;
 
         public uint ProgramCount { get; set; } = 0;
@@ -52,7 +52,7 @@ namespace Ryujinx.Graphics.Vulkan
         internal Lock BackgroundQueueLock { get; private set; }
         internal Lock QueueLock { get; private set; }
 
-        // NEU: SurfaceLock, um Create/Destroy/Queries zu serialisieren
+        // NEW: SurfaceLock to serialize create/destroy/queries
         internal Lock SurfaceLock { get; private set; }
 
         internal MemoryAllocator MemoryAllocator { get; private set; }
@@ -506,7 +506,7 @@ namespace Ryujinx.Graphics.Vulkan
             Queue = queue;
             QueueLock = new();
 
-            // Init Locks
+            // Init locks
             SurfaceLock = new();
             if (maxQueueCount >= 2)
             {
@@ -1021,7 +1021,7 @@ namespace Ryujinx.Graphics.Vulkan
             return !(IsMoltenVk || IsQualcommProprietary);
         }
 
-        // ===== Surface/Present Lifecycle helpers =====
+        // ===== Surface/Present lifecycle helpers =====
 
         public unsafe bool RecreateSurface()
         {
@@ -1052,7 +1052,7 @@ namespace Ryujinx.Graphics.Vulkan
                 }
                 catch
                 {
-                    // retry später
+                    // retry later
                     return false;
                 }
             }
