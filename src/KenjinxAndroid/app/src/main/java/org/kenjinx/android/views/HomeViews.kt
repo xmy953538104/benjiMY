@@ -105,7 +105,7 @@ class HomeViews {
         const val ListImageSize = 150
         const val GridImageSize = 300
 
-        // --- small version badge bottom left
+        // Small version badge in the bottom-left corner
         @Composable
         private fun VersionBadge(modifier: Modifier = Modifier) {
             Text(
@@ -115,7 +115,8 @@ class HomeViews {
                 modifier = modifier.padding(8.dp)
             )
         }
-        // -- Helper for Shortcut-Flow
+
+        // Helper for the shortcut flow
         private fun resolveGameUri(gm: GameModel): Uri? = gm.file.uri
 
         private fun decodeGameIcon(gm: GameModel): Bitmap? {
@@ -127,6 +128,7 @@ class HomeViews {
                 null
             }
         }
+
         @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
         @Composable
         fun Home(
@@ -151,14 +153,14 @@ class HomeViews {
             val showAmiiboSlotDialog = remember { mutableStateOf(false) }
             val pendingSlot = remember { mutableStateOf(1) }
 
-            // Shortcut-Dialog-State
+            // Shortcut dialog state
             val showShortcutDialog = remember { mutableStateOf(false) }
             val shortcutName = remember { mutableStateOf("") }
 
             val context = LocalContext.current
             val activity = LocalContext.current as? Activity
 
-            // NEW: Launcher für Amiibo (OpenDocument)
+            // NEW: Launcher for Amiibo (OpenDocument)
             val pickAmiiboLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.OpenDocument()
             ) { uri: Uri? ->
@@ -183,7 +185,7 @@ class HomeViews {
                 }
             }
 
-            // Launcher for "Custom icon" (OpenDocument)
+            // Launcher for custom icon (OpenDocument)
             val pickImageLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.OpenDocument()
             ) { uri: Uri? ->
@@ -222,7 +224,7 @@ class HomeViews {
                 }
             }
 
-            // --- Box around scaffold so we can overlay the badge
+            // Wrap the scaffold so we can overlay the version badge
             Box(Modifier.fillMaxSize()) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -297,7 +299,7 @@ class HomeViews {
                                     }
                                 }
 
-                                // Settings
+                                // Settings button
                                 IconButton(
                                     onClick = {
                                         if (!isNavigating.value) {
@@ -327,7 +329,7 @@ class HomeViews {
                                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                                 }
 
-                        }
+                            }
 
                             OutlinedTextField(
                                 value = query.value,
@@ -342,13 +344,13 @@ class HomeViews {
                                 singleLine = true,
                                 shape = RoundedCornerShape(8.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        disabledContainerColor = Color.Transparent,
-                                        errorContainerColor = Color.Transparent,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    )
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    errorContainerColor = Color.Transparent,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                )
                             )
                         }
                     },
@@ -583,7 +585,7 @@ class HomeViews {
                                         )
                                     }
 
-                                    // create Shortcut
+                                    // Create shortcut
                                     IconButton(onClick = {
                                         val gm = viewModel.mainViewModel?.selected
                                         if (gm != null) {
@@ -658,7 +660,7 @@ class HomeViews {
                         }
                     )
 
-                // --- Shortcut-Dialog
+                // Shortcut dialog
                 if (showShortcutDialog.value) {
                     val gm = viewModel.mainViewModel?.selected
                     AlertDialog(
@@ -683,11 +685,11 @@ class HomeViews {
                                         .padding(top = 8.dp)
                                 ) {
                                     TextButton(onClick = {
-                                        // App icon (Grid image)
+                                        // Use app icon (from grid image)
                                         if (gm != null && activity != null) {
                                             val gameUri = resolveGameUri(gm)
                                             if (gameUri != null) {
-                                                // persist rights for the game file
+                                                // Persist rights for the game file
                                                 ShortcutUtils.persistReadWrite(activity, gameUri)
 
                                                 val bmp = decodeGameIcon(gm)
@@ -709,7 +711,7 @@ class HomeViews {
                                     }) { Text("App icon") }
 
                                     TextButton(onClick = {
-                                        // Custom icon: open picker
+                                        // Pick a custom icon
                                         pickImageLauncher.launch(arrayOf("image/*"))
                                         showShortcutDialog.value = false
                                     }) { Text("Custom icon") }
@@ -724,11 +726,11 @@ class HomeViews {
                     )
                 }
 
-                // --- Version badge bottom left above the entire content
+                // Version badge at the bottom-left above all content
                 VersionBadge(
                     modifier = Modifier.align(Alignment.BottomStart)
                 )
-            } // End of box
+            } // End of Box
         }
 
         @OptIn(ExperimentalFoundationApi::class)
