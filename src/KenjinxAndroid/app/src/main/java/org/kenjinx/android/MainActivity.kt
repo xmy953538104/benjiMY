@@ -366,6 +366,14 @@ class MainActivity : BaseActivity() {
         return super.dispatchGenericMotionEvent(ev)
     }
 
+    // --- Audio foreground/background gating ---
+    private fun setAudioForegroundState(inForeground: Boolean) {
+        // bevorzugt: pausieren statt nur muten
+        try { KenjinxNative.audioSetPaused(!inForeground) } catch (_: Throwable) {}
+        // fallback: Master-Mute
+        try { KenjinxNative.audioSetMuted(!inForeground) } catch (_: Throwable) {}
+    }
+
     // --------- BACKGROUND STABILITY: Present gating ---------
     override fun onStart() {
         super.onStart()
@@ -385,6 +393,7 @@ class MainActivity : BaseActivity() {
     override fun onStop() {
         super.onStop()
         if (isGameRunning) {
+            setAudioForegroundState(false)
             handler.removeCallbacks(reattachWindowWhenReady)
             handler.removeCallbacks(enablePresentWhenReady)
             setPresentEnabled(false, "onStop")
@@ -397,6 +406,7 @@ class MainActivity : BaseActivity() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN && isGameRunning) {
+            setAudioForegroundState(false)
             if (MainActivity.mainViewModel?.rendererReady == true) {
                 try {
                     KenjinxNative.graphicsSetPresentEnabled(false)
@@ -412,6 +422,7 @@ class MainActivity : BaseActivity() {
     override fun onResume() {
         super.onResume()
         isActive = true
+        setAudioForegroundState(true)
 
         coldResetIfZombie("onResume")
 
@@ -467,6 +478,7 @@ class MainActivity : BaseActivity() {
         handler.removeCallbacks(enablePresentWhenReady)
 
         if (hasFocus && isActive) {
+            setAudioForegroundState(true)
             // NEU: zuerst sicherstellen, dass die Bindung existiert
             try { mainViewModel?.gameHost?.ensureServiceStartedAndBound() } catch (_: Throwable) {}
 
@@ -477,6 +489,7 @@ class MainActivity : BaseActivity() {
             handler.postDelayed({ try { mainViewModel?.gameHost?.postReattachKicks(rot) } catch (_: Throwable) {} }, 200L)
             handler.postDelayed(enablePresentWhenReady, 450L)
         } else {
+            setAudioForegroundState(false)
             setPresentEnabled(false, "focus lost")
             try { KenjinxNative.detachWindow() } catch (_: Throwable) {}
         }
@@ -485,6 +498,7 @@ class MainActivity : BaseActivity() {
     override fun onPause() {
         super.onPause()
         isActive = false
+        setAudioForegroundState(false)
 
         handler.removeCallbacks(reattachWindowWhenReady)
         handler.removeCallbacks(enablePresentWhenReady)

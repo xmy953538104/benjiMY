@@ -35,6 +35,254 @@ namespace LibKenjinx
 
         public static VulkanLoader? VulkanLoader { get; private set; }
 
+        // ==== Audio Foreground/Background State (reflection-safe) ====
+        private static bool _audioPaused = false;
+        private static bool _audioMuted  = false;
+
+        // strong reference if OpenAL backend is used
+        private static OpenALHardwareDeviceDriver? _openAl;
+
+        // ---------- helpers for broad reflection coverage ----------
+        private static readonly string[] PauseMethodCandidates =
+        {
+            "Pause", "SetPaused", "SetPause", "PauseAll", "RequestPause",
+            "SetIsPaused", "SetPauseState", "Suspend", "SetSuspended",
+            "PauseEmulation", "SetEmulationPaused", "SetRunning" // some implementations invert bool
+        };
+
+        private static readonly string[] VolumeMethodCandidates =
+        {
+            "SetVolumeMultiplier", "SetVolume", "SetMasterVolume", "SetGain"
+        };
+
+        private static readonly string[] VolumePropertyCandidates =
+        {
+            "VolumeMultiplier", "MasterVolume", "Volume", "Gain", "OutputVolume"
+        };
+
+        // Try call method with single bool
+        private static bool TryCallBool(object target, string[] names, bool arg)
+        {
+            if (target == null) return false;
+            var t = target.GetType();
+            foreach (var name in names)
+            {
+                var m = t.GetMethod(name, new[] { typeof(bool) });
+                if (m != null)
+                {
+                    try { m.Invoke(target, new object[] { arg }); return true; } catch { }
+                }
+            }
+            return false;
+        }
+
+        // Try call method with single float
+        private static bool TryCallFloat(object target, string[] names, float arg)
+        {
+            if (target == null) return false;
+            var t = target.GetType();
+            foreach (var name in names)
+            {
+                var m = t.GetMethod(name, new[] { typeof(float) });
+                if (m != null)
+                {
+                    try { m.Invoke(target, new object[] { arg }); return true; } catch { }
+                }
+            }
+            return false;
+        }
+
+        // Try set property (float/double)
+        private static bool TrySetFloatProp(object target, string[] names, float value)
+        {
+            if (target == null) return false;
+            var t = target.GetType();
+            foreach (var name in names)
+            {
+                var p = t.GetProperty(name);
+                if (p != null && p.CanWrite)
+                {
+                    try
+                    {
+                        object v = value;
+                        if (p.PropertyType == typeof(double)) v = (double)value;
+                        p.SetValue(target, v);
+                        return true;
+                    }
+                    catch { }
+                }
+            }
+            return false;
+        }
+
+        // Try set property (bool) for Mute/IsMuted etc.
+        private static bool TrySetBoolProp(object target, params string[] names)
+        {
+            if (target == null) return false;
+            var t = target.GetType();
+            foreach (var name in names)
+            {
+                var p = t.GetProperty(name);
+                if (p != null && p.CanWrite && p.PropertyType == typeof(bool))
+                {
+                    try { p.SetValue(target, true); return true; } catch { }
+                }
+            }
+            return false;
+        }
+
+        // breadth-first walk through "audio-ish" objects accessible from a root
+        private static IEnumerable<object?> WalkAudioObjects(object? root, int depth = 2)
+        {
+            if (root == null || depth < 0) yield break;
+
+            yield return root;
+
+            var t = root.GetType();
+            var props = t.GetProperties();
+            foreach (var p in props)
+            {
+                object? val = null;
+                try { val = p.GetValue(root); } catch { /* ignore */ }
+
+                if (val == null) continue;
+
+                // Prefer properties that look audio-related or are common containers
+                if (p.Name.IndexOf("Audio", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    p.Name.IndexOf("Sound", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    p.Name.IndexOf("Mixer", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    p.Name.IndexOf("Output", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    p.PropertyType.Name.IndexOf("Audio", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    foreach (var x in WalkAudioObjects(val, depth - 1))
+                        yield return x;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Attempts to pause the entire emulation (strongest guarantee to stop audio).
+        /// We probe several likely targets via reflection to be compatible across forks.
+        /// </summary>
+        private static bool TryPauseEmulation(bool pause)
+        {
+            int hits = 0;
+
+            try
+            {
+                // 1) Try SwitchDevice wrapper itself
+                var dev = SwitchDevice;
+                if (dev != null && TryCallBool(dev, PauseMethodCandidates, pause)) hits++;
+
+                // 2) Try underlying Switch or similar inner object
+                var inner =
+                    dev?.GetType().GetProperty("Switch")?.GetValue(dev) ??
+                    dev?.GetType().GetProperty("Device")?.GetValue(dev);
+                if (inner != null && TryCallBool(inner, PauseMethodCandidates, pause)) hits++;
+
+                // 3) Try EmulationContext and its "System" (kernel/front controller etc.)
+                var ctx = dev?.EmulationContext;
+                if (ctx != null)
+                {
+                    if (TryCallBool(ctx, PauseMethodCandidates, pause)) hits++;
+
+                    var sys = ctx.GetType().GetProperty("System")?.GetValue(ctx);
+                    if (sys != null && TryCallBool(sys, PauseMethodCandidates, pause)) hits++;
+
+                    // 4) walk all audio-ish descendants and try pause
+                    foreach (var node in WalkAudioObjects(ctx, depth: 2))
+                    {
+                        if (node != null && TryCallBool(node, PauseMethodCandidates, pause))
+                            hits++;
+                    }
+                }
+            }
+            catch { /* ignore */ }
+
+            if (hits > 0)
+                Logger.Info?.Print(LogClass.Application, $"[PauseGate] Emulation pause={pause} hits={hits}");
+
+            return hits > 0;
+        }
+
+        /// <summary>
+        /// Applies paused/muted state. Tries many backends/locations to be
+        /// resilient across Ryujinx revisions.
+        /// </summary>
+        private static void ApplyAudioState()
+        {
+            bool shouldMute = _audioPaused || _audioMuted;
+            float vol = shouldMute ? 0f : 1f;
+            int hits = 0;
+
+            // A) Direct: OpenAL driver (if used)
+            try
+            {
+                var oal = _openAl;
+                if (oal != null)
+                {
+                    bool p = TryCallBool(oal, PauseMethodCandidates, _audioPaused);
+                    bool v = TryCallFloat(oal, VolumeMethodCandidates, vol) || TrySetFloatProp(oal, VolumePropertyCandidates, vol);
+                    if (p || v) { hits++; Logger.Trace?.Print(LogClass.Application, $"[AudioGate] OpenAL applied p={p} v={v} vol={vol}"); }
+                }
+            }
+            catch { }
+
+            // B) EmulationContext managers (AudioRendererManager/AudioManager/AudioOutManager/…)
+            try
+            {
+                var ctx = SwitchDevice?.EmulationContext;
+                if (ctx != null)
+                {
+                    foreach (var node in WalkAudioObjects(ctx, depth: 2))
+                    {
+                        if (node == null) continue;
+
+                        bool p = TryCallBool(node, PauseMethodCandidates, _audioPaused);
+                        bool v = TryCallFloat(node, VolumeMethodCandidates, vol) || TrySetFloatProp(node, VolumePropertyCandidates, vol);
+
+                        // also try boolean mute-style properties (IsMuted/Mute)
+                        if (shouldMute)
+                            v = v || TrySetBoolProp(node, "IsMuted", "Muted", "Mute");
+
+                        if (p || v) hits++;
+                    }
+                }
+            }
+            catch { }
+
+            // C) Generic driver fallback (whatever AudioDriver actually is)
+            try
+            {
+                var drv = AudioDriver;
+                if (drv != null)
+                {
+                    bool p = TryCallBool(drv, PauseMethodCandidates, _audioPaused);
+                    bool v = TryCallFloat(drv, VolumeMethodCandidates, vol) || TrySetFloatProp(drv, VolumePropertyCandidates, vol);
+                    if (shouldMute) v = v || TrySetBoolProp(drv, "IsMuted", "Muted", "Mute");
+
+                    if (p || v) hits++;
+                }
+            }
+            catch { }
+
+            Logger.Info?.Print(LogClass.Application, $"[AudioGate] applied (hits={hits}) paused={_audioPaused} muted={_audioMuted} → vol={vol}");
+
+            // D) fallback: try to pause whole emulation if audio controls not hit
+            if (hits == 0 && _audioPaused)
+            {
+                if (TryPauseEmulation(true))
+                    Logger.Info?.Print(LogClass.Application, "[AudioGate] escalated: Emulation paused");
+            }
+            else if (hits == 0 && !_audioPaused)
+            {
+                // try resume if we previously paused emulation
+                if (TryPauseEmulation(false))
+                    Logger.Info?.Print(LogClass.Application, "[AudioGate] escalated: Emulation resumed");
+            }
+        }
+        // =============================================================
+
         [DllImport("libkenjinxjni")]
         internal extern static void setRenderingThread();
 
@@ -97,6 +345,7 @@ namespace LibKenjinx
             debug_break(4);
             Logger.Trace?.Print(LogClass.Application, "Jni Function Call");
             AudioDriver = new OpenALHardwareDeviceDriver();
+            _openAl = AudioDriver as OpenALHardwareDeviceDriver; // <-- audio patch: keep a strong ref
 
             var timezone = Marshal.PtrToStringAnsi(timeZonePtr);
             return InitializeDevice((MemoryManagerMode)memoryManagerMode,
@@ -565,6 +814,22 @@ namespace LibKenjinx
 
             DeleteUser(userId);
         }
+
+        // --- Audio JNI Exports (Foreground/Background gating) ---
+        [UnmanagedCallersOnly(EntryPoint = "audioSetPaused")]
+        public static void JniAudioSetPaused(bool paused)
+        {
+            _audioPaused = paused;
+            ApplyAudioState();
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "audioSetMuted")]
+        public static void JniAudioSetMuted(bool muted)
+        {
+            _audioMuted = muted;
+            ApplyAudioState();
+        }
+        // ---------------------------------------------------------
 
         [UnmanagedCallersOnly(EntryPoint = "uiHandlerSetup")]
         public static void JniSetupUiHandler()

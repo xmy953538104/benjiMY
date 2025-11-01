@@ -107,6 +107,10 @@ interface KenjinxNativeJna : Library {
     // Amiibo
     fun amiiboLoadBin(bytes: ByteArray, length: Int): Boolean
     fun amiiboClear()
+
+    // AUDIO (neu): direkte JNA-Brücke zu C#-Exports
+    fun audioSetPaused(paused: Boolean)
+    fun audioSetMuted(muted: Boolean)
 }
 
 val jnaInstance: KenjinxNativeJna = Native.load(
@@ -216,15 +220,24 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
             }
         }
     }
-    // -------------------------------------------------------------------------
+
+    // --- optionale Wrapper für Audio (safer logging) ---
+    override fun audioSetPaused(paused: Boolean) {
+        try { jnaInstance.audioSetPaused(paused) }
+        catch (t: Throwable) { Log.w("KenjinxNative", "audioSetPaused unavailable", t) }
+    }
+
+    override fun audioSetMuted(muted: Boolean) {
+        try { jnaInstance.audioSetMuted(muted) }
+        catch (t: Throwable) { Log.w("KenjinxNative", "audioSetMuted unavailable", t) }
+    }
+    // ----------------------------------------------------
 
     @JvmStatic
     fun frameEnded() = MainActivity.frameEnded()
 
     @JvmStatic
-    fun test() {
-        // no-op
-    }
+    fun test() { /* no-op */ }
 
     @JvmStatic
     fun getSurfacePtr(): Long = MainActivity.mainViewModel?.gameHost?.currentSurface ?: -1
@@ -278,8 +291,8 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
         return try {
             val handle = getWindowHandle()
             if (handle <= 0) return false
-            deviceSetWindowHandle(handle)  // Window wieder setzen
-            deviceRecreateSwapchain()      // Swapchain sauber neu anlegen
+            deviceSetWindowHandle(handle)
+            deviceRecreateSwapchain()
             true
         } catch (_: Throwable) {
             false
