@@ -31,6 +31,17 @@ import org.kenjinx.android.views.MainView
 import android.content.pm.ActivityInfo
 import android.hardware.display.DisplayManager
 import android.view.Surface
+import androidx.preference.PreferenceManager
+import java.io.File
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.content.Context
+import org.kenjinx.android.service.EmulationService
 
 class MainActivity : BaseActivity() {
     private var physicalControllerManager: PhysicalControllerManager =
@@ -38,12 +49,20 @@ class MainActivity : BaseActivity() {
     private lateinit var motionSensorManager: MotionSensorManager
     private var _isInit: Boolean = false
     private val handler = Handler(Looper.getMainLooper())
+    private val ENABLE_PRESENT_DELAY_MS = 400L
+    private val REATTACH_DELAY_MS = 300L
+    private var wantPresentEnabled = false
+    private val TAG_FG = "FgPresent"
     private val delayedHandleIntent = object : Runnable { override fun run() { handleIntent() } }
     var storedIntent: Intent = Intent()
     var isGameRunning = false
     var isActive = false
     var storageHelper: SimpleStorageHelper? = null
     lateinit var uiHandler: UiHandler
+
+    // Persistenz für Zombie-Erkennung
+    private val PREFS = "emu_core"
+    private val KEY_EMU_RUNNING = "emu_running"
 
     // Display Rotation + Orientation Handling
     private lateinit var displayManager: DisplayManager
@@ -58,6 +77,17 @@ class MainActivity : BaseActivity() {
         if (enabled) Log.d(TAG_ROT, msg)
     }
 
+    private val serviceStopReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == EmulationService.ACTION_STOPPED) {
+                handler.removeCallbacks(reattachWindowWhenReady)
+                handler.removeCallbacks(enablePresentWhenReady)
+                clearEmuRunningFlag()
+                hardColdReset("service stopped broadcast")
+            }
+        }
+    }
+
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) {}
         override fun onDisplayRemoved(displayId: Int) {}
@@ -65,7 +95,8 @@ class MainActivity : BaseActivity() {
             if (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     display?.displayId != displayId
                 } else {
-                    TODO("VERSION.SDK_INT < R")
+                    @Suppress("DEPRECATION")
+                    return
                 }
             ) return
             val rot = display?.rotation
@@ -102,6 +133,49 @@ class MainActivity : BaseActivity() {
         Surface.ROTATION_180 -> 180
         Surface.ROTATION_270 -> 270
         else -> -1
+    }
+
+    private fun setPresentEnabled(enabled: Boolean, reason: String) {
+        wantPresentEnabled = enabled
+        try {
+            KenjinxNative.graphicsSetPresentEnabled(enabled)
+            Log.d(TAG_FG, "present=${if (enabled) "ENABLED" else "DISABLED"} ($reason)")
+        } catch (_: Throwable) {
+            Log.d(TAG_FG, "native toggle not available ($reason)")
+        }
+    }
+
+    private val enablePresentWhenReady = object : Runnable {
+        override fun run() {
+            val isReallyResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && isActive
+            val hasFocusNow = hasWindowFocus()
+            val rendererReady = MainActivity.mainViewModel?.rendererReady == true
+
+            if (!isReallyResumed || !hasFocusNow || !rendererReady) {
+                handler.postDelayed(this, ENABLE_PRESENT_DELAY_MS)
+                return
+            }
+            setPresentEnabled(true, "focus regained + delay")
+        }
+    }
+
+    private val reattachWindowWhenReady = object : Runnable {
+        override fun run() {
+            val isReallyResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && isActive
+            val hasFocusNow = hasWindowFocus()
+            if (!isReallyResumed || !hasFocusNow) {
+                handler.postDelayed(this, REATTACH_DELAY_MS)
+                return
+            }
+
+            try { mainViewModel?.gameHost?.rebindNativeWindow(force = true) } catch (_: Throwable) {}
+
+            if (!KenjinxNative.reattachWindowIfReady()) {
+                handler.postDelayed(this, REATTACH_DELAY_MS)
+                return
+            }
+            Log.d(TAG_FG, "window reattached")
+        }
     }
 
     private fun doOrientationPulse(currentRot: Int) {
@@ -181,7 +255,7 @@ class MainActivity : BaseActivity() {
         if (_isInit) return
         val appPath: String = AppPath
 
-        var quickSettings = QuickSettings(this)
+        val quickSettings = QuickSettings(this)
         KenjinxNative.loggingSetEnabled(LogLevel.Info, quickSettings.enableInfoLogs)
         KenjinxNative.loggingSetEnabled(LogLevel.Stub, quickSettings.enableStubLogs)
         KenjinxNative.loggingSetEnabled(LogLevel.Warning, quickSettings.enableWarningLogs)
@@ -197,6 +271,7 @@ class MainActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ensureNotificationPermission()
 
         motionSensorManager = MotionSensorManager(this)
         Thread.setDefaultUncaughtExceptionHandler(crashHandler)
@@ -213,6 +288,8 @@ class MainActivity : BaseActivity() {
         }
 
         AppPath = this.getExternalFilesDir(null)!!.absolutePath
+
+        coldResetIfZombie("onCreate")
         initialize()
 
         window.attributes.layoutInDisplayCutoutMode =
@@ -282,35 +359,155 @@ class MainActivity : BaseActivity() {
         return super.dispatchGenericMotionEvent(ev)
     }
 
+    // --- Audio foreground/background gating ---
+    private fun setAudioForegroundState(inForeground: Boolean) {
+        // bevorzugt: pausieren statt nur muten
+        try { KenjinxNative.audioSetPaused(!inForeground) } catch (_: Throwable) {}
+        // fallback: Master-Mute
+        try { KenjinxNative.audioSetMuted(!inForeground) } catch (_: Throwable) {}
+    }
+
+    // --------- BACKGROUND STABILITY: Present gating ---------
+    override fun onStart() {
+        super.onStart()
+        coldResetIfZombie("onStart")
+
+        if (isGameRunning && MainActivity.mainViewModel?.rendererReady == true) {
+            try {
+                KenjinxNative.graphicsSetPresentEnabled(true)
+                Log.d(TAG_FG, "present=ENABLED (onStart)")
+            } catch (_: Throwable) {}
+        } else {
+            Log.d(TAG_FG, "skip enable present (onStart) — rendererReady=${MainActivity.mainViewModel?.rendererReady}")
+            setPresentEnabled(false, "cold reset: onStart (no game)")
+        }
+    }
+
     override fun onStop() {
         super.onStop()
-        isActive = false
-        if (isGameRunning) mainViewModel?.performanceManager?.setTurboMode(false)
+        if (isGameRunning) {
+            setAudioForegroundState(false)
+            handler.removeCallbacks(reattachWindowWhenReady)
+            handler.removeCallbacks(enablePresentWhenReady)
+            setPresentEnabled(false, "onStop")
+            try { KenjinxNative.detachWindow() } catch (_: Throwable) {}
+        }
+        // WICHTIG: Bindung sicher lösen (verhindert Leak)
+        try { mainViewModel?.gameHost?.shutdownBinding() } catch (_: Throwable) {}
     }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN && isGameRunning) {
+            setAudioForegroundState(false)
+            if (MainActivity.mainViewModel?.rendererReady == true) {
+                try {
+                    KenjinxNative.graphicsSetPresentEnabled(false)
+                    Log.d(TAG_FG, "present=DISABLED (onTrimMemory:$level)")
+                } catch (_: Throwable) {}
+            } else {
+                Log.d(TAG_FG, "skip disable present (onTrimMemory) — rendererReady=${MainActivity.mainViewModel?.rendererReady}")
+            }
+        }
+    }
+    // --------------------------------------------------------
 
     override fun onResume() {
         super.onResume()
-        // Reapply alignment if necessary
+        isActive = true
+        setAudioForegroundState(true)
+
+        coldResetIfZombie("onResume")
+
         applyOrientationPreference()
 
         // Enable display listener
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             lastKnownRotation = display?.rotation
-        rotLog("onResume: display.rotation=${display?.rotation} → ${deg(display?.rotation)}°")
+            rotLog("onResume: display.rotation=${display?.rotation} → ${deg(display?.rotation)}°")
         }
+
         try { displayManager.registerDisplayListener(displayListener, handler) } catch (_: Throwable) {}
 
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(
+                    serviceStopReceiver,
+                    IntentFilter(EmulationService.ACTION_STOPPED),
+                    Context.RECEIVER_EXPORTED
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(serviceStopReceiver, IntentFilter(EmulationService.ACTION_STOPPED))
+            }
+        } catch (_: Throwable) {}
+
+        handler.removeCallbacks(reattachWindowWhenReady)
+        handler.removeCallbacks(enablePresentWhenReady)
+
+        try { mainViewModel?.gameHost?.rebindNativeWindow(force = true) } catch (_: Throwable) {}
+
         handler.postDelayed(delayedHandleIntent, 10)
-        isActive = true
-        if (isGameRunning && QuickSettings(this).enableMotion) motionSensorManager.register()
+
+        if (isGameRunning && QuickSettings(this).enableMotion) {
+            motionSensorManager.register()
+        }
+
+        if (isGameRunning) {
+            handler.postDelayed(reattachWindowWhenReady, REATTACH_DELAY_MS)
+            if (hasWindowFocus()) {
+                handler.postDelayed(enablePresentWhenReady, ENABLE_PRESENT_DELAY_MS)
+            }
+        } else {
+            setPresentEnabled(false, "cold reset: onResume (no game)")
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!isGameRunning) return
+
+        handler.removeCallbacks(reattachWindowWhenReady)
+        handler.removeCallbacks(enablePresentWhenReady)
+
+        if (hasFocus && isActive) {
+            setAudioForegroundState(true)
+            // NEU: zuerst sicherstellen, dass die Bindung existiert
+            try { mainViewModel?.gameHost?.ensureServiceStartedAndBound() } catch (_: Throwable) {}
+
+            setPresentEnabled(false, "focus gained → pre-rebind")
+            try { mainViewModel?.gameHost?.rebindNativeWindow(force = true) } catch (_: Throwable) {}
+            handler.postDelayed(reattachWindowWhenReady, 150L)
+            val rot = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display?.rotation else null
+            handler.postDelayed({ try { mainViewModel?.gameHost?.postReattachKicks(rot) } catch (_: Throwable) {} }, 200L)
+            handler.postDelayed(enablePresentWhenReady, 450L)
+        } else {
+            setAudioForegroundState(false)
+            setPresentEnabled(false, "focus lost")
+            try { KenjinxNative.detachWindow() } catch (_: Throwable) {}
+        }
     }
 
     override fun onPause() {
         super.onPause()
         isActive = false
-        if (isGameRunning) mainViewModel?.performanceManager?.setTurboMode(false)
-        motionSensorManager.unregister()
+        setAudioForegroundState(false)
+
+        handler.removeCallbacks(reattachWindowWhenReady)
+        handler.removeCallbacks(enablePresentWhenReady)
+
+        if (isGameRunning) {
+            setPresentEnabled(false, "onPause")
+            try { KenjinxNative.detachWindow() } catch (_: Throwable) {}
+            mainViewModel?.performanceManager?.setTurboMode(false)
+            motionSensorManager.unregister()
+        }
+
         try { displayManager.unregisterDisplayListener(displayListener) } catch (_: Throwable) {}
+        try { unregisterReceiver(serviceStopReceiver) } catch (_: Throwable) {}
+
+        // NEU: Bindung aufräumen (verhindert Leak beim Task-Swipe)
+        try { mainViewModel?.gameHost?.shutdownBinding() } catch (_: Throwable) {}
     }
 
     private fun handleIntent() {
@@ -341,10 +538,102 @@ class MainActivity : BaseActivity() {
         val rot = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             this.display?.rotation
         } else {
-            TODO("VERSION.SDK_INT < R")
+            @Suppress("DEPRECATION")
+            null
         }
         rotLog("applyOrientationPreference: rot=$rot → ${deg(rot)}°, pref=${pref.name}")
         try { KenjinxNative.setSurfaceRotationByAndroidRotation(rot) } catch (_: Throwable) {}
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val rot = this.display?.rotation
+        val old = lastKnownRotation
+        lastKnownRotation = rot
+
+        rotLog("onConfigurationChanged: display.rotation=$rot → ${deg(rot)}°")
+
+        try { KenjinxNative.setSurfaceRotationByAndroidRotation(rot) } catch (_: Throwable) {}
+
+        val pref = QuickSettings(this).orientationPreference
+        val shouldPropagate =
+            pref == QuickSettings.OrientationPreference.Sensor ||
+                pref == QuickSettings.OrientationPreference.SensorLandscape
+
+        if (shouldPropagate && isGameRunning) {
+            handler.post { try { mainViewModel?.gameHost?.onOrientationOrSizeChanged(rot) } catch (_: Throwable) {} }
+        }
+
+        if (pref == QuickSettings.OrientationPreference.SensorLandscape && old != null && rot != null) {
+            val isSideFlip = (old == Surface.ROTATION_90 && rot == Surface.ROTATION_270) ||
+                (old == Surface.ROTATION_270 && rot == Surface.ROTATION_90)
+            if (isSideFlip) doOrientationPulse(rot)
+        }
+    }
+
+    private val requestNotifPerm = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* optional: Log/Toast */ }
+
+    private fun ensureNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            val granted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                requestNotifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    private fun resolveGameByTitleIdOrName(titleIdHex: String?, displayName: String?): DocumentFile? {
+        val gamesRoot = getDefaultGamesTree() ?: return null
+        for (child in gamesRoot.listFiles()) {
+            if (!child.isFile) continue
+            if (!displayName.isNullOrBlank()) {
+                val n = child.name ?: ""
+                if (n.contains(displayName, ignoreCase = true)) return child
+            }
+            if (!titleIdHex.isNullOrBlank()) {
+                val tid = getTitleIdFast(child)
+                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) return child
+            }
+        }
+        if (!titleIdHex.isNullOrBlank()) {
+            for (child in gamesRoot.listFiles()) {
+                if (!child.isFile) continue
+                val tid = getTitleIdFast(child)
+                if (tid != null && tid.equals(titleIdHex, ignoreCase = true)) return child
+            }
+        }
+        return null
+    }
+
+    private fun getDefaultGamesTree(): DocumentFile? {
+        val vm = mainViewModel
+        if (vm?.defaultGameFolderUri != null) {
+            return DocumentFile.fromTreeUri(this, vm.defaultGameFolderUri!!)
+        }
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        val legacyPath = prefs.getString("gameFolder", null)
+        if (!legacyPath.isNullOrEmpty()) {
+            // Ohne SAF-URI kein Tree-Listing möglich
+        }
+        return null
+    }
+
+    private fun getTitleIdFast(file: DocumentFile): String? {
+        val name = file.name ?: return null
+        val dot = name.lastIndexOf('.')
+        if (dot <= 0 || dot >= name.length - 1) return null
+        val ext = name.substring(dot + 1).lowercase()
+        return try {
+            contentResolver.openFileDescriptor(file.uri, "r")?.use { pfd ->
+                val info = org.kenjinx.android.viewmodels.GameInfo()
+                KenjinxNative.deviceGetGameInfo(pfd.fd, ext, info)
+                info.TitleId?.lowercase()
+            }
+        } catch (_: Exception) { null }
     }
 
     fun shutdownAndRestart() {
@@ -355,5 +644,54 @@ class MainActivity : BaseActivity() {
         mainViewModel?.let { it.performanceManager?.setTurboMode(false) }
         startActivity(restartIntent)
         Runtime.getRuntime().exit(0)
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacks(enablePresentWhenReady)
+        handler.removeCallbacks(reattachWindowWhenReady)
+        // NEU: falls die Activity stirbt → Bindung garantiert lösen
+        try { mainViewModel?.gameHost?.shutdownBinding() } catch (_: Throwable) {}
+        super.onDestroy()
+    }
+
+    // ---------- Helpers ----------
+
+    private fun setEmuRunningFlag(value: Boolean) {
+        try {
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_EMU_RUNNING, value)
+                .apply()
+        } catch (_: Throwable) { }
+    }
+
+    private fun clearEmuRunningFlag() = setEmuRunningFlag(false)
+
+    private fun hardColdReset(reason: String) {
+        Log.d(TAG_FG, "Cold graphics reset ($reason)")
+        isGameRunning = false
+        mainViewModel?.rendererReady = false
+
+        try { setPresentEnabled(false, "cold reset: $reason") } catch (_: Throwable) {}
+        try { KenjinxNative.detachWindow() } catch (_: Throwable) {}
+
+        try { stopService(Intent(this, EmulationService::class.java)) } catch (_: Throwable) {}
+
+        try { mainViewModel?.loadGameModel?.value = null } catch (_: Throwable) {}
+        try { mainViewModel?.bootPath?.value = "" } catch (_: Throwable) {}
+        try { mainViewModel?.forceNceAndPptc?.value = false } catch (_: Throwable) {}
+        storedIntent = Intent()
+    }
+
+    private fun coldResetIfZombie(phase: String) {
+        try {
+            val zombie = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean(KEY_EMU_RUNNING, false)
+            if (zombie) {
+                clearEmuRunningFlag()
+                setPresentEnabled(false, "kill stray: $phase")
+                hardColdReset("kill stray: $phase")
+            }
+        } catch (_: Throwable) { }
     }
 }
