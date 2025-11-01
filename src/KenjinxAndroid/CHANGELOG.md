@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.5l — 2025-11-01
+
+### Added
+- **Emulation Service**: Keeps the Game running in the Background.
+
 ## 2.0.5k — 2025-10-28
 
 ### Added

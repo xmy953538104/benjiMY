@@ -13,8 +13,9 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.5k – Highlights
+## Version 2.0.5l – Highlights
 
+- **Emulation Service**: Keeps the Game running in the Background.
 - **Virtual Controller**: Added Controller Scale Slider.
 - **Tablets/Foldable**: Fixed Gamescreen for Tablets and Foldables.
 - **Nightly Patches**: added some nightly patches from Kenji-NX. All Credits to KeatonTheBot, LotP, Coxxs, GreemDev, Xam, TechDunk.
