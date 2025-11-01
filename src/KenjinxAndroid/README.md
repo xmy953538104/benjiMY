@@ -13,7 +13,7 @@ Goal: jump into your game faster, with fewer rough edges.
 
 ---
 
-## Version 2.0.5l – Highlights
+## Version 2.0.5m – Highlights
 
 - **Emulation Service**: Keeps the Game running in the Background.
 - **Virtual Controller**: Added Controller Scale Slider.

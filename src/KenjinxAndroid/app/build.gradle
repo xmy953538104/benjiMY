@@ -13,7 +13,7 @@ android {
         //noinspection EditedTargetSdkVersion
         targetSdk 36
         versionCode 20005
-        versionName '2.0.5l'
+        versionName '2.0.5m'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

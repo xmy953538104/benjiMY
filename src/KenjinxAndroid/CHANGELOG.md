@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.5m — 2025-11-01
+
+### Fixed
+- **Emulation Service**: Fixed a bug that keeps the Audio running, even if the game is in the background.
+
 ## 2.0.5l — 2025-11-01
 
 ### Added
