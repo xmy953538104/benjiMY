@@ -28,6 +28,9 @@ namespace Ryujinx.Graphics.Vulkan
 
         private bool _initialized;
 
+        // JNI/Lifecycle-Flag
+        internal volatile bool PresentAllowed = true;
+
         public uint ProgramCount { get; set; } = 0;
 
         internal FormatCapabilities FormatCapabilities { get; private set; }
@@ -48,6 +51,9 @@ namespace Ryujinx.Graphics.Vulkan
         internal Queue BackgroundQueue { get; private set; }
         internal Lock BackgroundQueueLock { get; private set; }
         internal Lock QueueLock { get; private set; }
+
+        // NEU: SurfaceLock, um Create/Destroy/Queries zu serialisieren
+        internal Lock SurfaceLock { get; private set; }
 
         internal MemoryAllocator MemoryAllocator { get; private set; }
         internal HostMemoryAllocator HostMemoryAllocator { get; private set; }
@@ -500,6 +506,15 @@ namespace Ryujinx.Graphics.Vulkan
             Queue = queue;
             QueueLock = new();
 
+            // Init Locks
+            SurfaceLock = new();
+            if (maxQueueCount >= 2)
+            {
+                Api.GetDeviceQueue(_device, queueFamilyIndex, 1, out var backgroundQueue);
+                BackgroundQueue = backgroundQueue;
+                BackgroundQueueLock = new();
+            }
+
             LoadFeatures(maxQueueCount, queueFamilyIndex);
 
             QueueFamilyIndex = queueFamilyIndex;
@@ -551,7 +566,7 @@ namespace Ryujinx.Graphics.Vulkan
         public IProgram CreateProgram(ShaderSource[] sources, ShaderInfo info)
         {
             ProgramCount++;
-            
+
             bool isCompute = sources.Length == 1 && sources[0].Stage == ShaderStage.Compute;
 
             if (info.State.HasValue || isCompute)
@@ -1006,13 +1021,100 @@ namespace Ryujinx.Graphics.Vulkan
             return !(IsMoltenVk || IsQualcommProprietary);
         }
 
-        internal unsafe void RecreateSurface()
+        // ===== Surface/Present Lifecycle helpers =====
+
+        public unsafe bool RecreateSurface()
         {
-            SurfaceApi.DestroySurface(_instance.Instance, _surface, null);
+            if (!PresentAllowed)
+            {
+                return false;
+            }
 
-            _surface = _getSurface(_instance.Instance, Api);
+            lock (SurfaceLock)
+            {
+                try
+                {
+                    if (_surface.Handle != 0)
+                    {
+                        SurfaceApi.DestroySurface(_instance.Instance, _surface, null);
+                        _surface = new SurfaceKHR(0);
+                    }
 
-            (_window as Window)?.SetSurface(_surface);
+                    _surface = _getSurface(_instance.Instance, Api);
+                    if (_surface.Handle == 0)
+                    {
+                        return false;
+                    }
+
+                    ( _window as Window )?.SetSurface(_surface);
+                    ( _window as Window )?.SetSurfaceQueryAllowed(true);
+                    return true;
+                }
+                catch
+                {
+                    // retry später
+                    return false;
+                }
+            }
+        }
+
+        public unsafe void ReleaseSurface()
+        {
+            lock (SurfaceLock)
+            {
+                try
+                {
+                    ( _window as Window )?.SetSurfaceQueryAllowed(false);
+
+                    if (_surface.Handle != 0)
+                    {
+                        SurfaceApi.DestroySurface(_instance.Instance, _surface, null);
+                        _surface = new SurfaceKHR(0);
+                    }
+                }
+                catch
+                {
+                    // still
+                }
+
+                ( _window as Window )?.OnSurfaceLost();
+            }
+        }
+
+        public void SetPresentEnabled(bool enabled)
+        {
+            PresentAllowed = enabled;
+
+            if (!enabled)
+            {
+                ( _window as Window )?.SetSurfaceQueryAllowed(false);
+                ReleaseSurface();
+            }
+            else
+            {
+                _ = RecreateSurface();
+            }
+        }
+
+        public void SetPresentAllowed(bool allowed)
+        {
+            PresentAllowed = allowed;
+            Logger.Trace?.Print(LogClass.Gpu, $"PresentAllowed={allowed}");
+
+            if (allowed)
+            {
+                try
+                {
+                    ( _window as Window )?.SetSurfaceQueryAllowed(true);
+                    _window?.SetSize(0, 0);
+                    _ = RecreateSurface();
+                }
+                catch { }
+            }
+            else
+            {
+                ( _window as Window )?.SetSurfaceQueryAllowed(false);
+            }
         }
 
         public unsafe void Dispose()
@@ -1034,22 +1136,14 @@ namespace Ryujinx.Graphics.Vulkan
 
             MemoryAllocator.Dispose();
 
-            foreach (var shader in Shaders)
-            {
-                shader.Dispose();
-            }
+            foreach (var shader in Shaders) shader.Dispose();
+            foreach (var texture in Textures) texture.Release();
+            foreach (var sampler in Samplers) sampler.Dispose();
 
-            foreach (var texture in Textures)
+            if (_surface.Handle != 0)
             {
-                texture.Release();
+                SurfaceApi.DestroySurface(_instance.Instance, _surface, null);
             }
-
-            foreach (var sampler in Samplers)
-            {
-                sampler.Dispose();
-            }
-
-            SurfaceApi.DestroySurface(_instance.Instance, _surface, null);
 
             Api.DestroyDevice(_device, null);
 

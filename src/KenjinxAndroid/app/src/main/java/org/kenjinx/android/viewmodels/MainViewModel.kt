@@ -1,6 +1,7 @@
 package org.kenjinx.android.viewmodels
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavHostController
@@ -8,7 +9,7 @@ import androidx.preference.PreferenceManager
 import com.anggrayudi.storage.extension.launchOnUiThread
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
-import org.kenjinx.android.GameController
+import org.kenjinx.android.IGameController
 import org.kenjinx.android.GameHost
 import org.kenjinx.android.Logging
 import org.kenjinx.android.MainActivity
@@ -30,7 +31,7 @@ class MainViewModel(val activity: MainActivity) {
     var physicalControllerManager: PhysicalControllerManager? = null
     var motionSensorManager: MotionSensorManager? = null
     var gameModel: GameModel? = null
-    var controller: GameController? = null
+    var controller: IGameController? = null
     var performanceManager: PerformanceManager? = null
     var selected: GameModel? = null
     val loadGameModel: MutableState<GameModel?> = mutableStateOf(null)
@@ -50,7 +51,15 @@ class MainViewModel(val activity: MainActivity) {
     private var progressValue: MutableState<Float>? = null
     private var showLoading: MutableState<Boolean>? = null
     private var refreshUser: MutableState<Boolean>? = null
+    @Volatile var rendererReady: Boolean = false
 
+    // Default Game Folder
+    var defaultGameFolderUri: Uri? = null
+        set(value) {
+            field = value
+            val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+            prefs.edit().putString("defaultGameFolderUri", value?.toString() ?: "").apply()
+        }
     var gameHost: GameHost? = null
         set(value) {
             field = value
@@ -62,6 +71,12 @@ class MainViewModel(val activity: MainActivity) {
 
     init {
         performanceManager = PerformanceManager(activity)
+
+        val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+        val saved = prefs.getString("defaultGameFolderUri", "") ?: ""
+        if (saved.isNotEmpty()) {
+            defaultGameFolderUri = Uri.parse(saved)
+        }
     }
 
     fun refreshFirmwareVersion() {
@@ -75,6 +90,7 @@ class MainViewModel(val activity: MainActivity) {
         motionSensorManager?.unregister()
         physicalControllerManager?.disconnect()
         motionSensorManager?.setControllerId(-1)
+        rendererReady = false
     }
 
     // ---- Load language/region from Preferences (Defaults: AmericanEnglish/USA) ----
@@ -117,13 +133,16 @@ class MainViewModel(val activity: MainActivity) {
             settings.overrideSettings(forceNceAndPptc)
         }
 
+        // 0=Auto, 1=SingleThread, 2=Threaded
+        val backendMode = if (settings.disableThreadedRendering) 1 else 2
+
         var success = KenjinxNative.graphicsInitialize(
             enableMacroHLE = settings.enableMacroHLE,
             enableShaderCache = settings.enableShaderCache,
             enableTextureRecompression = settings.enableTextureRecompression,
             rescale = settings.resScale,
             maxAnisotropy = settings.maxAnisotropy,
-            backendThreading = org.kenjinx.android.BackendThreading.Auto.ordinal
+            backendThreading = backendMode
         )
 
         if (!success)
@@ -178,6 +197,7 @@ class MainViewModel(val activity: MainActivity) {
             extensions.size,
             driverHandle
         )
+        rendererReady = success
         if (!success)
             return 0
 
@@ -227,13 +247,16 @@ class MainViewModel(val activity: MainActivity) {
 
         val settings = QuickSettings(activity)
 
+        // 0=Auto, 1=SingleThread, 2=Threaded
+        val backendMode = if (settings.disableThreadedRendering) 1 else 2
+
         var success = KenjinxNative.graphicsInitialize(
             enableMacroHLE = settings.enableMacroHLE,
             enableShaderCache = settings.enableShaderCache,
             enableTextureRecompression = settings.enableTextureRecompression,
             rescale = settings.resScale,
             maxAnisotropy = settings.maxAnisotropy,
-            backendThreading = org.kenjinx.android.BackendThreading.Auto.ordinal
+            backendThreading = backendMode
         )
 
         if (!success)
@@ -289,6 +312,7 @@ class MainViewModel(val activity: MainActivity) {
             extensions.size,
             driverHandle
         )
+        rendererReady = success
         if (!success)
             return false
 
@@ -422,7 +446,7 @@ class MainViewModel(val activity: MainActivity) {
         frequenciesState?.let { PerformanceMonitor.getFrequencies(it) }
     }
 
-    fun setGameController(controller: GameController) {
+    fun setGameController(controller: IGameController) {
         this.controller = controller
     }
 

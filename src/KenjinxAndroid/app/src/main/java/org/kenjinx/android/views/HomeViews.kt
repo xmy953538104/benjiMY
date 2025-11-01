@@ -1,7 +1,11 @@
 package org.kenjinx.android.views
 
+import android.app.Activity
+import android.content.Intent
 import android.content.res.Resources
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -87,6 +91,29 @@ import org.kenjinx.android.viewmodels.GameModel
 import org.kenjinx.android.viewmodels.HomeViewModel
 import org.kenjinx.android.viewmodels.QuickSettings
 import org.kenjinx.android.widgets.SimpleAlertDialog
+import org.kenjinx.android.ShortcutUtils
+import org.kenjinx.android.ShortcutWizardActivity
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.documentfile.provider.DocumentFile
+
+// NEW: Cheats
+import org.kenjinx.android.cheats.CheatPrefs
+import org.kenjinx.android.cheats.CheatItem
+import org.kenjinx.android.cheats.loadCheatsFromDisk
+import org.kenjinx.android.cheats.applyCheatSelectionOnDisk
+import org.kenjinx.android.cheats.importCheatTxt
+
+// NEW: Mods
+import org.kenjinx.android.cheats.listMods
+import org.kenjinx.android.cheats.deleteMod
+import org.kenjinx.android.cheats.importModsZip
+
+// NEW: Saves
+import org.kenjinx.android.saves.*
 
 class HomeViews {
     companion object {
@@ -103,7 +130,18 @@ class HomeViews {
                 modifier = modifier.padding(8.dp)
             )
         }
+        // -- Helper for Shortcut-Flow
+        private fun resolveGameUri(gm: GameModel): Uri? = gm.file.uri
 
+        private fun decodeGameIcon(gm: GameModel): Bitmap? {
+            return try {
+                val b64 = gm.icon ?: return null
+                val bytes = Base64.getDecoder().decode(b64)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } catch (_: Throwable) {
+                null
+            }
+        }
         @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
         @Composable
         fun Home(
@@ -124,7 +162,221 @@ class HomeViews {
             var isFabVisible by remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
 
+            // NEW: Amiibo slot picker state
+            val showAmiiboSlotDialog = remember { mutableStateOf(false) }
+            val pendingSlot = remember { mutableStateOf(1) }
+
+            // NEW: Cheats UI state
+            val openCheatsDialog = remember { mutableStateOf(false) }
+            val cheatsForSelected = remember { mutableStateOf(listOf<CheatItem>()) }
+            val enabledCheatKeys = remember { mutableStateOf(mutableSetOf<String>()) }
+
+            // NEW: Mods UI state
+            val openModsDialog = remember { mutableStateOf(false) }
+            val modsForSelected = remember { mutableStateOf(listOf<String>()) }
+            val modsImportProgress = remember { mutableStateOf(0f) }
+            val modsImportBusy = remember { mutableStateOf(false) }
+            val modsImportStatusText = remember { mutableStateOf("") }
+
+            // Save Manager State
+            val openSavesDialog = remember { mutableStateOf(false) }
+            val saveImportBusy = remember { mutableStateOf(false) }
+            val saveExportBusy = remember { mutableStateOf(false) }
+            val saveImportProgress = remember { mutableStateOf(0f) }
+            val saveExportProgress = remember { mutableStateOf(0f) }
+            val saveImportStatus = remember { mutableStateOf("") }
+            val saveExportStatus = remember { mutableStateOf("") }
+
+            val activity = LocalContext.current as? Activity
+
+            // Import: OpenDocument (ZIP)
+            val importZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val act = activity
+                // Guard auf ausgewähltes Spiel – optional
+                val tIdNow = viewModel.mainViewModel?.selected?.titleId.orEmpty()
+                if (uri != null && act != null && tIdNow.isNotEmpty()) {
+                    saveImportBusy.value = true
+                    saveImportProgress.value = 0f
+                    saveImportStatus.value = "Starting…"
+
+                    thread {
+                        val res = importSaveFromZip(act, uri) { prog ->
+                            val frac = if (prog.total > 0) prog.bytes.toFloat() / prog.total else 0f
+                            saveImportProgress.value = frac.coerceIn(0f, 1f)
+                            saveImportStatus.value = "Importing: ${prog.currentEntry}"
+                        }
+                        saveImportBusy.value = false
+                        launchOnUiThread {
+                            Toast.makeText(act, res.message, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+
+            // Export: CreateDocument (ZIP)
+            val exportZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.CreateDocument("application/zip")
+            ) { uri: Uri? ->
+                val act = activity
+                val tIdNow = viewModel.mainViewModel?.selected?.titleId.orEmpty()
+                if (uri != null && act != null && tIdNow.isNotEmpty()) {
+                    saveExportBusy.value = true
+                    saveExportProgress.value = 0f
+                    saveExportStatus.value = "Starting…"
+
+                    thread {
+                        val res = exportSaveToZip(act, tIdNow, uri) { prog ->
+                            val frac = if (prog.total > 0) prog.bytes.toFloat() / prog.total else 0f
+                            saveExportProgress.value = frac.coerceIn(0f, 1f)
+                            saveExportStatus.value = "Exporting: ${prog.currentPath}"
+                        }
+                        saveExportBusy.value = false
+                        launchOnUiThread {
+                            Toast.makeText(
+                                act,
+                                if (res.ok) "save exported" else (res.error ?: "export failed"),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            }
+
+            // Shortcut-Dialog-State
+            val showShortcutDialog = remember { mutableStateOf(false) }
+            val shortcutName = remember { mutableStateOf("") }
+
             val context = LocalContext.current
+
+            // NEW: Launcher für Amiibo (OpenDocument)
+            val pickAmiiboLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                if (uri != null && activity != null) {
+                    try {
+                        activity.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) {}
+                    val name = DocumentFile.fromSingleUri(activity, uri)?.name ?: "amiibo.bin"
+                    val qs = QuickSettings(activity)
+                    when (pendingSlot.value) {
+                        1 -> { qs.amiibo1Uri = uri.toString(); qs.amiibo1Name = name }
+                        2 -> { qs.amiibo2Uri = uri.toString(); qs.amiibo2Name = name }
+                        3 -> { qs.amiibo3Uri = uri.toString(); qs.amiibo3Name = name }
+                        4 -> { qs.amiibo4Uri = uri.toString(); qs.amiibo4Name = name }
+                        5 -> { qs.amiibo5Uri = uri.toString(); qs.amiibo5Name = name }
+                    }
+                    qs.save()
+                    Toast.makeText(activity, "Amiibo saved to slot ${pendingSlot.value}", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            // NEW: Cheats Import (.txt)
+            val importCheatLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                val act = viewModel.activity
+                val titleId = gm?.titleId ?: ""
+                if (uri != null && act != null && titleId.isNotEmpty()) {
+                    // nur .txt akzeptieren
+                    val okExt = runCatching {
+                        DocumentFile.fromSingleUri(act, uri)?.name?.lowercase()?.endsWith(".txt") == true
+                    }.getOrElse { false }
+                    if (!okExt) {
+                        Toast.makeText(act, "Please select a .txt file", Toast.LENGTH_SHORT).show()
+                        return@rememberLauncherForActivityResult
+                    }
+
+                    val res = importCheatTxt(act, titleId, uri)
+                    if (res.isSuccess) {
+                        Toast.makeText(act, "Imported: ${res.getOrNull()?.name}", Toast.LENGTH_SHORT).show()
+                        // danach Liste aktualisieren
+                        cheatsForSelected.value = loadCheatsFromDisk(act, titleId)
+                    } else {
+                        Toast.makeText(act, "Import failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            // NEW: Launcher for Mods
+            val pickModZipLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                val act = viewModel.activity
+                val titleId = gm?.titleId ?: ""
+                if (uri != null && act != null && titleId.isNotEmpty()) {
+                    // Persist permission (lesen)
+                    try {
+                        act.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (_: Exception) {}
+
+                    modsImportBusy.value = true
+                    modsImportProgress.value = 0f
+                    modsImportStatusText.value = "Starting…"
+
+                    thread {
+                        val res = importModsZip(
+                            act,
+                            titleId,
+                            uri
+                        ) { prog ->
+                            modsImportProgress.value = prog.fraction
+                            modsImportStatusText.value = if (prog.currentEntry.isNotEmpty())
+                                "Copying: ${prog.currentEntry}"
+                            else
+                                "Copying… ${(prog.fraction * 100).toInt()}%"
+                        }
+
+                        // Liste aktualisieren
+                        modsForSelected.value = listMods(act, titleId)
+                        modsImportBusy.value = false
+
+                        launchOnUiThread {
+                            val msg = if (res.ok)
+                                "Imported: ${res.imported.joinToString(", ")}"
+                            else
+                                "Import failed"
+                            Toast.makeText(act, msg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                }
+            }
+
+
+            // Launcher for "Custom icon" (OpenDocument)
+            val pickImageLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri: Uri? ->
+                val gm = viewModel.mainViewModel?.selected
+                if (uri != null && gm != null && activity != null) {
+                    val bmp = runCatching {
+                        context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) }
+                    }.getOrNull()
+
+                    val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
+                    val gameUri = resolveGameUri(gm)
+                    if (gameUri != null) {
+                        ShortcutUtils.persistReadWrite(activity, gameUri)
+
+                        ShortcutUtils.pinShortcutForGame(
+                            activity = activity,
+                            gameUri = gameUri,
+                            label = label,
+                            iconBitmap = bmp
+                        ) {
+
+                        }
+                    } else {
+                        showError.value = "Shortcut failed (no game URI found)."
+                    }
+                }
+            }
 
             val nestedScrollConnection = remember {
                 object : NestedScrollConnection {
@@ -241,7 +493,7 @@ class HomeViews {
                                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                                 }
 
-                        }
+                            }
 
                             OutlinedTextField(
                                 value = query.value,
@@ -256,27 +508,39 @@ class HomeViews {
                                 singleLine = true,
                                 shape = RoundedCornerShape(8.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        disabledContainerColor = Color.Transparent,
-                                        errorContainerColor = Color.Transparent,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    )
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    errorContainerColor = Color.Transparent,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                )
                             )
                         }
                     },
                     floatingActionButton = {
                         AnimatedVisibility(visible = isFabVisible) {
-                            FloatingActionButton(
-                                onClick = {
-                                    viewModel.requestReload()
-                                    viewModel.ensureReloadIfNecessary()
-                                },
-                                shape = MaterialTheme.shapes.small,
-                                containerColor = MaterialTheme.colorScheme.tertiary
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = "refresh")
+                            // NEW: two FABs in a row: Refresh + Import Amiibo
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                FloatingActionButton(
+                                    onClick = {
+                                        viewModel.requestReload()
+                                        viewModel.ensureReloadIfNecessary()
+                                    },
+                                    shape = MaterialTheme.shapes.small,
+                                    containerColor = MaterialTheme.colorScheme.tertiary
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "refresh")
+                                }
+                                FloatingActionButton(
+                                    onClick = { showAmiiboSlotDialog.value = true },
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    Icon(
+                                        org.kenjinx.android.Icons.folderOpen(MaterialTheme.colorScheme.onSurface),
+                                        contentDescription = "Import Amiibo"
+                                    )
+                                }
                             }
                         }
                     },
@@ -375,6 +639,51 @@ class HomeViews {
                         val name = viewModel.mainViewModel?.selected?.titleName ?: ""
                         DlcViews.Main(titleId, name, openDlcDialog, canClose)
                     }
+
+                    // NEW: Amiibo slot chooser dialog (outside of game)
+                    if (showAmiiboSlotDialog.value) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { showAmiiboSlotDialog.value = false },
+                            title = { Text("Import Amiibo") },
+                            text = {
+                                Column {
+                                    Text("Choose a slot to save this Amiibo:", modifier = Modifier.padding(bottom = 8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 1
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 1") }
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 2
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 2") }
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 3
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 3") }
+                                    }
+                                    Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 4
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 4") }
+                                        TextButton(onClick = {
+                                            pendingSlot.value = 5
+                                            pickAmiiboLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                            showAmiiboSlotDialog.value = false
+                                        }) { Text("Slot 5") }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showAmiiboSlotDialog.value = false }) { Text("Close") }
+                            }
+                        )
+                    }
                 }
 
                 if (viewModel.mainViewModel?.loadGameModel?.value != null)
@@ -386,8 +695,14 @@ class HomeViews {
 
                             thread {
                                 showLoading.value = true
+
+                                // NEW: Push Cheats vor dem Start (Auto-Start Pfad)
+                                val gm = viewModel.mainViewModel.loadGameModel.value!!
+                                val tId = gm.titleId ?: ""
+                                val act = viewModel.activity
+
                                 val success = viewModel.mainViewModel.loadGame(
-                                    viewModel.mainViewModel.loadGameModel.value!!,
+                                    gm,
                                     true,
                                     viewModel.mainViewModel.forceNceAndPptc.value
                                 )
@@ -415,10 +730,16 @@ class HomeViews {
                                 if (showAppActions.value) {
                                     IconButton(onClick = {
                                         if (viewModel.mainViewModel?.selected != null) {
+
+                                            // NEW: Push Cheats vor dem Start (Run-Button)
+                                            val gmSel = viewModel.mainViewModel!!.selected!!
+                                            val tId = gmSel.titleId ?: ""
+                                            val act = viewModel.activity
+
                                             thread {
                                                 showLoading.value = true
                                                 val success = viewModel.mainViewModel.loadGame(
-                                                    viewModel.mainViewModel.selected!!
+                                                    gmSel
                                                 )
                                                 if (success == 1) {
                                                     launchOnUiThread {
@@ -439,6 +760,21 @@ class HomeViews {
                                             contentDescription = "Run"
                                         )
                                     }
+
+                                    // create Shortcut
+                                    IconButton(onClick = {
+                                        val gm = viewModel.mainViewModel?.selected
+                                        if (gm != null) {
+                                            shortcutName.value = gm.titleName ?: ""
+                                            showShortcutDialog.value = true
+                                        }
+                                    }) {
+                                        Icon(
+                                            Icons.Filled.Add,
+                                            contentDescription = "Create Shortcut"
+                                        )
+                                    }
+
                                     val showAppMenu = remember { mutableStateOf(false) }
                                     Box {
                                         IconButton(onClick = { showAppMenu.value = true }) {
@@ -489,6 +825,47 @@ class HomeViews {
                                                     openDlcDialog.value = true
                                                 }
                                             )
+                                            // NEW: Manage Cheats
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Manage Cheats") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    val gm = viewModel.mainViewModel?.selected
+                                                    val act = viewModel.activity
+                                                    if (gm != null && !gm.titleId.isNullOrEmpty() && act != null) {
+                                                        val titleId = gm.titleId!!
+                                                        cheatsForSelected.value = loadCheatsFromDisk(act, titleId)
+                                                        enabledCheatKeys.value = CheatPrefs(act).getEnabled(titleId)
+                                                        openCheatsDialog.value = true
+                                                    } else {
+                                                        showError.value = "No title selected."
+                                                    }
+                                                }
+                                            )
+                                            // NEW: Manage Mods
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Manage Mods") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    val gm = viewModel.mainViewModel?.selected
+                                                    val act = viewModel.activity
+                                                    if (gm != null && !gm.titleId.isNullOrEmpty() && act != null) {
+                                                        val titleId = gm.titleId!!
+                                                        modsForSelected.value = listMods(act, titleId)
+                                                        openModsDialog.value = true
+                                                    } else {
+                                                        showError.value = "No title selected."
+                                                    }
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(text = "Manage Saves") },
+                                                onClick = {
+                                                    showAppMenu.value = false
+                                                    openSavesDialog.value = true
+                                                }
+                                            )
+
                                         }
                                     }
                                 }
@@ -499,6 +876,328 @@ class HomeViews {
                             selectedModel.value = null
                         }
                     )
+
+                // --- Cheats Bottom Sheet ---
+                if (openCheatsDialog.value) {
+                    ModalBottomSheet(
+                        onDismissRequest = { openCheatsDialog.value = false }
+                    ) {
+                        val gm = viewModel.mainViewModel?.selected
+                        val act = viewModel.activity
+                        val titleId = gm?.titleId ?: ""
+
+                        Column(Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // LINKS: Import .txt
+                                TextButton(onClick = {
+                                    importCheatLauncher.launch(arrayOf("text/plain", "text/*", "*/*"))
+                                }) { Text("Import .txt") }
+
+                                // RECHTS: Cancel + Save
+                                Row {
+                                    TextButton(onClick = { openCheatsDialog.value = false }) { Text("Cancel") }
+                                    TextButton(onClick = {
+                                        val act2 = act
+                                        if (act2 != null && titleId.isNotEmpty()) {
+                                            CheatPrefs(act2).setEnabled(titleId, enabledCheatKeys.value)
+                                            applyCheatSelectionOnDisk(act2, titleId, enabledCheatKeys.value)
+                                            cheatsForSelected.value = loadCheatsFromDisk(act2, titleId)
+                                        }
+                                        openCheatsDialog.value = false
+                                    }) { Text("Save") }
+                                }
+                            }
+
+                            Text("Manage Cheats", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = gm?.titleName ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            if (cheatsForSelected.value.isEmpty()) {
+                                Text("No cheats found for this title.")
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 12.dp)
+                                ) {
+                                    items(cheatsForSelected.value) { cheat ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column(
+                                                Modifier
+                                                    .weight(1f)
+                                                    .padding(end = 12.dp)
+                                            ) {
+                                                Text(cheat.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                                Text(
+                                                    cheat.buildId,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                )
+                                            }
+                                            val checked = enabledCheatKeys.value.contains(cheat.key)
+                                            androidx.compose.material3.Switch(
+                                                checked = checked,
+                                                onCheckedChange = { isOn ->
+                                                    enabledCheatKeys.value =
+                                                        enabledCheatKeys.value.toMutableSet().apply {
+                                                            if (isOn) add(cheat.key) else remove(cheat.key)
+                                                        }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // --- Mods Bottom Sheet ---
+                if (openModsDialog.value) {
+                    ModalBottomSheet(
+                        onDismissRequest = { openModsDialog.value = false }
+                    ) {
+                        val gm = viewModel.mainViewModel?.selected
+                        val act = viewModel.activity
+                        val titleId = gm?.titleId ?: ""
+
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Manage Mods", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = gm?.titleName ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            // Import-Zeile
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    enabled = !modsImportBusy.value,
+                                    onClick = { pickModZipLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }
+                                ) { Text("Import .zip") }
+                            }
+
+                            // Progress
+                            if (modsImportBusy.value) {
+                                androidx.compose.material3.LinearProgressIndicator(
+                                    progress = { modsImportProgress.value },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                )
+                                Text(
+                                    modsImportStatusText.value,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
+
+                            // Liste der Mods
+                            if (modsForSelected.value.isEmpty()) {
+                                Text("No mods found for this title.")
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 12.dp)
+                                ) {
+                                    items(modsForSelected.value) { modName ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(modName, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            Row {
+                                                TextButton(
+                                                    onClick = {
+                                                        val a = act
+                                                        if (a != null && titleId.isNotEmpty()) {
+                                                            thread {
+                                                                val ok = deleteMod(a, titleId, modName)
+                                                                if (ok) {
+                                                                    modsForSelected.value = listMods(a, titleId)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                ) { Text("Delete") }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = { openModsDialog.value = false }) { Text("Close") }
+                            }
+                        }
+                    }
+                }
+
+                // --- Saves Bottom Sheet ---
+                if (openSavesDialog.value) {
+                    ModalBottomSheet(
+                        onDismissRequest = { openSavesDialog.value = false }
+                    ) {
+                        val act = activity
+
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Save Manager", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = viewModel.mainViewModel?.selected?.titleName ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                // Import-Button
+                                androidx.compose.material3.Button(
+                                    enabled = !saveImportBusy.value && !saveExportBusy.value &&
+                                        (viewModel.mainViewModel?.selected?.titleId?.isNotEmpty() == true),
+                                    onClick = {
+                                        saveImportProgress.value = 0f
+                                        saveImportStatus.value = ""
+                                        importZipLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                                    }
+                                ) { Text("Import ZIP") }
+
+                                // Export-Button
+                                androidx.compose.material3.Button(
+                                    enabled = !saveImportBusy.value && !saveExportBusy.value &&
+                                        (viewModel.mainViewModel?.selected?.titleId?.isNotEmpty() == true),
+                                    onClick = {
+                                        val actLocal = activity
+                                        val tIdNow = viewModel.mainViewModel?.selected?.titleId.orEmpty()
+                                        if (actLocal != null && tIdNow.isNotEmpty()) {
+                                            val fname = suggestedCreateDocNameForExport(actLocal, tIdNow)
+                                            saveExportProgress.value = 0f
+                                            saveExportStatus.value = ""
+                                            exportZipLauncher.launch(fname)
+                                        }
+                                    }
+                                ) { Text("Export ZIP") }
+                            }
+
+                            if (saveImportBusy.value) {
+                                Column(Modifier.padding(top = 12.dp)) {
+                                    androidx.compose.material3.LinearProgressIndicator(progress = { saveImportProgress.value })
+                                    Text(saveImportStatus.value, modifier = Modifier.padding(top = 6.dp))
+                                }
+                            }
+                            if (saveExportBusy.value) {
+                                Column(Modifier.padding(top = 12.dp)) {
+                                    androidx.compose.material3.LinearProgressIndicator(progress = { saveExportProgress.value })
+                                    Text(saveExportStatus.value, modifier = Modifier.padding(top = 6.dp))
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 12.dp),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                androidx.compose.material3.TextButton(
+                                    onClick = { openSavesDialog.value = false }
+                                ) { Text("Close") }
+                            }
+                        }
+                    }
+                }
+
+                // --- Shortcut-Dialog
+                if (showShortcutDialog.value) {
+                    val gm = viewModel.mainViewModel?.selected
+                    AlertDialog(
+                        onDismissRequest = { showShortcutDialog.value = false },
+                        title = { Text("Create shortcut") },
+                        text = {
+                            Column {
+                                OutlinedTextField(
+                                    value = shortcutName.value,
+                                    onValueChange = { shortcutName.value = it },
+                                    label = { Text("Name") },
+                                    singleLine = true
+                                )
+                                Text(
+                                    text = "Choose icon:",
+                                    modifier = Modifier.padding(top = 12.dp)
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp)
+                                ) {
+                                    TextButton(onClick = {
+                                        // App icon (Grid image)
+                                        if (gm != null && activity != null) {
+                                            val gameUri = resolveGameUri(gm)
+                                            if (gameUri != null) {
+                                                // persist rights for the game file
+                                                ShortcutUtils.persistReadWrite(activity, gameUri)
+
+                                                val bmp = decodeGameIcon(gm)
+                                                val label = shortcutName.value.ifBlank { gm.titleName ?: "Start Game" }
+
+                                                ShortcutUtils.pinShortcutForGame(
+                                                    activity = activity,
+                                                    gameUri = gameUri,
+                                                    label = label,
+                                                    iconBitmap = bmp
+                                                ) { }
+                                                showShortcutDialog.value = false
+                                            } else {
+                                                showShortcutDialog.value = false
+                                            }
+                                        } else {
+                                            showShortcutDialog.value = false
+                                        }
+                                    }) { Text("App icon") }
+
+                                    TextButton(onClick = {
+                                        // Custom icon: open picker
+                                        pickImageLauncher.launch(arrayOf("image/*"))
+                                        showShortcutDialog.value = false
+                                    }) { Text("Custom icon") }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showShortcutDialog.value = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
+                }
 
                 // --- Version badge bottom left above the entire content
                 VersionBadge(
@@ -540,6 +1239,11 @@ class HomeViews {
                             ) {
                                 thread {
                                     showLoading.value = true
+
+                                    // NEW: Push Cheats vor dem Start
+                                    val tId = gameModel.titleId ?: ""
+                                    val act = viewModel.activity
+
                                     val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
                                         launchOnUiThread { viewModel.mainViewModel?.navigateToGame() }
@@ -631,6 +1335,11 @@ class HomeViews {
                             ) {
                                 thread {
                                     showLoading.value = true
+
+                                    // NEW: Push Cheats vor dem Start
+                                    val tId = gameModel.titleId ?: ""
+                                    val act = viewModel.activity
+
                                     val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
                                         launchOnUiThread { viewModel.mainViewModel?.navigateToGame() }

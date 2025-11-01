@@ -24,6 +24,13 @@ class QuickSettings(val activity: Activity) {
         BottomMiddle, BottomLeft, BottomRight, TopMiddle, TopLeft, TopRight
     }
 
+    // --- Virtual Controller Preset
+    enum class VirtualControllerPreset {
+        Default, Layout2, Layout3, Layout4, Layout5, Layout6
+    }
+
+    var virtualControllerPreset: VirtualControllerPreset
+
     var orientationPreference: OrientationPreference
 
     // --- Overlay Settings
@@ -41,6 +48,18 @@ class QuickSettings(val activity: Activity) {
     var useNce: Boolean
     var memoryConfiguration: MemoryConfiguration
     var useVirtualController: Boolean
+    // Amiibo slots (URIs + names)
+    var amiibo1Uri: String?
+    var amiibo1Name: String?
+    var amiibo2Uri: String?
+    var amiibo2Name: String?
+    var amiibo3Uri: String?
+    var amiibo3Name: String?
+    var amiibo4Uri: String?
+    var amiibo4Name: String?
+    var amiibo5Uri: String?
+    var amiibo5Name: String?
+
     var memoryManagerMode: MemoryManagerMode
     var enableShaderCache: Boolean
     var enableTextureRecompression: Boolean
@@ -53,6 +72,10 @@ class QuickSettings(val activity: Activity) {
     var enableMotion: Boolean
     var enablePerformanceMode: Boolean
     var controllerStickSensitivity: Float
+
+    // --- NEU: Controller Scale (0.5f..1.5f, Default 1.0f)
+    var controllerScale: Float
+
     var enableStubLogs: Boolean
     var enableInfoLogs: Boolean
     var enableWarningLogs: Boolean
@@ -63,14 +86,29 @@ class QuickSettings(val activity: Activity) {
     var enableDebugLogs: Boolean
     var enableGraphicsLogs: Boolean
 
+    // --- NEU: Threaded Rendering Toggle (persistiert)
+    var disableThreadedRendering: Boolean
+
     private var sharedPref: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(activity)
 
     init {
+        // Load Amiibo slots
+        amiibo1Uri = sharedPref.getString("amiibo1Uri", null)
+        amiibo1Name = sharedPref.getString("amiibo1Name", null)
+        amiibo2Uri = sharedPref.getString("amiibo2Uri", null)
+        amiibo2Name = sharedPref.getString("amiibo2Name", null)
+        amiibo3Uri = sharedPref.getString("amiibo3Uri", null)
+        amiibo3Name = sharedPref.getString("amiibo3Name", null)
+        amiibo4Uri = sharedPref.getString("amiibo4Uri", null)
+        amiibo4Name = sharedPref.getString("amiibo4Name", null)
+        amiibo5Uri = sharedPref.getString("amiibo5Uri", null)
+        amiibo5Name = sharedPref.getString("amiibo5Name", null)
+
         // --- Load alignment (Default: Sensor)
         val oriValue = sharedPref.getInt("orientationPreference", ActivityInfo.SCREEN_ORIENTATION_SENSOR)
         orientationPreference = OrientationPreference.fromValue(oriValue)
 
-        // --- NEU: Overlay Settings laden
+        // --- Overlay Settings laden
         overlayMenuPosition = OverlayMenuPosition.entries[
             sharedPref.getInt("overlayMenuPosition", OverlayMenuPosition.BottomMiddle.ordinal)
         ]
@@ -94,11 +132,18 @@ class QuickSettings(val activity: Activity) {
         resScale = sharedPref.getFloat("resScale", 1f)
         maxAnisotropy = sharedPref.getFloat("maxAnisotropy", 0f)
         useVirtualController = sharedPref.getBoolean("useVirtualController", true)
+        virtualControllerPreset = VirtualControllerPreset.entries[
+            sharedPref.getInt("virtualControllerPreset", VirtualControllerPreset.Default.ordinal)
+        ]
         isGrid = sharedPref.getBoolean("isGrid", true)
         useSwitchLayout = sharedPref.getBoolean("useSwitchLayout", true)
         enableMotion = sharedPref.getBoolean("enableMotion", true)
         enablePerformanceMode = sharedPref.getBoolean("enablePerformanceMode", true)
         controllerStickSensitivity = sharedPref.getFloat("controllerStickSensitivity", 1.0f)
+
+        // --- NEU laden: Controller Scale
+        controllerScale = sharedPref.getFloat("controllerScale", 1.0f).coerceIn(0.5f, 1.5f)
+
         enableStubLogs = sharedPref.getBoolean("enableStubLogs", false)
         enableInfoLogs = sharedPref.getBoolean("enableInfoLogs", true)
         enableWarningLogs = sharedPref.getBoolean("enableWarningLogs", true)
@@ -108,14 +153,29 @@ class QuickSettings(val activity: Activity) {
         enableTraceLogs = sharedPref.getBoolean("enableStubLogs", false)
         enableDebugLogs = sharedPref.getBoolean("enableDebugLogs", false)
         enableGraphicsLogs = sharedPref.getBoolean("enableGraphicsLogs", false)
+
+        // --- NEU laden
+        disableThreadedRendering = sharedPref.getBoolean("disableThreadedRendering", false)
     }
 
     fun save() {
         sharedPref.edit {
+            // Amiibo slots
+            putString("amiibo1Uri", amiibo1Uri)
+            putString("amiibo1Name", amiibo1Name)
+            putString("amiibo2Uri", amiibo2Uri)
+            putString("amiibo2Name", amiibo2Name)
+            putString("amiibo3Uri", amiibo3Uri)
+            putString("amiibo3Name", amiibo3Name)
+            putString("amiibo4Uri", amiibo4Uri)
+            putString("amiibo4Name", amiibo4Name)
+            putString("amiibo5Uri", amiibo5Uri)
+            putString("amiibo5Name", amiibo5Name)
+
             // --- Save orientation
             putInt("orientationPreference", orientationPreference.value)
 
-            // --- NEU: Overlay Settings speichern
+            // --- Overlay Settings speichern
             putInt("overlayMenuPosition", overlayMenuPosition.ordinal)
             putFloat("overlayMenuOpacity", overlayMenuOpacity.coerceIn(0f, 1f))
 
@@ -142,6 +202,10 @@ class QuickSettings(val activity: Activity) {
             putBoolean("enableMotion", enableMotion)
             putBoolean("enablePerformanceMode", enablePerformanceMode)
             putFloat("controllerStickSensitivity", controllerStickSensitivity)
+
+            // --- NEU speichern: Controller Scale
+            putFloat("controllerScale", controllerScale.coerceIn(0.5f, 1.5f))
+
             putBoolean("enableStubLogs", enableStubLogs)
             putBoolean("enableInfoLogs", enableInfoLogs)
             putBoolean("enableWarningLogs", enableWarningLogs)
@@ -151,6 +215,10 @@ class QuickSettings(val activity: Activity) {
             putBoolean("enableTraceLogs", enableTraceLogs)
             putBoolean("enableDebugLogs", enableDebugLogs)
             putBoolean("enableGraphicsLogs", enableGraphicsLogs)
+            putInt("virtualControllerPreset", virtualControllerPreset.ordinal)
+
+            // --- NEU speichern
+            putBoolean("disableThreadedRendering", disableThreadedRendering)
         }
     }
 

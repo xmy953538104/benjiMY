@@ -20,6 +20,7 @@ using Ryujinx.Common.Logging.Targets;
 using Ryujinx.Common.Utilities;
 using Ryujinx.Graphics.GAL.Multithreading;
 using Ryujinx.HLE;
+using Ryujinx.HLE.Kenjinx;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.HOS;
 using Ryujinx.HLE.HOS.Services.Account.Acc;
@@ -690,9 +691,64 @@ namespace LibKenjinx
                 uiHandler.SetResponse(isOkPressed, input);
             }
         }
+
+        // ===== Amiibo Helpers (Kenjinx) =====
+        public static bool AmiiboLoadFromBytes(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                Logger.Warning?.Print(LogClass.Service, "[Amiibo] Load aborted: empty data.");
+                return false;
+            }
+
+            var dev = SwitchDevice?.EmulationContext;
+            if (dev == null)
+            {
+                Logger.Warning?.Print(LogClass.Service, "[Amiibo] Load aborted: no active EmulationContext.");
+                return false;
+            }
+
+            try
+            {
+                var ok = AmiiboBridge.TryLoadVirtualAmiibo(dev, data, out string msg);
+                if (ok)
+                    Logger.Info?.Print(LogClass.Service, $"[Amiibo] Loaded {data.Length} bytes. {msg}");
+                else
+                    Logger.Warning?.Print(LogClass.Service, $"[Amiibo] Injection failed. {msg}");
+                return ok;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error?.Print(LogClass.Service, $"[Amiibo] Exception: {ex}");
+                return false;
+            }
+        }
+
+        public static void AmiiboClear()
+        {
+            var dev = SwitchDevice?.EmulationContext;
+            if (dev == null)
+            {
+                Logger.Warning?.Print(LogClass.Service, "[Amiibo] Clear aborted: no active EmulationContext.");
+                return;
+            }
+
+            try
+            {
+                AmiiboBridge.ClearVirtualAmiibo(dev);
+                Logger.Info?.Print(LogClass.Service, "[Amiibo] Cleared.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error?.Print(LogClass.Service, $"[Amiibo] Clear exception: {ex}");
+            }
+        }
+        // ===== End Amiibo Helpers =====
+
     }
 
     public class SwitchDevice : IDisposable
+
     {
         private readonly SystemVersion _firmwareVersion;
         public VirtualFileSystem VirtualFileSystem { get; set; }
@@ -966,156 +1022,152 @@ namespace LibKenjinx
                 .Replace("\n", "\\n");
         }
 
-/// <summary>
-/// Updates .../save/titleid_map.ndjson in NDJSON format:
-/// - Reads existing lines
-/// - Replaces/adds entry for titleId
-/// - Completely rewrites the file (no unlimited size increase)
-/// - NEVER overwrites the folder with an empty value; attempts to determine it via markers
-/// </summary>
-private static void UpsertTitleMapNdjson(string savesRoot, string titleIdHex, string titleName, string createdFolder)
-{
-    Directory.CreateDirectory(savesRoot);
-    string mapPath = Path.Combine(savesRoot, "titleid_map.ndjson");
-
-    // titleId (lowercase) -> (Name, Folder, Timestamp)
-    var byTitleId = new Dictionary<string, (string Name, string Folder, string Timestamp)>(StringComparer.OrdinalIgnoreCase);
-
-    // Bestehende Datei einlesen
-    try
-    {
-        if (File.Exists(mapPath))
+        /// <summary>
+        /// Updates .../save/titleid_map.ndjson in NDJSON format:
+        /// - Reads existing lines
+        /// - Replaces/adds entry for titleId
+        /// - Completely rewrites the file (no unlimited size increase)
+        /// - NEVER overwrites the folder with an empty value; attempts to determine it via markers
+        /// </summary>
+        private static void UpsertTitleMapNdjson(string savesRoot, string titleIdHex, string titleName, string createdFolder)
         {
-            foreach (var line in File.ReadLines(mapPath, Encoding.UTF8))
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
+            Directory.CreateDirectory(savesRoot);
+            string mapPath = Path.Combine(savesRoot, "titleid_map.ndjson");
 
-                try
-                {
-                    using var doc = JsonDocument.Parse(line);
-                    var root = doc.RootElement;
+            // titleId (lowercase) -> (Name, Folder, Timestamp)
+            var byTitleId = new Dictionary<string, (string Name, string Folder, string Timestamp)>(StringComparer.OrdinalIgnoreCase);
 
-                    string tid = root.TryGetProperty("titleId", out var tidEl) ? (tidEl.GetString() ?? "").Trim() : "";
-                    if (string.IsNullOrEmpty(tid)) continue;
-
-                    string name    = root.TryGetProperty("name", out var nameEl)       ? (nameEl.GetString()    ?? "") : "";
-                    string folder  = root.TryGetProperty("folder", out var folderEl)   ? (folderEl.GetString()  ?? "") : "";
-                    string ts      = root.TryGetProperty("timestamp", out var tsEl)    ? (tsEl.GetString()      ?? "") : "";
-
-                    byTitleId[tid.ToLowerInvariant()] = (name, folder, ts);
-                }
-                catch
-                {
-                    // Korrupten Eintrag ignorieren
-                }
-            }
-        }
-    }
-    catch
-    {
-        byTitleId.Clear();
-    }
-
-    var nowIso   = DateTime.UtcNow.ToString("O");
-    var titleIdLc = (titleIdHex ?? string.Empty).ToLowerInvariant();
-
-    // 1) Bestimme den "bestehenden" Ordner aus der Map (falls vorhanden)
-    byTitleId.TryGetValue(titleIdLc, out var existing);
-    string existingFolder = existing.Folder ?? "";
-
-    // 2) Versuche, einen sinnvollen Ordner zu bestimmen:
-    //    a) frisch erstellter Ordnername
-    //    b) per Markerdatei in den Saves ermitteln
-    //    c) bisherigen (nicht-leeren) Wert beibehalten
-    string effectiveFolder = createdFolder;
-    if (string.IsNullOrWhiteSpace(effectiveFolder))
-    {
-        effectiveFolder = ResolveSaveFolderByMarker(savesRoot, titleIdLc);
-    }
-    if (string.IsNullOrWhiteSpace(effectiveFolder) && !string.IsNullOrWhiteSpace(existingFolder))
-    {
-        effectiveFolder = existingFolder;
-    }
-
-    // 3) Markerdatei sicherstellen, falls Ordner ermittelt
-    try
-    {
-        if (!string.IsNullOrWhiteSpace(effectiveFolder))
-        {
-            string markerPath = Path.Combine(savesRoot, effectiveFolder, "TITLEID.txt");
-            if (!File.Exists(markerPath))
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
-                File.WriteAllText(markerPath, $"{titleIdLc}\n{titleName ?? "Unknown"}");
-            }
-        }
-    }
-    catch
-    {
-        // Marker-Erstellung darf das Gameplay nicht stören
-    }
-
-    // 4) Upsert: niemals mit leerem Folder überschreiben
-    string finalName   = string.IsNullOrWhiteSpace(titleName) ? (existing.Name ?? "") : titleName;
-    string finalFolder = string.IsNullOrWhiteSpace(effectiveFolder) ? (existing.Folder ?? "") : effectiveFolder;
-    string finalTs     = nowIso;
-
-    byTitleId[titleIdLc] = (finalName ?? "", finalFolder ?? "", finalTs);
-
-    // 5) Datei vollständig neu schreiben (stabil: nach titleId sortiert)
-    try
-    {
-        var ordered = byTitleId
-            .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(kv =>
-                $"{{\"titleId\":\"{EscapeJson(kv.Key)}\",\"name\":\"{EscapeJson(kv.Value.Name)}\"," +
-                $"\"folder\":\"{EscapeJson(kv.Value.Folder)}\",\"timestamp\":\"{EscapeJson(kv.Value.Timestamp)}\"}}{Environment.NewLine}"
-            );
-
-        File.WriteAllText(mapPath, string.Concat(ordered), Encoding.UTF8);
-    }
-    catch
-    {
-        // Schreibfehler stillschweigend ignorieren
-    }
-}
-
-/// <summary>
-/// Durchsucht alle Save-Ordner nach einer TITLEID.txt, deren erste Zeile der titleId entspricht.
-/// Gibt den Ordnernamen (z.B. "00000012") zurück oder null.
-/// </summary>
-private static string ResolveSaveFolderByMarker(string savesRoot, string titleIdLc)
-{
-    try
-    {
-        if (!Directory.Exists(savesRoot)) return null;
-
-        foreach (var dir in Directory.GetDirectories(savesRoot))
-        {
-            string marker = Path.Combine(dir, "TITLEID.txt");
-            if (!File.Exists(marker)) continue;
-
+            // Read existing file
             try
             {
-                using var sr = new StreamReader(marker, Encoding.UTF8, true);
-                string first = sr.ReadLine()?.Trim()?.ToLowerInvariant();
-                if (first == titleIdLc)
+                if (File.Exists(mapPath))
                 {
-                    return Path.GetFileName(dir);
+                    foreach (var line in File.ReadLines(mapPath, Encoding.UTF8))
+                    {
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(line);
+                            var root = doc.RootElement;
+
+                            string tid = root.TryGetProperty("titleId", out var tidEl) ? (tidEl.GetString() ?? "").Trim() : "";
+                            if (string.IsNullOrEmpty(tid)) continue;
+
+                            string name    = root.TryGetProperty("name", out var nameEl)       ? (nameEl.GetString()    ?? "") : "";
+                            string folder  = root.TryGetProperty("folder", out var folderEl)   ? (folderEl.GetString()  ?? "") : "";
+                            string ts      = root.TryGetProperty("timestamp", out var tsEl)    ? (tsEl.GetString()      ?? "") : "";
+
+                            byTitleId[tid.ToLowerInvariant()] = (name, folder, ts);
+                        }
+                        catch
+                        {
+                            // ignore corrupt entry
+                        }
+                    }
                 }
             }
             catch
             {
-                // ignorieren und weiter
+                byTitleId.Clear();
+            }
+
+            var nowIso   = DateTime.UtcNow.ToString("O");
+            var titleIdLc = (titleIdHex ?? string.Empty).ToLowerInvariant();
+
+            // 1) take existing folder if known
+            byTitleId.TryGetValue(titleIdLc, out var existing);
+            string existingFolder = existing.Folder ?? "";
+
+            // 2) figure out effective folder
+            string effectiveFolder = createdFolder;
+            if (string.IsNullOrWhiteSpace(effectiveFolder))
+            {
+                effectiveFolder = ResolveSaveFolderByMarker(savesRoot, titleIdLc);
+            }
+            if (string.IsNullOrWhiteSpace(effectiveFolder) && !string.IsNullOrWhiteSpace(existingFolder))
+            {
+                effectiveFolder = existingFolder;
+            }
+
+            // 3) ensure marker in the folder
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(effectiveFolder))
+                {
+                    string markerPath = Path.Combine(savesRoot, effectiveFolder, "TITLEID.txt");
+                    if (!File.Exists(markerPath))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
+                        File.WriteAllText(markerPath, $"{titleIdLc}\n{titleName ?? "Unknown"}");
+                    }
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+
+            // 4) upsert (never overwrite with empty folder)
+            string finalName   = string.IsNullOrWhiteSpace(titleName) ? (existing.Name ?? "") : titleName;
+            string finalFolder = string.IsNullOrWhiteSpace(effectiveFolder) ? (existing.Folder ?? "") : effectiveFolder;
+            string finalTs     = nowIso;
+
+            byTitleId[titleIdLc] = (finalName ?? "", finalFolder ?? "", finalTs);
+
+            // 5) rewrite file (stable: sort by titleId)
+            try
+            {
+                var ordered = byTitleId
+                    .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(kv =>
+                        $"{{\"titleId\":\"{EscapeJson(kv.Key)}\",\"name\":\"{EscapeJson(kv.Value.Name)}\"," +
+                        $"\"folder\":\"{EscapeJson(kv.Value.Folder)}\",\"timestamp\":\"{EscapeJson(kv.Value.Timestamp)}\"}}{Environment.NewLine}"
+                    );
+
+                File.WriteAllText(mapPath, string.Concat(ordered), Encoding.UTF8);
+            }
+            catch
+            {
+                // ignore write errors
             }
         }
-    }
-    catch
-    {
-        // ignorieren
-    }
-    return null;
-}
+
+        /// <summary>
+        /// Scans save subfolders for a TITLEID.txt whose first line equals the titleId; returns folder name or null.
+        /// </summary>
+        private static string ResolveSaveFolderByMarker(string savesRoot, string titleIdLc)
+        {
+            try
+            {
+                if (!Directory.Exists(savesRoot)) return null;
+
+                foreach (var dir in Directory.GetDirectories(savesRoot))
+                {
+                    string marker = Path.Combine(dir, "TITLEID.txt");
+                    if (!File.Exists(marker)) continue;
+
+                    try
+                    {
+                        using var sr = new StreamReader(marker, Encoding.UTF8, true);
+                        string first = sr.ReadLine()?.Trim()?.ToLowerInvariant();
+                        if (first == titleIdLc)
+                        {
+                            return Path.GetFileName(dir);
+                        }
+                    }
+                    catch
+                    {
+                        // ignore and continue
+                    }
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+            return null;
+        }
 
 
         /// <summary>

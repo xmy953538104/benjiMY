@@ -176,7 +176,7 @@ class TitleUpdateViewModel(val titleId: String) {
         }
     }
 
-    private fun saveChanges() {
+    fun saveChanges() {
         val metadata = data ?: TitleUpdateMetadata()
         val gson = Gson()
 

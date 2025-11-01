@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Panorama
 import androidx.compose.material.icons.outlined.Settings
@@ -47,6 +48,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +65,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.concurrent.thread
+import kotlin.math.roundToInt
 import org.kenjinx.android.MainActivity
 import org.kenjinx.android.providers.DocumentProvider
 import org.kenjinx.android.viewmodels.DataImportState
@@ -70,8 +73,8 @@ import org.kenjinx.android.viewmodels.DataResetState
 import org.kenjinx.android.viewmodels.FirmwareInstallState
 import org.kenjinx.android.viewmodels.KeyInstallState
 import org.kenjinx.android.viewmodels.MainViewModel
-import org.kenjinx.android.viewmodels.MemoryConfiguration
 import org.kenjinx.android.viewmodels.SettingsViewModel
+import org.kenjinx.android.viewmodels.MemoryConfiguration
 import org.kenjinx.android.viewmodels.MemoryManagerMode
 import org.kenjinx.android.viewmodels.VSyncMode
 import org.kenjinx.android.widgets.ActionButton
@@ -88,6 +91,11 @@ import org.kenjinx.android.viewmodels.QuickSettings.OverlayMenuPosition // ← N
 // Import enums
 import org.kenjinx.android.SystemLanguage
 import org.kenjinx.android.RegionCode
+
+import org.kenjinx.android.viewmodels.QuickSettings.VirtualControllerPreset
+
+// >>> NEU: KenjinxNative für das Live-Umschalten des Threading-Backends
+import org.kenjinx.android.KenjinxNative
 
 class SettingViews {
     companion object {
@@ -129,8 +137,17 @@ class SettingViews {
             val isGrid = remember { mutableStateOf(true) }
             val useSwitchLayout = remember { mutableStateOf(true) }
             val enableMotion = remember { mutableStateOf(true) }
+            val vcPreset = remember {
+                mutableStateOf(QuickSettings(mainViewModel.activity).virtualControllerPreset)
+            }
             val enablePerformanceMode = remember { mutableStateOf(true) }
             val controllerStickSensitivity = remember { mutableFloatStateOf(1.0f) }
+
+            // --- NEU: Controller Scale (0.5 .. 1.5), direkt aus QuickSettings laden
+            val controllerScale = remember {
+                mutableFloatStateOf(QuickSettings(mainViewModel.activity).controllerScale)
+            }
+
             val enableStubLogs = remember { mutableStateOf(true) }
             val enableInfoLogs = remember { mutableStateOf(true) }
             val enableWarningLogs = remember { mutableStateOf(true) }
@@ -158,6 +175,12 @@ class SettingViews {
             val overlayOpacity = remember {
                 mutableFloatStateOf(QuickSettings(mainViewModel.activity).overlayMenuOpacity.coerceIn(0f, 1f))
             }
+
+            // --- NEU: Disable Threaded Rendering (aus QuickSettings laden)
+            val disableThreadedRendering = remember {
+                mutableStateOf(QuickSettings(mainViewModel.activity).disableThreadedRendering)
+            }
+            val threadToggleInitialized = remember { mutableStateOf(false) }
 
             if (!loaded.value) {
                 settingsViewModel.initializeState(
@@ -243,6 +266,7 @@ class SettingViews {
                                     regionCode
                                 )
 
+                                // Controller Scale wird separat direkt in QuickSettings gespeichert.
                                 if (!isNavigating.value) {
                                     isNavigating.value = true
                                     mainViewModel.navController?.popBackStack()
@@ -417,6 +441,23 @@ class SettingViews {
                                     },
                                     text = "Add Game Folder",
                                     icon = Icons.Default.Add,
+                                    modifier = Modifier.weight(1f),
+                                    isFullWidth = false,
+                                )
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ){
+                                ActionButton(
+                                    onClick = {
+                                        settingsViewModel.openUpdatesFolder()
+                                    },
+                                    text = "Select Updates/DLC Folder",
+                                    icon = Icons.Outlined.Folder,
                                     modifier = Modifier.weight(1f),
                                     isFullWidth = false,
                                 )
@@ -1224,6 +1265,79 @@ class SettingViews {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             useVirtualController.SwitchSelector(label = "Use Virtual Controller")
                             useSwitchLayout.SwitchSelector(label = "Use Switch Controller Layout")
+                            if (useVirtualController.value) {
+                                VirtualControllerPresetDropdown(
+                                    selectedPreset = vcPreset.value,
+                                    onPresetSelected = { preset ->
+                                        vcPreset.value = preset
+                                        val qs = QuickSettings(mainViewModel.activity)
+                                        qs.virtualControllerPreset = preset
+                                        qs.save() // sofort persistieren
+                                    }
+                                )
+
+                                // --- NEU: Controller Scale Slider (0.5x .. 1.5x) ---
+                                val interactionSourceScale: MutableInteractionSource = remember { MutableInteractionSource() }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(56.dp)
+                                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        text = "Controller Scale (${(controllerScale.floatValue * 100f).roundToInt()}%)",
+                                        modifier = Modifier.align(Alignment.CenterVertically)
+                                    )
+                                    Slider(
+                                        modifier = Modifier.width(250.dp),
+                                        value = controllerScale.floatValue,
+                                        onValueChange = { v ->
+                                            val clamped = v.coerceIn(0.5f, 1.5f)
+                                            controllerScale.floatValue = clamped
+                                            // Live auf den aktiven Virtual Controller anwenden (per Reflection)
+                                            mainViewModel.controller?.let { c ->
+                                                try {
+                                                    val m = c::class.java.getMethod("setScale", Float::class.javaPrimitiveType)
+                                                    m.invoke(c, clamped)
+                                                } catch (_: Throwable) { /* ignorieren, falls Layout ohne setScale */ }
+                                            }
+                                        },
+                                        valueRange = 0.5f..1.5f,
+                                        steps = 19,
+                                        interactionSource = interactionSourceScale,
+                                        thumb = {
+                                            Label(
+                                                label = {
+                                                    PlainTooltip(
+                                                        modifier = Modifier
+                                                            .sizeIn(45.dp, 25.dp)
+                                                            .wrapContentWidth()
+                                                    ) {
+                                                        Text("${(controllerScale.floatValue * 100f).roundToInt()}%")
+                                                    }
+                                                },
+                                                interactionSource = interactionSourceScale
+                                            ) {
+                                                Icon(
+                                                    imageVector = org.kenjinx.android.Icons.circle(
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    ),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(ButtonDefaults.IconSize),
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        },
+                                        onValueChangeFinished = {
+                                            // Persistieren
+                                            val qs = QuickSettings(mainViewModel.activity)
+                                            qs.controllerScale = controllerScale.floatValue.coerceIn(0.5f, 1.5f)
+                                            qs.save()
+                                        }
+                                    )
+                                }
+                            }
 
                             val interactionSource: MutableInteractionSource = remember { MutableInteractionSource() }
 
@@ -1321,6 +1435,34 @@ class SettingViews {
                             enableShaderCache.SwitchSelector(label = "Shader Cache")
                             enableTextureRecompression.SwitchSelector(label = "Texture Recompression")
                             enableMacroHLE.SwitchSelector(label = "Macro HLE")
+
+                            // --- NEU: Toggle für Single-Thread-Renderer
+                            disableThreadedRendering.SwitchSelector(label = "Disable Threaded Rendering")
+
+                            // Reaktion auf Toggle: persistieren + sanftes Reconfigure
+                            LaunchedEffect(disableThreadedRendering.value) {
+                                if (!threadToggleInitialized.value) {
+                                    threadToggleInitialized.value = true
+                                } else {
+                                    val qs = QuickSettings(mainViewModel.activity)
+                                    qs.disableThreadedRendering = disableThreadedRendering.value
+                                    qs.save()
+
+                                    val mode = if (disableThreadedRendering.value) 1 /*Single*/ else 2 /*Threaded*/
+
+                                    thread {
+                                        try {
+                                            KenjinxNative.graphicsSetPresentEnabled(false)
+                                            KenjinxNative.deviceWaitForGpuDone(500)
+                                            KenjinxNative.graphicsSetBackendThreading(mode)
+                                            KenjinxNative.deviceRecreateSwapchain()
+                                        } finally {
+                                            KenjinxNative.graphicsSetPresentEnabled(true)
+                                        }
+                                    }
+                                }
+                            }
+
                             stretchToFullscreen.SwitchSelector(label = "Stretch to Fullscreen")
                             ResolutionScaleDropdown(
                                 selectedScale = resScale.floatValue,
@@ -1503,8 +1645,6 @@ class SettingViews {
             )
         }
 
-        // ---- Existing dropdowns ----
-
         // ---- Dropdown for orientation ----
         @Composable
         fun OrientationDropdown(
@@ -1532,7 +1672,38 @@ class SettingViews {
             )
         }
 
-        // ---- Existing dropdowns ----
+        @Composable
+        fun VirtualControllerPresetDropdown(
+            selectedPreset: VirtualControllerPreset,
+            onPresetSelected: (VirtualControllerPreset) -> Unit
+        ) {
+            val options = listOf(
+                VirtualControllerPreset.Default,
+                VirtualControllerPreset.Layout2,
+                VirtualControllerPreset.Layout3,
+                VirtualControllerPreset.Layout4,
+                VirtualControllerPreset.Layout5,
+                VirtualControllerPreset.Layout6
+            )
+
+            DropdownSelector(
+                label = "Controller Layout",
+                selectedValue = selectedPreset,
+                options = options,
+                getDisplayText = { opt ->
+                    when (opt) {
+                        VirtualControllerPreset.Default -> "Default"
+                        VirtualControllerPreset.Layout2 -> "Layout 2"
+                        VirtualControllerPreset.Layout3 -> "Layout 3"
+                        VirtualControllerPreset.Layout4 -> "Layout 4"
+                        VirtualControllerPreset.Layout5 -> "Layout 5"
+                        VirtualControllerPreset.Layout6 -> "Layout 6"
+                    }
+                },
+                onOptionSelected = onPresetSelected
+            )
+        }
+
 
         @Composable
         fun MemoryModeDropdown(

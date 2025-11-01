@@ -38,6 +38,11 @@ import androidx.compose.ui.draw.alpha
 import compose.icons.CssGgIcons
 import compose.icons.cssggicons.ToolbarBottom
 import org.kenjinx.android.GameController
+import org.kenjinx.android.GameController2
+import org.kenjinx.android.GameController3
+import org.kenjinx.android.GameController4
+import org.kenjinx.android.GameController5
+import org.kenjinx.android.GameController6
 import org.kenjinx.android.GameHost
 import org.kenjinx.android.Icons
 import org.kenjinx.android.MainActivity
@@ -48,6 +53,15 @@ import org.kenjinx.android.viewmodels.VSyncMode
 import org.kenjinx.android.widgets.SimpleAlertDialog
 import java.util.Locale
 import kotlin.math.roundToInt
+import android.net.Uri
+import android.widget.Toast
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.LocalConfiguration
+import org.kenjinx.android.viewmodels.QuickSettings.VirtualControllerPreset
+
 
 class GameViews {
     companion object {
@@ -55,7 +69,7 @@ class GameViews {
         fun Main() {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
+                color = Color.Black
             ) {
                 GameView(mainViewModel = MainActivity.mainViewModel!!)
             }
@@ -63,16 +77,68 @@ class GameViews {
 
         @Composable
         fun GameView(mainViewModel: MainViewModel) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                AndroidView(
+            val cfg = LocalConfiguration.current
+            val isLandscape = cfg.screenWidthDp >= cfg.screenHeightDp
+            val isLarge = (cfg.smallestScreenWidthDp >= 600) || (cfg.screenWidthDp >= 900)
+
+            // Setting aus den Preferences (wird beim Game-Start gelesen)
+            val stretch = QuickSettings(mainViewModel.activity).stretchToFullscreen
+
+            // Standard-Ratio (Switch 16:9). Wenn du später dynamisch aus dem Renderer lesen willst,
+            // kannst du gameAspect hier zur Laufzeit aktualisieren.
+            val gameAspect = 16f / 9f
+
+            if (stretch) {
+                // Vollbild strecken (keine Letterbox), oben verankert
+                Box(
                     modifier = Modifier.fillMaxSize(),
-                    factory = { context ->
-                        GameHost(context, mainViewModel)
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .align(Alignment.TopCenter),
+                        factory = { context -> GameHost(context, mainViewModel) }
+                    )
+                    GameOverlay(mainViewModel)
+                }
+            } else {
+                // Letterbox beibehalten, aber oben fixieren. Phones: smart-fit,
+                // Tablets/Foldables in Landscape: erzwinge fitWidth (wie gewünscht).
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val containerAspect = maxWidth.value / maxHeight.value
+
+                    val useFitWidth =
+                        if (isLandscape && isLarge) true
+                        else containerAspect < gameAspect
+
+                    val fitModifier =
+                        if (useFitWidth) {
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(gameAspect)
+                                .align(Alignment.TopCenter)
+                        } else {
+                            Modifier
+                                .fillMaxHeight()
+                                .aspectRatio(gameAspect)
+                                .align(Alignment.TopCenter)
+                        }
+
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        AndroidView(
+                            modifier = fitModifier,
+                            factory = { context -> GameHost(context, mainViewModel) }
+                        )
+                        GameOverlay(mainViewModel)
                     }
-                )
-                GameOverlay(mainViewModel)
+                }
             }
         }
+
 
         @OptIn(ExperimentalMaterial3Api::class)
         @Composable
@@ -107,6 +173,9 @@ class GameViews {
                     }
                 }
 
+                // helper: slot label
+                fun qsLabel(name: String?, slot: Int): String =
+                    if (name.isNullOrBlank()) "Slot $slot" else name
 
                 if (showStats.value) {
                     GameStats(mainViewModel)
@@ -155,7 +224,17 @@ class GameViews {
                 }
 
                 if (!showLoading.value) {
-                    GameController.Compose(mainViewModel)
+                    // Aktuelles Preset aus QuickSettings holen (bei jeder Recomposition neu – so greift auch ein Wechsel nach dem Speichern)
+                    val preset = QuickSettings(mainViewModel.activity).virtualControllerPreset
+
+                    when (preset) {
+                        VirtualControllerPreset.Default -> GameController.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout2  -> GameController2.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout3  -> GameController3.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout4  -> GameController4.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout5  -> GameController5.Compose(mainViewModel)
+                        VirtualControllerPreset.Layout6  -> GameController6.Compose(mainViewModel)
+                    }
 
                     // --- Button at any corner/edge + transparency
                     Row(
@@ -243,6 +322,110 @@ class GameViews {
                                                 tint = if (showStats.value) Color.Green else Color.Red,
                                                 contentDescription = "Toggle Game Stats"
                                             )
+                                        }
+                                    }
+
+                                    // MINIMAL ADD: Amiibo slot buttons
+                                    Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                                        Text(text = "Amiibo Slots")
+
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo1Uri
+                                                val name = qs.amiibo1Name ?: "Slot 1"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 1 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo1Name, 1)) }
+
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo2Uri
+                                                val name = qs.amiibo2Name ?: "Slot 2"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 2 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo2Name, 2)) }
+
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo3Uri
+                                                val name = qs.amiibo3Name ?: "Slot 3"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 3 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo3Name, 3)) }
+                                        }
+
+                                        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo4Uri
+                                                val name = qs.amiibo4Name ?: "Slot 4"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 4 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo4Name, 4)) }
+
+                                            androidx.compose.material3.Button(onClick = {
+                                                val qs = QuickSettings(mainViewModel.activity)
+                                                val u = qs.amiibo5Uri
+                                                val name = qs.amiibo5Name ?: "Slot 5"
+                                                if (u.isNullOrEmpty()) {
+                                                    Toast.makeText(mainViewModel.activity, "Slot 5 is empty.", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    try {
+                                                        val bytes = mainViewModel.activity.contentResolver.openInputStream(Uri.parse(u))?.use { it.readBytes() }
+                                                        if (bytes != null && bytes.isNotEmpty()) {
+                                                            val ok = KenjinxNative.amiiboLoadBin(bytes, bytes.size)
+                                                            if (ok) Toast.makeText(mainViewModel.activity, "Loaded: $name", Toast.LENGTH_SHORT).show()
+                                                            else     Toast.makeText(mainViewModel.activity, "Load failed (check log)", Toast.LENGTH_SHORT).show()
+                                                        } else Toast.makeText(mainViewModel.activity, "File not readable.", Toast.LENGTH_SHORT).show()
+                                                    } catch (t: Throwable) { Toast.makeText(mainViewModel.activity, "Error: ${t.message}", Toast.LENGTH_SHORT).show() }
+                                                }
+                                            }) { androidx.compose.material3.Text(qsLabel(QuickSettings(mainViewModel.activity).amiibo5Name, 5)) }
+
+                                            androidx.compose.material3.OutlinedButton(onClick = {
+                                                KenjinxNative.amiiboClear()
+                                                Toast.makeText(mainViewModel.activity, "Amiibo cleared", Toast.LENGTH_SHORT).show()
+                                            }) { androidx.compose.material3.Text("Clear") }
                                         }
                                     }
                                 }
