@@ -76,15 +76,15 @@ class GameViews {
             val isLandscape = cfg.screenWidthDp >= cfg.screenHeightDp
             val isLarge = (cfg.smallestScreenWidthDp >= 600) || (cfg.screenWidthDp >= 900)
 
-            // Setting aus den Preferences (wird beim Game-Start gelesen)
+            // Setting from preferences (read at game start)
             val stretch = QuickSettings(mainViewModel.activity).stretchToFullscreen
 
-            // Standard-Ratio (Switch 16:9). Wenn du später dynamisch aus dem Renderer lesen willst,
-            // kannst du gameAspect hier zur Laufzeit aktualisieren.
+            // Default aspect ratio (Switch 16:9). If you later want to read dynamically from the renderer,
+            // you can update gameAspect here at runtime.
             val gameAspect = 16f / 9f
 
             if (stretch) {
-                // Vollbild strecken (keine Letterbox), oben verankert
+                // Stretch to full screen (no letterbox), anchored to the top
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.TopCenter
@@ -98,8 +98,8 @@ class GameViews {
                     GameOverlay(mainViewModel)
                 }
             } else {
-                // Letterbox beibehalten, aber oben fixieren. Phones: smart-fit,
-                // Tablets/Foldables in Landscape: erzwinge fitWidth (wie gewünscht).
+                // Keep letterbox but pin to the top. Phones: smart-fit,
+                // Tablets/Foldables in landscape: enforce fitWidth (as desired).
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val containerAspect = maxWidth.value / maxHeight.value
 
