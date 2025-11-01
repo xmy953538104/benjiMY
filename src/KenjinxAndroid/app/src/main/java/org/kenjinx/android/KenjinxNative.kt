@@ -222,6 +222,11 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
     fun frameEnded() = MainActivity.frameEnded()
 
     @JvmStatic
+    fun test() {
+        // no-op
+    }
+
+    @JvmStatic
     fun getSurfacePtr(): Long = MainActivity.mainViewModel?.gameHost?.currentSurface ?: -1
 
     @JvmStatic
@@ -259,6 +264,26 @@ object KenjinxNative : KenjinxNativeJna by jnaInstance {
             graphicsRendererSetSize(width, height)
             inputSetClientSize(width, height)
         } catch (_: Throwable) {}
+    }
+
+    @JvmStatic
+    fun detachWindow() {
+        try { graphicsSetPresentEnabled(false) } catch (_: Throwable) {}
+        try { deviceWaitForGpuDone(100) } catch (_: Throwable) {}
+        try { deviceSetWindowHandle(0) } catch (_: Throwable) {}
+    }
+
+    @JvmStatic
+    fun reattachWindowIfReady(): Boolean {
+        return try {
+            val handle = getWindowHandle()
+            if (handle <= 0) return false
+            deviceSetWindowHandle(handle)  // Window wieder setzen
+            deviceRecreateSwapchain()      // Swapchain sauber neu anlegen
+            true
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     /**

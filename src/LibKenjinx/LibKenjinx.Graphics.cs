@@ -61,7 +61,16 @@ namespace LibKenjinx
             }
             else if (graphicsBackend == GraphicsBackend.Vulkan)
             {
-                Renderer = new VulkanRenderer(Vk.GetApi(), (instance, _) => new SurfaceKHR(createSurfaceFunc == null ? null : (ulong?)createSurfaceFunc(instance.Handle)),
+                // Prefer the platform-provided Vulkan loader (if present), fall back to default.
+                var api = VulkanLoader?.GetApi() ?? Vk.GetApi();
+
+                Renderer = new VulkanRenderer(
+                    api,
+                    (instance, _) =>
+                    {
+                        // use provided CreateSurface delegate (Android path will create ANativeWindow surface)
+                        return new SurfaceKHR(createSurfaceFunc == null ? null : (ulong?)createSurfaceFunc(instance.Handle));
+                    },
                     () => requiredExtensions,
                     null);
             }
@@ -146,9 +155,9 @@ namespace LibKenjinx
                         }
                     }
 
-                    if (device.Gpu.Renderer is ThreadedRenderer threaded)
+                    if (device.Gpu.Renderer is ThreadedRenderer tr)
                     {
-                        threaded.FlushThreadedCommands();
+                        tr.FlushThreadedCommands();
                     }
 
                     _gpuDoneEvent.Set();
@@ -165,7 +174,7 @@ namespace LibKenjinx
         {
             void SetInfo(string status, float value)
             {
-                if(PlatformInfo.IsBionic)
+                if (PlatformInfo.IsBionic)
                 {
                     Interop.UpdateProgress(status, value);
                 }
@@ -178,7 +187,7 @@ namespace LibKenjinx
             switch (state)
             {
                 case LoadState ptcState:
-                    if (float.IsNaN((progress)))
+                    if (float.IsNaN(progress))
                         progress = 0;
 
                     switch (ptcState)
@@ -215,6 +224,26 @@ namespace LibKenjinx
         public static void SetSwapBuffersCallback(SwapBuffersCallback swapBuffersCallback)
         {
             _swapBuffersCallback = swapBuffersCallback;
+        }
+
+        // ===== Convenience-Wrapper für Vulkan re-attach (von JNI nutzbar) =====
+        public static bool TryReattachSurface()
+        {
+            if (Renderer is VulkanRenderer vr)
+            {
+                return vr.RecreateSurface();
+            }
+            return false;
+        }
+
+        public static void ReleaseRendererSurface()
+        {
+            (Renderer as VulkanRenderer)?.ReleaseSurface();
+        }
+
+        public static void SetPresentEnabled(bool enabled)
+        {
+            (Renderer as VulkanRenderer)?.SetPresentEnabled(enabled);
         }
     }
 

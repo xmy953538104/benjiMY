@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Ryujinx.Graphics.Vulkan;
 
 namespace LibKenjinx
 {
@@ -316,7 +317,7 @@ namespace LibKenjinx
                         Window = (nint*)_surfacePtr,
                     };
 
-                    var result = surfaceExtension.CreateAndroidSurface(new Instance(instance), createInfo, null, out var surface);
+                    var result = surfaceExtension.CreateAndroidSurface(new Instance(instance), in createInfo, null, out var surface);
 
                     // If a rotation was applied before the surface was created → apply it now
                     if (_window != 0 && _pendingRotationDegrees != -1)
@@ -686,6 +687,82 @@ namespace LibKenjinx
             catch (Exception ex)
             {
                 Logger.Error?.Print(LogClass.Application, $"deviceRecreateSwapchain failed: {ex}");
+            }
+        }
+
+        // ===== PresentAllowed / Surface Control (JNI) =====
+
+        // alias für ältere Aufrufe, falls vorhanden
+        [UnmanagedCallersOnly(EntryPoint = "graphicsRendererSetPresent")]
+        public static void JniGraphicsRendererSetPresent(bool enabled)
+        {
+            try
+            {
+                if (Renderer is VulkanRenderer vr)
+                {
+                    vr.SetPresentEnabled(enabled);
+                    Logger.Trace?.Print(LogClass.Application, $"[JNI] PresentEnabled = {enabled}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning?.Print(LogClass.Application, $"graphicsRendererSetPresent failed: {ex}");
+            }
+        }
+
+        // neuer Name: passt zu KenjinxNative.graphicsSetPresentEnabled(...)
+        [UnmanagedCallersOnly(EntryPoint = "graphicsSetPresentEnabled")]
+        public static void JniGraphicsSetPresentEnabled(bool enabled)
+        {
+            try
+            {
+                (Renderer as VulkanRenderer)?.SetPresentEnabled(enabled);
+                Logger.Trace?.Print(LogClass.Application, $"[JNI] graphicsSetPresentEnabled({enabled})");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning?.Print(LogClass.Application, $"graphicsSetPresentEnabled failed: {ex}");
+            }
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "graphicsRendererRecreateSurface")]
+        public static void JniGraphicsRendererRecreateSurface()
+        {
+            try
+            {
+                _ = (Renderer as VulkanRenderer)?.RecreateSurface();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning?.Print(LogClass.Application, $"graphicsRendererRecreateSurface failed: {ex}");
+            }
+        }
+
+        // von MainActivity/GameHost benutzt
+        [UnmanagedCallersOnly(EntryPoint = "reattachWindowIfReady")]
+        public static bool JniReattachWindowIfReady()
+        {
+            try
+            {
+                return (Renderer as VulkanRenderer)?.RecreateSurface() ?? false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning?.Print(LogClass.Application, $"reattachWindowIfReady failed: {ex}");
+                return false;
+            }
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "detachWindow")]
+        public static void JniDetachWindow()
+        {
+            try
+            {
+                (Renderer as VulkanRenderer)?.ReleaseSurface();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning?.Print(LogClass.Application, $"detachWindow failed: {ex}");
             }
         }
 

@@ -51,6 +51,7 @@ class MainViewModel(val activity: MainActivity) {
     private var progressValue: MutableState<Float>? = null
     private var showLoading: MutableState<Boolean>? = null
     private var refreshUser: MutableState<Boolean>? = null
+    @Volatile var rendererReady: Boolean = false
 
     // Default Game Folder
     var defaultGameFolderUri: Uri? = null
@@ -89,6 +90,7 @@ class MainViewModel(val activity: MainActivity) {
         motionSensorManager?.unregister()
         physicalControllerManager?.disconnect()
         motionSensorManager?.setControllerId(-1)
+        rendererReady = false
     }
 
     // ---- Load language/region from Preferences (Defaults: AmericanEnglish/USA) ----
@@ -195,6 +197,7 @@ class MainViewModel(val activity: MainActivity) {
             extensions.size,
             driverHandle
         )
+        rendererReady = success
         if (!success)
             return 0
 
@@ -309,6 +312,7 @@ class MainViewModel(val activity: MainActivity) {
             extensions.size,
             driverHandle
         )
+        rendererReady = success
         if (!success)
             return false
 
