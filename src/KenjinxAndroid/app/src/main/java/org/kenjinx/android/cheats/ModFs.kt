@@ -10,7 +10,7 @@ import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
-/* -------- Pfade -------- */
+/* -------- Paths -------- */
 
 private fun modsRootExternal(activity: Activity): File {
     // /storage/emulated/0/Android/data/<pkg>/files/sdcard/atmosphere/contents
@@ -18,7 +18,7 @@ private fun modsRootExternal(activity: Activity): File {
 }
 
 private fun modsTitleDir(activity: Activity, titleIdUpper: String): File {
-    // TITLEID muss groß geschrieben sein
+    // TITLEID must be uppercase
     return File(modsRootExternal(activity), titleIdUpper)
 }
 
@@ -26,14 +26,14 @@ private fun modDir(activity: Activity, titleIdUpper: String, modName: String): F
     return File(modsTitleDir(activity, titleIdUpper), modName)
 }
 
-/* -------- Auflisten & Löschen -------- */
+/* -------- List & Delete -------- */
 
 fun listMods(activity: Activity, titleId: String): List<String> {
     val titleIdUpper = titleId.trim().uppercase()
     val dir = modsTitleDir(activity, titleIdUpper)
     if (!dir.exists() || !dir.isDirectory) return emptyList()
 
-    return dir.listFiles { f -> f.isDirectory } // NAME-Ordner
+    return dir.listFiles { f -> f.isDirectory } // NAME folders
         ?.map { it.name }
         ?.sortedBy { it.lowercase() }
         ?: emptyList()
@@ -67,7 +67,7 @@ data class ImportProgress(
         get() = if (totalBytes <= 0) 0f else (bytesRead.coerceAtMost(totalBytes).toFloat() / totalBytes.toFloat())
 }
 
-// NEU: Multi-Import. Top-Level-Ordner in der ZIP sind die Mod-Namen.
+// NEW: Multi-import. Top-level folders inside the ZIP are treated as mod names.
 data class ImportModsResult(
     val imported: List<String>,
     val ok: Boolean
@@ -91,9 +91,9 @@ fun importModsZip(
         }
     }
 
-    // Für jeden Top-Level-Ordner (Mod-Name) einmalig vorbereiten (ggf. alten Ordner löschen).
+    // Prepare each top-level folder (mod name) once (delete existing folder if present).
     val preparedMods = mutableSetOf<String>()
-    val importedMods = linkedSetOf<String>() // Reihenfolge stabil
+    val importedMods = linkedSetOf<String>() // stable order
 
     return try {
         activity.contentResolver.openInputStream(zipUri).use { raw ->
@@ -103,15 +103,15 @@ fun importModsZip(
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
 
                 while (entry != null) {
-                    val rawName = entry.name.replace('\\', '/') // normalisieren
-                    // Sicherheitsfilter & leere Namen überspringen
+                    val rawName = entry.name.replace('\\', '/') // normalize
+                    // Safety filter & skip empty names
                     if (rawName.isBlank() || rawName.startsWith("/") || rawName.contains("..")) {
                         zis.closeEntry()
                         entry = zis.nextEntry
                         continue
                     }
 
-                    // Top-Level: erster Segment vor dem ersten '/'
+                    // Top-level: first segment before the first '/'
                     val slash = rawName.indexOf('/')
                     val topLevel = if (slash > 0) rawName.substring(0, slash) else rawName
                     if (topLevel.isBlank()) {
@@ -120,18 +120,18 @@ fun importModsZip(
                         continue
                     }
 
-                    // restlicher Pfad innerhalb des Mod-Ordners
+                    // Remaining path inside the mod folder
                     val relPath = if (slash >= 0 && slash + 1 < rawName.length) rawName.substring(slash + 1) else ""
 
-                    // Nur Einträge verarbeiten, die innerhalb eines Modordners liegen (wir wollen NAME/... Strukturen)
+                    // Only process entries that are inside a mod folder (we expect NAME/... structures)
                     if (relPath.isBlank() && entry.isDirectory.not()) {
-                        // Datei direkt im Top-Level (z.B. NAME.txt) ignorieren
+                        // File directly at top level (e.g., NAME.txt) → ignore
                         zis.closeEntry()
                         entry = zis.nextEntry
                         continue
                     }
 
-                    // Mod-Ordner vorbereiten (einmalig: ggf. alten Ordner entfernen)
+                    // Prepare mod folder (once; remove old folder if present)
                     if (preparedMods.add(topLevel)) {
                         val modFolder = modDir(activity, titleIdUpper, topLevel)
                         if (modFolder.exists()) modFolder.safeDeleteRecursively()
@@ -139,9 +139,9 @@ fun importModsZip(
                         importedMods += topLevel
                     }
 
-                    // Zielpfad: .../TITLEID/<topLevel>/<relPath>
+                    // Destination path: .../TITLEID/<topLevel>/<relPath>
                     val dest = if (relPath.isBlank()) {
-                        // nur ein Ordner-Eintrag (NAME/ oder NAME/exefs/)
+                        // just a directory entry (NAME/ or NAME/exefs/)
                         File(modDir(activity, titleIdUpper, topLevel), "")
                     } else {
                         File(modDir(activity, titleIdUpper, topLevel), relPath)
@@ -170,7 +170,7 @@ fun importModsZip(
         ImportModsResult(imported = importedMods.toList(), ok = importedMods.isNotEmpty())
     } catch (t: Throwable) {
         Log.w("ModFs", "importModsZip failed: ${t.message}")
-        // Best effort: schon angelegte Mods sauber entfernen
+        // Best effort: clean up already created mod folders
         importedMods.forEach { name ->
             runCatching { modDir(activity, titleIdUpper, name).safeDeleteRecursively() }
         }

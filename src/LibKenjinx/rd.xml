@@ -531,7 +531,7 @@
                   Dynamic="Required All" />
             <Type Name="Ryujinx.HLE.HOS.Services.Pcv.Rgltr.IRegulatorManager"
                   Dynamic="Required All" />
-            <!-- Explizit die generischen Tamper-Operationen rooten, die per MakeGenericType gebaut werden -->
+            <!-- Explicitly root the generic tamper operations that are constructed via MakeGenericType -->
             <Type Name="Ryujinx.HLE.HOS.Tamper.Operations.OpMov`1[[System.Byte]]"
                 Dynamic="Required All" />
             <Type Name="Ryujinx.HLE.HOS.Tamper.Operations.OpMov`1[[System.UInt16]]"
@@ -550,7 +550,7 @@
                 Dynamic="Required All" />
 
         </Assembly>
-        <!-- AOT/Trimming: dynamic binder & expression tree runtime behalten -->
+        <!-- AOT/Trimming: keep the dynamic binder & expression tree runtime -->
         <Assembly Name="Microsoft.CSharp" Dynamic="Required All" />
         <Assembly Name="System.Linq.Expressions" Dynamic="Required All" />
     </Application>

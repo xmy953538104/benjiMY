@@ -12,7 +12,7 @@ data class CheatItem(val buildId: String, val name: String) {
     val key get() = "$buildId-$name"
 }
 
-/* -------- Pfade -------- */
+/* -------- Paths -------- */
 
 private fun cheatsDirExternal(activity: Activity, titleId: String): File {
     val base = activity.getExternalFilesDir(null) // /storage/emulated/0/Android/data/<pkg>/files
@@ -37,7 +37,7 @@ private fun parseCheatNames(text: String): List<String> {
         .toList()
 }
 
-/* -------- Public: Cheats laden -------- */
+/* -------- Public: Load cheats -------- */
 
 fun loadCheatsFromDisk(activity: Activity, titleId: String): List<CheatItem> {
     val dirs = allCheatDirs(activity, titleId)
@@ -62,10 +62,10 @@ fun loadCheatsFromDisk(activity: Activity, titleId: String): List<CheatItem> {
         .sortedWith(compareBy({ it.buildId.lowercase() }, { it.name.lowercase() }))
 }
 
-/* -------- Public: Auswahl SOFORT auf Disk anwenden -------- */
+/* -------- Public: Apply selection IMMEDIATELY on disk -------- */
 
 fun applyCheatSelectionOnDisk(activity: Activity, titleId: String, enabledKeys: Set<String>) {
-    // Wir wählen genau EINE BUILDID-Datei (die „beste“), und schalten darin Sections.
+    // We pick exactly ONE BUILDID file (the “best”) and toggle sections within it.
     val dirs = allCheatDirs(activity, titleId)
     val allTxt = dirs.flatMap { d ->
         d.listFiles { f -> f.isFile && f.name.endsWith(".txt", ignoreCase = true) }?.toList() ?: emptyList()
@@ -79,7 +79,7 @@ fun applyCheatSelectionOnDisk(activity: Activity, titleId: String, enabledKeys: 
     val text = runCatching { buildFile.readText(Charset.forName("UTF-8")) }.getOrElse { "" }
     if (text.isEmpty()) return
 
-    // Enabled-Set normalisieren: Keys sind "<BUILDID>-<SectionName>"
+    // Normalize enabled set: keys are "<BUILDID>-<SectionName>"
     val enabledSections = enabledKeys.asSequence()
         .mapNotNull { key ->
             val dash = key.indexOf('-')
@@ -97,7 +97,7 @@ fun applyCheatSelectionOnDisk(activity: Activity, titleId: String, enabledKeys: 
     }
 }
 
-/* -------- Implementierung: Auswahl anwenden (nur ';' als Kommentar) -------- */
+/* -------- Implementation: apply selection (use ';' only for comments) -------- */
 
 private fun pickBestBuildFile(files: List<File>): File {
     fun looksHexName(p: File): Boolean {
@@ -121,8 +121,8 @@ private fun sectionNameFromHeader(line: String): String {
 }
 
 /**
- * Entfernt EIN führendes Kommentarzeichen (';') + optionales Leerzeichen.
- * Nur am absoluten Zeilenanfang (keine führenden Spaces erlaubt).
+ * Removes ONE leading comment marker (';') + optional space.
+ * Only at absolute column 0 (no leading spaces allowed).
  */
 private fun uncommentOnce(raw: String): String {
     if (raw.isEmpty()) return raw
@@ -132,8 +132,8 @@ private fun uncommentOnce(raw: String): String {
 }
 
 /**
- * Kommentiert die Zeile aus, wenn sie nicht bereits mit ';' beginnt.
- * Atmosphère nutzt ';' – das verwenden wir ausschließlich.
+ * Comments out the line if it doesn't already start with ';'.
+ * Atmosphère uses ';' — we strictly use that here as well.
  */
 private fun commentOut(raw: String): String {
     val t = raw.trimStart()
@@ -143,12 +143,12 @@ private fun commentOut(raw: String): String {
 }
 
 /**
- * Schreibt die Datei neu:
- *  - Keine Marker einfügen
- *  - Pro Section den Body gemäß enabled/disabled (enabledSections) kommentieren/entkommentieren
- *  - Reine Kommentar-/Leerzeilen (nur ';') bleiben erhalten
+ * Rewrites the file:
+ *  - Do not insert markers
+ *  - For each section, comment/uncomment the body according to enabledSections
+ *  - Preserve pure comment/blank lines (only ';')
  */
-// Hilfsfunktionen: trailing Blankzeilen trimmen / Header normalisieren
+// Helpers: trim trailing blank lines / normalize header
 private fun trimTrailingBlankLines(lines: MutableList<String>) {
     while (lines.isNotEmpty() && lines.last().trim().isEmpty()) {
         lines.removeAt(lines.lastIndex)
@@ -156,18 +156,18 @@ private fun trimTrailingBlankLines(lines: MutableList<String>) {
 }
 
 private fun joinHeaderBufferOnce(header: List<String>): String {
-    // Header-Zeilen unverändert, aber trailing Blanks entfernen und genau 1 Leerzeile danach
+    // Keep header lines unchanged, but remove trailing blanks and insert exactly one blank line after
     val buf = header.toMutableList()
     trimTrailingBlankLines(buf)
     return if (buf.isEmpty()) "" else buf.joinToString("\n") + "\n\n"
 }
 
 /**
- * Schreibt die Datei neu:
- *  - Keine Marker einfügen
- *  - Pro Section den Body gemäß enabled/disabled (enabledSections) kommentieren/entkommentieren
- *  - Reine Kommentar-/Leerzeilen bleiben erhalten
- *  - Zwischen Sections genau EINE Leerzeile, am Ende genau EIN Newline.
+ * Rewrites the file:
+ *  - Do not insert markers
+ *  - For each section, comment/uncomment the body according to enabledSections
+ *  - Preserve pure comment/blank lines
+ *  - Ensure exactly ONE blank line between sections, and exactly ONE trailing newline at EOF.
  */
 private fun rewriteCheatFile(original: String, enabledSections: Set<String>): String {
     val lines = original.replace("\uFEFF", "").lines()
@@ -183,18 +183,18 @@ private fun rewriteCheatFile(original: String, enabledSections: Set<String>): St
     fun flushCurrent() {
         val sec = currentSection ?: return
 
-        // trailing Blankzeilen im Block entfernen, damit keine doppelten Abstände wachsen
+        // Remove trailing blank lines in the block to avoid growing gaps
         trimTrailingBlankLines(currentBlock)
 
         val enabled = enabledSections.contains(sec.lowercase())
 
-        // Zwischen Sections genau eine Leerzeile einfügen (aber nicht vor der ersten)
+        // Insert exactly one blank line between sections (but not before the first)
         if (wroteAnySection) out.append('\n')
 
         out.append('[').append(sec).append(']').append('\n')
 
         if (enabled) {
-            // Entkommentieren (nur ein führendes ';' an Spalte 0)
+            // Uncomment (only one leading ';' at column 0)
             for (l in currentBlock) {
                 val trimmed = l.trim()
                 if (trimmed.isEmpty() || (trimmed.startsWith(";") && trimmed.length <= 1)) {
@@ -210,7 +210,7 @@ private fun rewriteCheatFile(original: String, enabledSections: Set<String>): St
                 }
             }
         } else {
-            // Disablen: alles, was nicht schon mit ';' beginnt und nicht leer ist, auskommentieren
+            // Disable: anything not starting with ';' and not blank gets commented out
             for (l in currentBlock) {
                 val t = l.trim()
                 if (t.isEmpty() || t.startsWith(";")) {
@@ -242,20 +242,22 @@ private fun rewriteCheatFile(original: String, enabledSections: Set<String>): St
     }
     flushCurrent()
 
-    // Header vorn einsetzen (mit genau einer Leerzeile danach, falls vorhanden)
+    // Prepend header (with exactly one blank line after, if present)
     val headerText = joinHeaderBufferOnce(headerBuffer)
     if (headerText.isNotEmpty()) {
         out.insert(0, headerText)
     }
 
-    // Globale Normalisierung: 3+ Newlines -> 2, und am Ende genau EIN '\n'
-    var result = out.toString()
-        .replace(Regex("\n{3,}"), "\n\n") // nie mehr als 1 Leerzeile zwischen Abschnitten
-        .trimEnd() + "\n"                 // genau ein Newline am Ende
+    // Global normalization: collapse 3+ newlines to 2, and ensure exactly ONE trailing '\n'
+    val result = out.toString()
+        .replace(Regex("\n{3,}"), "\n\n") // never more than 1 blank line between sections
+        .trimEnd() + "\n"                 // exactly one newline at the end
 
     return result
 }
+
 private fun cheatsDirPreferredForWrite(activity: Activity, titleId: String): File {
+    // Preferred write location: external app-specific storage
     val dir = cheatsDirExternal(activity, titleId)
     if (!dir.exists()) dir.mkdirs()
     return dir
@@ -285,12 +287,12 @@ private fun uniqueFile(targetDir: File, baseName: String): File {
 }
 
 /**
- * Importiert eine .txt aus einem SAF-Uri in den Cheats-Ordner des Titels.
- * Gibt das Zieldatei-Objekt zurück, wenn erfolgreich.
+ * Imports a .txt from a SAF Uri into the title's cheats folder.
+ * Returns the destination File on success.
  */
 fun importCheatTxt(activity: Activity, titleId: String, source: Uri): Result<File> {
     return runCatching {
-        // Lese-Rechte ggf. dauerhaft sichern
+        // Persist read permission if possible
         try {
             activity.contentResolver.takePersistableUriPermission(
                 source,
@@ -310,8 +312,8 @@ fun importCheatTxt(activity: Activity, titleId: String, source: Uri): Result<Fil
             }
         }
 
-        // nach Import: optional sofort neu einlesen/normalisieren wäre möglich,
-        // aber wir belassen die Datei so wie geliefert.
+        // After import: we could re-scan/normalize immediately,
+        // but we leave the file as provided.
         target
     }
 }

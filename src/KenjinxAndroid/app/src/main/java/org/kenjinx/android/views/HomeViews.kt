@@ -148,14 +148,14 @@ class HomeViews {
             val importBusy = remember { mutableStateOf(false) }
             val importStatusText = remember { mutableStateOf("") }
 
-            // Shortcut-Dialog-State
+            // Shortcut dialog state
             val showShortcutDialog = remember { mutableStateOf(false) }
             val shortcutName = remember { mutableStateOf("") }
 
             val context = LocalContext.current
             val activity = LocalContext.current as? Activity
 
-            // NEW: Cheats Import (.txt)
+            // NEW: Cheats import (.txt)
             val importCheatLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.OpenDocument()
             ) { uri: Uri? ->
@@ -163,7 +163,7 @@ class HomeViews {
                 val act = viewModel.activity
                 val titleId = gm?.titleId ?: ""
                 if (uri != null && act != null && titleId.isNotEmpty()) {
-                    // nur .txt akzeptieren
+                    // only accept .txt
                     val okExt = runCatching {
                         DocumentFile.fromSingleUri(act, uri)?.name?.lowercase()?.endsWith(".txt") == true
                     }.getOrElse { false }
@@ -175,7 +175,7 @@ class HomeViews {
                     val res = importCheatTxt(act, titleId, uri)
                     if (res.isSuccess) {
                         Toast.makeText(act, "Imported: ${res.getOrNull()?.name}", Toast.LENGTH_SHORT).show()
-                        // danach Liste aktualisieren
+                        // then refresh list
                         cheatsForSelected.value = loadCheatsFromDisk(act, titleId)
                     } else {
                         Toast.makeText(act, "Import failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
@@ -190,7 +190,7 @@ class HomeViews {
                 val act = viewModel.activity
                 val titleId = gm?.titleId ?: ""
                 if (uri != null && act != null && titleId.isNotEmpty()) {
-                    // Persist permission (lesen)
+                    // Persist permission (read)
                     try {
                         act.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     } catch (_: Exception) {}
@@ -212,7 +212,7 @@ class HomeViews {
                                 "Copying… ${(prog.fraction * 100).toInt()}%"
                         }
 
-                        // Liste aktualisieren
+                        // refresh list
                         modsForSelected.value = listMods(act, titleId)
                         importBusy.value = false
 
@@ -519,7 +519,7 @@ class HomeViews {
                             thread {
                                 showLoading.value = true
 
-                                // NEW: Push Cheats vor dem Start (Auto-Start Pfad)
+                                // NEW: Push cheats before start (auto-start path)
                                 val gm = viewModel.mainViewModel.loadGameModel.value!!
                                 val tId = gm.titleId ?: ""
                                 val act = viewModel.activity
@@ -555,7 +555,7 @@ class HomeViews {
                                     IconButton(onClick = {
                                         if (viewModel.mainViewModel?.selected != null) {
 
-                                            // NEW: Push Cheats vor dem Start (Run-Button)
+                                            // NEW: Push cheats before start (Run button)
                                             val gmSel = viewModel.mainViewModel!!.selected!!
                                             val tId = gmSel.titleId ?: ""
                                             val act = viewModel.activity
@@ -693,12 +693,12 @@ class HomeViews {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                // LINKS: Import .txt
+                                // LEFT: Import .txt
                                 TextButton(onClick = {
                                     importCheatLauncher.launch(arrayOf("text/plain", "text/*", "*/*"))
                                 }) { Text("Import .txt") }
 
-                                // RECHTS: Cancel + Save
+                                // RIGHT: Cancel + Save
                                 Row {
                                     TextButton(onClick = { openCheatsDialog.value = false }) { Text("Cancel") }
                                     TextButton(onClick = {
@@ -788,7 +788,7 @@ class HomeViews {
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
 
-                            // Import-Zeile
+                            // Import row
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -818,7 +818,7 @@ class HomeViews {
                                 )
                             }
 
-                            // Liste der Mods
+                            // List of mods
                             if (modsForSelected.value.isEmpty()) {
                                 Text("No mods found for this title.")
                             } else {
@@ -865,7 +865,7 @@ class HomeViews {
                         }
                     }
                 }
-                // --- Shortcut-Dialog
+                // --- Shortcut dialog
                 if (showShortcutDialog.value) {
                     val gm = viewModel.mainViewModel?.selected
                     AlertDialog(
@@ -972,7 +972,7 @@ class HomeViews {
                                 thread {
                                     showLoading.value = true
 
-                                    // NEW: Push Cheats vor dem Start
+                                    // NEW: Push cheats before start
                                     val tId = gameModel.titleId ?: ""
                                     val act = viewModel.activity
 
@@ -1069,7 +1069,7 @@ class HomeViews {
                                 thread {
                                     showLoading.value = true
 
-                                    // NEW: Push Cheats vor dem Start
+                                    // NEW: Push cheats before start
                                     val tId = gameModel.titleId ?: ""
                                     val act = viewModel.activity
 

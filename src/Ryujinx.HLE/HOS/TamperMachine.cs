@@ -51,7 +51,7 @@ namespace Ryujinx.HLE.HOS
                 _programs.Enqueue(program);
                 _programDictionary.TryAdd($"{buildId}-{name}", program);
 
-                // NEU: Standardmäßig einschalten (bei Android gibt es (noch) keine UI, die EnableCheats aufruft)
+                // NEW: Enable by default (on Android there's currently no UI that calls EnableCheats).
                 program.IsEnabled = true;
             }
 
@@ -141,11 +141,13 @@ namespace Ryujinx.HLE.HOS
 
             // Re-enqueue the tampering program because the process is still valid.
             _programs.Enqueue(program);
-            // NEU: Wenn der Cheat (noch) disabled ist – nur weiter rotieren, nicht ausführen.
+
+            // NEW: If the cheat is (still) disabled, keep rotating but do not execute.
             if (!program.IsEnabled)
             {
                 return true;
             }
+
             Logger.Debug?.Print(LogClass.TamperMachine, $"Running tampering program {program.Name}");
 
             try
@@ -171,7 +173,7 @@ namespace Ryujinx.HLE.HOS
                 //    Logger.Debug?.Print(LogClass.TamperMachine, ex.Message);
                 //}
 
-                // NEU: kompletter Stacktrace
+                // NEW: full stack trace
                 Logger.Debug?.Print(LogClass.TamperMachine, ex.ToString());
             }
 
@@ -191,7 +193,7 @@ namespace Ryujinx.HLE.HOS
                 }
             }
 
-            // Clear the input because player one is not conected.
+            // Clear the input because player one is not connected.
             Volatile.Write(ref _pressedKeys, 0);
         }
     }
