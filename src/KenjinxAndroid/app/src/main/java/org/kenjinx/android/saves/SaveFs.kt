@@ -30,15 +30,15 @@ private fun isHex16(name: String): Boolean =
 
 data class SaveFolderMeta(
     val dir: File,
-    val indexHex: String,     // z.B. 0000000000000008 oder 000000000000000a
-    val titleId: String?,     // aus TITLEID.txt (lowercase) oder geerbter Wert
-    val titleName: String?,   // zweite Zeile aus TITLEID.txt, falls vorhanden
-    val hasMarker: Boolean    // true, wenn dieser Ordner die TITLEID.txt selbst hat
+    val indexHex: String,     // e.g., 0000000000000008 or 000000000000000a
+    val titleId: String?,     // from TITLEID.txt (lowercase) or inherited value
+    val titleName: String?,   // second line from TITLEID.txt, if present
+    val hasMarker: Boolean    // true if this folder itself contains TITLEID.txt
 )
 
 /**
- * Scannt .../bis/user/save; ordnet nummerierte Ordner (16 Hex-Zeichen) per „Marker-Vererbung“:
- * Ein Ordner ohne TITLEID.txt gehört zum zuletzt gesehenen Ordner mit TITLEID.txt davor.
+ * Scans .../bis/user/save; assigns numbered folders (16 hex chars) via “marker inheritance”:
+ * A folder without TITLEID.txt belongs to the most recent preceding folder that does contain TITLEID.txt.
  */
 fun listSaveFolders(activity: Activity): List<SaveFolderMeta> {
     val root = savesRootExternal(activity)
@@ -72,18 +72,18 @@ fun listSaveFolders(activity: Activity): List<SaveFolderMeta> {
     return out
 }
 
-/* ===== TitleID-Kandidaten (Base/Update tolerant) & Gruppierung ===== */
+/* ===== TitleID candidates (base/update tolerant) & grouping ===== */
 
 private fun hex16CandidatesForSaves(id: String): List<String> {
     val lc = id.trim().lowercase(Locale.ROOT)
     if (!isHex16(lc)) return listOf(lc)
-    val head = lc.substring(0, 13)     // erste 13 Zeichen
+    val head = lc.substring(0, 13)     // first 13 characters
     val base = head + "000"            // ...000
     val upd  = head + "800"            // ...800
     return listOf(lc, base, upd).distinct()
 }
 
-/** Alle Save-Ordner einer TitleID-Gruppe (Marker-Vererbung), Base/Update tolerant. */
+/** All save folders of a TitleID group (marker inheritance), tolerant of base/update IDs. */
 private fun listSaveGroupForTitle(activity: Activity, titleId: String): List<SaveFolderMeta> {
     val candidates = hex16CandidatesForSaves(titleId)
     val metas = listSaveFolders(activity)
@@ -93,7 +93,7 @@ private fun listSaveGroupForTitle(activity: Activity, titleId: String): List<Sav
     }
 }
 
-/** Bevorzugt den Ordner mit TITLEID.txt; Fallback: lexikografisch kleinster der Gruppe. */
+/** Prefer the folder with TITLEID.txt; fallback: lexicographically smallest in the group. */
 private fun pickSaveDirWithMarker(activity: Activity, titleId: String): File? {
     val group = listSaveGroupForTitle(activity, titleId)
     val marker = group.firstOrNull { it.hasMarker }?.dir
@@ -110,8 +110,8 @@ private fun sanitizeFileName(s: String): String =
     s.replace(Regex("""[\\/:*?"<>|]"""), "_").trim().ifBlank { "save" }
 
 /**
- * Schreibt eine ZIP im Format: ZIP enthält Ordner "TITLEID_UPPER/…" und darin
- * den reinen Inhalt des Ordners "0" (nicht den Ordner 0 selbst).
+ * Writes a ZIP with the structure: the ZIP contains folder "TITLEID_UPPER/…" and inside it
+ * the raw contents of folder "0" (not the folder "0" itself).
  */
 fun exportSaveToZip(
     activity: Activity,
@@ -168,7 +168,7 @@ fun exportSaveToZip(
     }
 }
 
-/** Hilfsname für CreateDocument: "<Name>_save_YYYY-MM-DD.zip" (aus Marker-Ordner) */
+/** Helper name for CreateDocument: "<Name>_save_YYYY-MM-DD.zip" (derived from marker folder) */
 fun buildSuggestedExportName(activity: Activity, titleId: String): String {
     val primary = pickSaveDirWithMarker(activity, titleId)
     val displayName = if (primary != null) {
@@ -214,7 +214,7 @@ private fun clearDirectory(dir: File) {
 }
 
 /**
- * Erwartet ZIP mit Struktur: TITLEID_UPPER/…  – schreibt NUR in den Ordner mit TITLEID.txt.
+ * Expects a ZIP with structure: TITLEID_UPPER/… — writes ONLY into the folder that has TITLEID.txt.
  */
 fun importSaveFromZip(
     activity: Activity,
@@ -223,11 +223,11 @@ fun importSaveFromZip(
 ): ImportResult {
     val cr: ContentResolver = activity.contentResolver
 
-    // TitelID-Ordner im ZIP finden
+    // Find TitleID folder inside the ZIP
     var titleIdFromZip: String? = null
     var totalBytes = 0L
 
-    // Pass 1: Top-Level TitelID und Total ermitteln
+    // Pass 1: determine top-level TitleID and total size
     runCatching {
         cr.openInputStream(zipUri)?.use { ins ->
             ZipInputStream(BufferedInputStream(ins)).use { zis ->
@@ -248,7 +248,7 @@ fun importSaveFromZip(
     if (titleIdFromZip == null) return ImportResult(false, "error importing save. missing TITLEID folder")
     val tidZip = titleIdFromZip!!.lowercase(Locale.ROOT)
 
-    // Größe nur unterhalb /<TITLEID>/… summieren
+    // Sum size only for paths under /<TITLEID>/…
     runCatching {
         cr.openInputStream(zipUri)?.use { ins ->
             ZipInputStream(BufferedInputStream(ins)).use { zis ->
@@ -264,18 +264,18 @@ fun importSaveFromZip(
         }
     }
 
-    // Ziel: NUR der Marker-Ordner
+    // Target: ONLY the marker folder
     val targetRoot = pickSaveDirWithMarker(activity, tidZip)
         ?: pickSaveDirWithMarker(activity, tidZip.uppercase(Locale.ROOT))
         ?: return ImportResult(false, "error importing save. start game once.")
 
-    // 0/1 vorbereiten (leeren)
+    // Prepare 0/1 (clear)
     val zero = File(targetRoot, "0").apply { mkdirs() }
     val one  = File(targetRoot, "1").apply { mkdirs() }
     clearDirectory(zero)
     clearDirectory(one)
 
-    // Pass 2: extrahieren
+    // Pass 2: extract
     var written = 0L
     val buf = ByteArray(DEFAULT_BUFFER_SIZE)
 
@@ -296,13 +296,13 @@ fun importSaveFromZip(
                             out1.parentFile?.mkdirs()
 
                             if (!ensureInside(zero, out0) || !ensureInside(one, out1)) {
-                                // Zip-Slip Schutz
+                                // Zip-slip protection
                                 zis.closeEntry()
                                 ze = zis.nextEntry
                                 continue
                             }
 
-                            // Einmal lesen, zweimal schreiben
+                            // Read once, write twice
                             val os0 = out0.outputStream()
                             val os1 = out1.outputStream()
                             try {

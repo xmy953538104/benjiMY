@@ -127,7 +127,7 @@ class HomeViews {
             var isFabVisible by remember { mutableStateOf(true) }
             val isNavigating = remember { mutableStateOf(false) }
 
-            // Save Manager State
+            // Save Manager state
             val openSavesDialog = remember { mutableStateOf(false) }
             val saveImportBusy = remember { mutableStateOf(false) }
             val saveExportBusy = remember { mutableStateOf(false) }
@@ -143,7 +143,7 @@ class HomeViews {
                 contract = ActivityResultContracts.OpenDocument()
             ) { uri: Uri? ->
                 val act = activity
-                // Guard auf ausgewähltes Spiel – optional
+                // Optional guard: ensure a selected game
                 val tIdNow = viewModel.mainViewModel?.selected?.titleId.orEmpty()
                 if (uri != null && act != null && tIdNow.isNotEmpty()) {
                     saveImportBusy.value = true
@@ -195,7 +195,7 @@ class HomeViews {
 
             val context = LocalContext.current
 
-            // NEW: Launcher für Amiibo (OpenDocument)
+            // NEW: Launcher for Amiibo (OpenDocument)
             val pickAmiiboLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.OpenDocument()
             ) { uri: Uri? ->
@@ -220,7 +220,7 @@ class HomeViews {
                 }
             }
 
-            // NEW: Cheats Import (.txt)
+            // NEW: Cheats import (.txt)
             val importCheatLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.OpenDocument()
             ) { uri: Uri? ->
@@ -228,7 +228,7 @@ class HomeViews {
                 val act = viewModel.activity
                 val titleId = gm?.titleId ?: ""
                 if (uri != null && act != null && titleId.isNotEmpty()) {
-                    // nur .txt akzeptieren
+                    // accept only .txt
                     val okExt = runCatching {
                         DocumentFile.fromSingleUri(act, uri)?.name?.lowercase()?.endsWith(".txt") == true
                     }.getOrElse { false }
@@ -240,7 +240,7 @@ class HomeViews {
                     val res = importCheatTxt(act, titleId, uri)
                     if (res.isSuccess) {
                         Toast.makeText(act, "Imported: ${res.getOrNull()?.name}", Toast.LENGTH_SHORT).show()
-                        // danach Liste aktualisieren
+                        // then refresh list
                         cheatsForSelected.value = loadCheatsFromDisk(act, titleId)
                     } else {
                         Toast.makeText(act, "Import failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
@@ -255,7 +255,7 @@ class HomeViews {
                 val act = viewModel.activity
                 val titleId = gm?.titleId ?: ""
                 if (uri != null && act != null && titleId.isNotEmpty()) {
-                    // Persist permission (lesen)
+                    // Persist permission (read)
                     try {
                         act.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     } catch (_: Exception) {}
@@ -277,7 +277,7 @@ class HomeViews {
                                 "Copying… ${(prog.fraction * 100).toInt()}%"
                         }
 
-                        // Liste aktualisieren
+                        // refresh list
                         modsForSelected.value = listMods(act, titleId)
                         modsImportBusy.value = false
 
@@ -438,7 +438,7 @@ class HomeViews {
                                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                                 }
 
-                        }
+                            }
 
                             OutlinedTextField(
                                 value = query.value,
@@ -453,13 +453,13 @@ class HomeViews {
                                 singleLine = true,
                                 shape = RoundedCornerShape(8.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        disabledContainerColor = Color.Transparent,
-                                        errorContainerColor = Color.Transparent,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    )
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    errorContainerColor = Color.Transparent,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                )
                             )
                         }
                     },
@@ -711,12 +711,12 @@ class HomeViews {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                // LINKS: Import .txt
+                                // LEFT: Import .txt
                                 TextButton(onClick = {
                                     importCheatLauncher.launch(arrayOf("text/plain", "text/*", "*/*"))
                                 }) { Text("Import .txt") }
 
-                                // RECHTS: Cancel + Save
+                                // RIGHT: Cancel + Save
                                 Row {
                                     TextButton(onClick = { openCheatsDialog.value = false }) { Text("Cancel") }
                                     TextButton(onClick = {
@@ -803,7 +803,7 @@ class HomeViews {
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
 
-                            // Import-Zeile
+                            // Import row
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -833,7 +833,7 @@ class HomeViews {
                                 )
                             }
 
-                            // Liste der Mods
+                            // List of mods
                             if (modsForSelected.value.isEmpty()) {
                                 Text("No mods found for this title.")
                             } else {
@@ -898,7 +898,7 @@ class HomeViews {
                             )
 
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                // Import-Button
+                                // Import button
                                 androidx.compose.material3.Button(
                                     enabled = !saveImportBusy.value && !saveExportBusy.value &&
                                         (viewModel.mainViewModel?.selected?.titleId?.isNotEmpty() == true),
@@ -909,7 +909,7 @@ class HomeViews {
                                     }
                                 ) { Text("Import ZIP") }
 
-                                // Export-Button
+                                // Export button
                                 androidx.compose.material3.Button(
                                     enabled = !saveImportBusy.value && !saveExportBusy.value &&
                                         (viewModel.mainViewModel?.selected?.titleId?.isNotEmpty() == true),
@@ -953,7 +953,7 @@ class HomeViews {
                     }
                 }
 
-                // --- Shortcut-Dialog
+                // --- Shortcut dialog
                 if (showShortcutDialog.value) {
                     val gm = viewModel.mainViewModel?.selected
                     AlertDialog(
