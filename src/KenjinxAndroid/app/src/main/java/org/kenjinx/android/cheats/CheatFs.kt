@@ -9,7 +9,7 @@ data class CheatItem(val buildId: String, val name: String) {
     val key get() = "$buildId-$name"
 }
 
-/* -------- Pfade -------- */
+/* -------- Paths -------- */
 
 private fun cheatsDirExternal(activity: Activity, titleId: String): File {
     val base = activity.getExternalFilesDir(null) // /storage/emulated/0/Android/data/<pkg>/files
@@ -22,7 +22,7 @@ private fun cheatsDirInternal(activity: Activity, titleId: String): File {
 }
 
 private fun allCheatDirs(activity: Activity, titleId: String): List<File> {
-    // Reihenfolge: internal zuerst (hier schreibt LibKenjinx i.d.R.), dann external
+    // Order: internal first (LibKenjinx usually writes here), then external
     return listOf(cheatsDirInternal(activity, titleId), cheatsDirExternal(activity, titleId))
         .distinct()
         .filter { it.exists() && it.isDirectory }
@@ -40,7 +40,7 @@ private fun parseCheatNames(text: String): List<String> {
         .toList()
 }
 
-/* -------- Public: Cheats laden -------- */
+/* -------- Public: Load cheats -------- */
 
 fun loadCheatsFromDisk(activity: Activity, titleId: String): List<CheatItem> {
     val dirs = allCheatDirs(activity, titleId)
@@ -65,10 +65,10 @@ fun loadCheatsFromDisk(activity: Activity, titleId: String): List<CheatItem> {
         .sortedWith(compareBy({ it.buildId.lowercase() }, { it.name.lowercase() }))
 }
 
-/* -------- Public: Auswahl SOFORT auf Disk anwenden -------- */
+/* -------- Public: Apply selection to disk immediately -------- */
 
 fun applyCheatSelectionOnDisk(activity: Activity, titleId: String, enabledKeys: Set<String>) {
-    // Wir wählen genau EINE BUILDID-Datei (die „beste“), und schalten darin Sections.
+    // We pick exactly ONE BUILDID file (the "best") and toggle sections inside it.
     val dirs = allCheatDirs(activity, titleId)
     val allTxt = dirs.flatMap { d ->
         d.listFiles { f -> f.isFile && f.name.endsWith(".txt", ignoreCase = true) }?.toList() ?: emptyList()
@@ -82,7 +82,7 @@ fun applyCheatSelectionOnDisk(activity: Activity, titleId: String, enabledKeys: 
     val text = runCatching { buildFile.readText(Charset.forName("UTF-8")) }.getOrElse { "" }
     if (text.isEmpty()) return
 
-    // Enabled-Set normalisieren: Keys sind "<BUILDID>-<SectionName>"
+    // Normalize enabled set: keys are "<BUILDID>-<SectionName>"
     val enabledSections = enabledKeys.asSequence()
         .mapNotNull { key ->
             val dash = key.indexOf('-')
@@ -100,7 +100,7 @@ fun applyCheatSelectionOnDisk(activity: Activity, titleId: String, enabledKeys: 
     }
 }
 
-/* -------- Implementierung: Auswahl anwenden (nur ';' als Kommentar) -------- */
+/* -------- Implementation: apply selection (using only ';' as comment) -------- */
 
 private fun pickBestBuildFile(files: List<File>): File {
     fun looksHexName(p: File): Boolean {
@@ -124,8 +124,8 @@ private fun sectionNameFromHeader(line: String): String {
 }
 
 /**
- * Entfernt EIN führendes Kommentarzeichen (';') + optionales Leerzeichen.
- * Nur am absoluten Zeilenanfang (keine führenden Spaces erlaubt).
+ * Removes ONE leading comment marker (';') + optional space.
+ * Only at absolute column 0 (no leading spaces allowed).
  */
 private fun uncommentOnce(raw: String): String {
     if (raw.isEmpty()) return raw
@@ -135,8 +135,8 @@ private fun uncommentOnce(raw: String): String {
 }
 
 /**
- * Kommentiert die Zeile aus, wenn sie nicht bereits mit ';' beginnt.
- * Atmosphère nutzt ';' – das verwenden wir ausschließlich.
+ * Comments out the line if it does not already start with ';'.
+ * Atmosphère uses ';' — we use that exclusively.
  */
 private fun commentOut(raw: String): String {
     val t = raw.trimStart()
@@ -146,12 +146,12 @@ private fun commentOut(raw: String): String {
 }
 
 /**
- * Schreibt die Datei neu:
- *  - Keine Marker einfügen
- *  - Pro Section den Body gemäß enabled/disabled (enabledSections) kommentieren/entkommentieren
- *  - Reine Kommentar-/Leerzeilen (nur ';') bleiben erhalten
+ * Rewrites the file:
+ *  - Do not insert markers
+ *  - For each section, comment/uncomment the body according to enabled/disabled (enabledSections)
+ *  - Keep pure comment/empty lines (only ';') intact
  */
-// Hilfsfunktionen: trailing Blankzeilen trimmen / Header normalisieren
+// Helpers: trim trailing blank lines / normalize header
 private fun trimTrailingBlankLines(lines: MutableList<String>) {
     while (lines.isNotEmpty() && lines.last().trim().isEmpty()) {
         lines.removeAt(lines.lastIndex)
@@ -159,18 +159,18 @@ private fun trimTrailingBlankLines(lines: MutableList<String>) {
 }
 
 private fun joinHeaderBufferOnce(header: List<String>): String {
-    // Header-Zeilen unverändert, aber trailing Blanks entfernen und genau 1 Leerzeile danach
+    // Keep header lines unchanged, but remove trailing blanks and add exactly one blank line after
     val buf = header.toMutableList()
     trimTrailingBlankLines(buf)
     return if (buf.isEmpty()) "" else buf.joinToString("\n") + "\n\n"
 }
 
 /**
- * Schreibt die Datei neu:
- *  - Keine Marker einfügen
- *  - Pro Section den Body gemäß enabled/disabled (enabledSections) kommentieren/entkommentieren
- *  - Reine Kommentar-/Leerzeilen bleiben erhalten
- *  - Zwischen Sections genau EINE Leerzeile, am Ende genau EIN Newline.
+ * Rewrites the file:
+ *  - Do not insert markers
+ *  - For each section, comment/uncomment the body according to enabled/disabled (enabledSections)
+ *  - Keep pure comment/empty lines intact
+ *  - Exactly ONE blank line between sections, exactly ONE newline at the end.
  */
 private fun rewriteCheatFile(original: String, enabledSections: Set<String>): String {
     val lines = original.replace("\uFEFF", "").lines()
@@ -186,18 +186,18 @@ private fun rewriteCheatFile(original: String, enabledSections: Set<String>): St
     fun flushCurrent() {
         val sec = currentSection ?: return
 
-        // trailing Blankzeilen im Block entfernen, damit keine doppelten Abstände wachsen
+        // Remove trailing blank lines from the block so spacing doesn't grow
         trimTrailingBlankLines(currentBlock)
 
         val enabled = enabledSections.contains(sec.lowercase())
 
-        // Zwischen Sections genau eine Leerzeile einfügen (aber nicht vor der ersten)
+        // Insert exactly one blank line between sections (but not before the first)
         if (wroteAnySection) out.append('\n')
 
         out.append('[').append(sec).append(']').append('\n')
 
         if (enabled) {
-            // Entkommentieren (nur ein führendes ';' an Spalte 0)
+            // Uncomment (only a single leading ';' at column 0)
             for (l in currentBlock) {
                 val trimmed = l.trim()
                 if (trimmed.isEmpty() || (trimmed.startsWith(";") && trimmed.length <= 1)) {
@@ -213,7 +213,7 @@ private fun rewriteCheatFile(original: String, enabledSections: Set<String>): St
                 }
             }
         } else {
-            // Disablen: alles, was nicht schon mit ';' beginnt und nicht leer ist, auskommentieren
+            // Disable: comment out anything that doesn't already start with ';' and isn't empty
             for (l in currentBlock) {
                 val t = l.trim()
                 if (t.isEmpty() || t.startsWith(";")) {
@@ -245,16 +245,16 @@ private fun rewriteCheatFile(original: String, enabledSections: Set<String>): St
     }
     flushCurrent()
 
-    // Header vorn einsetzen (mit genau einer Leerzeile danach, falls vorhanden)
+    // Prepend header (with exactly one blank line after it, if present)
     val headerText = joinHeaderBufferOnce(headerBuffer)
     if (headerText.isNotEmpty()) {
         out.insert(0, headerText)
     }
 
-    // Globale Normalisierung: 3+ Newlines -> 2, und am Ende genau EIN '\n'
-    var result = out.toString()
-        .replace(Regex("\n{3,}"), "\n\n") // nie mehr als 1 Leerzeile zwischen Abschnitten
-        .trimEnd() + "\n"                 // genau ein Newline am Ende
+    // Global normalization: 3+ newlines -> 2, and exactly ONE '\n' at the end
+    val result = out.toString()
+        .replace(Regex("\n{3,}"), "\n\n") // never more than 1 blank line between sections
+        .trimEnd() + "\n"                 // exactly one newline at the end
 
     return result
 }

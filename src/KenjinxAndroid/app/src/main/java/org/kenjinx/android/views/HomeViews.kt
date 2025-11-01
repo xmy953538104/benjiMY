@@ -135,7 +135,7 @@ class HomeViews {
             val cheatsForSelected = remember { mutableStateOf(listOf<CheatItem>()) }
             val enabledCheatKeys = remember { mutableStateOf(mutableSetOf<String>()) }
 
-            // Shortcut-Dialog-State
+            // Shortcut dialog state
             val showShortcutDialog = remember { mutableStateOf(false) }
             val shortcutName = remember { mutableStateOf("") }
 
@@ -402,11 +402,10 @@ class HomeViews {
                             thread {
                                 showLoading.value = true
 
-                                // NEW: Push Cheats vor dem Start (Auto-Start Pfad)
+                                // NEW: Push cheats before launch (auto-start path)
                                 val gm = viewModel.mainViewModel.loadGameModel.value!!
                                 val tId = gm.titleId ?: ""
                                 val act = viewModel.activity
-
 
                                 val success = viewModel.mainViewModel.loadGame(
                                     gm,
@@ -438,11 +437,10 @@ class HomeViews {
                                     IconButton(onClick = {
                                         if (viewModel.mainViewModel?.selected != null) {
 
-                                            // NEW: Push Cheats vor dem Start (Run-Button)
+                                            // NEW: Push cheats before launch (Run button)
                                             val gmSel = viewModel.mainViewModel!!.selected!!
                                             val tId = gmSel.titleId ?: ""
                                             val act = viewModel.activity
-
 
                                             thread {
                                                 showLoading.value = true
@@ -564,13 +562,13 @@ class HomeViews {
                                 TextButton(onClick = {
                                     val act2 = act
                                     if (act2 != null && titleId.isNotEmpty()) {
-                                        // 1) Auswahl persistent speichern (UI-State)
+                                        // 1) Persist selection (UI state)
                                         CheatPrefs(act2).setEnabled(titleId, enabledCheatKeys.value)
 
-                                        // 2) SOFORT die .txt umschreiben
+                                        // 2) Immediately rewrite the .txt on disk
                                         applyCheatSelectionOnDisk(act2, titleId, enabledCheatKeys.value)
 
-                                        // 3) Liste neu laden (damit disabled Einträge sichtbar bleiben)
+                                        // 3) Reload list (so disabled entries remain visible)
                                         cheatsForSelected.value = loadCheatsFromDisk(act2, titleId)
                                     }
                                     openCheatsDialog.value = false
@@ -633,7 +631,7 @@ class HomeViews {
                     }
                 }
 
-                // --- Shortcut-Dialog
+                // --- Shortcut dialog
                 if (showShortcutDialog.value) {
                     val gm = viewModel.mainViewModel?.selected
                     AlertDialog(
@@ -658,7 +656,7 @@ class HomeViews {
                                         .padding(top = 8.dp)
                                 ) {
                                     TextButton(onClick = {
-                                        // App icon (Grid image)
+                                        // App icon (grid image)
                                         if (gm != null && activity != null) {
                                             val gameUri = resolveGameUri(gm)
                                             if (gameUri != null) {
@@ -740,10 +738,9 @@ class HomeViews {
                                 thread {
                                     showLoading.value = true
 
-                                    // NEW: Push Cheats vor dem Start
+                                    // NEW: Push cheats before launch
                                     val tId = gameModel.titleId ?: ""
                                     val act = viewModel.activity
-
 
                                     val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
@@ -837,10 +834,9 @@ class HomeViews {
                                 thread {
                                     showLoading.value = true
 
-                                    // NEW: Push Cheats vor dem Start
+                                    // NEW: Push cheats before launch
                                     val tId = gameModel.titleId ?: ""
                                     val act = viewModel.activity
-
 
                                     val success = viewModel.mainViewModel?.loadGame(gameModel) ?: false
                                     if (success == 1) {
