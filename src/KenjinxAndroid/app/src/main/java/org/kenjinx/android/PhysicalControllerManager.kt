@@ -9,7 +9,7 @@ import kotlin.math.abs
 class PhysicalControllerManager(val activity: MainActivity) {
     private var controllerId: Int = -1
 
-    // Trigger-Entprellung (analog → digital)
+    // Trigger debouncing (analog → digital)
     private var leftTriggerPressed = false
     private var rightTriggerPressed = false
     private val pressThreshold = 0.65f
@@ -50,7 +50,7 @@ class PhysicalControllerManager(val activity: MainActivity) {
 
         fun axisValue(axis: Int): Float = ev.getAxisValue(axis)
 
-        // --- Sticks (rechts bevorzugt RX/RY, Fallback Z/RZ) ---
+        // --- Sticks (prefer RX/RY on the right, fallback to Z/RZ) ---
         val rightXaxis = if (hasAxis(MotionEvent.AXIS_RX)) MotionEvent.AXIS_RX else MotionEvent.AXIS_Z
         val rightYaxis = if (hasAxis(MotionEvent.AXIS_RY)) MotionEvent.AXIS_RY else MotionEvent.AXIS_RZ
 
@@ -62,10 +62,10 @@ class PhysicalControllerManager(val activity: MainActivity) {
         KenjinxNative.inputSetStickAxis(1, leftStickX,  -leftStickY,  controllerId)
         KenjinxNative.inputSetStickAxis(2, rightStickX, -rightStickY, controllerId)
 
-        // --- Trigger lesen (mit Fallbacks) ---
-        // Bevorzugt: LTRIGGER/RTRIGGER, dann BRAKE/GAS.
-        // Wenn der rechte Stick RX/RY nutzt (Standard bei Xbox), sind Z/RZ frei -> als weiterer Fallback verwenden.
-        // Nutzt der Stick Z/RZ, werden diese NICHT für Trigger verwendet (um Konflikte zu vermeiden).
+        // --- Read triggers (with fallbacks) ---
+        // Preferred: LTRIGGER/RTRIGGER, then BRAKE/GAS.
+        // If the right stick uses RX/RY (standard on Xbox), Z/RZ are free → use as an additional fallback.
+        // If the stick uses Z/RZ, do NOT use them for triggers (to avoid conflicts).
         val rightStickUsesZ  = (rightXaxis == MotionEvent.AXIS_Z)
         val rightStickUsesRZ = (rightYaxis == MotionEvent.AXIS_RZ)
 
@@ -82,11 +82,11 @@ class PhysicalControllerManager(val activity: MainActivity) {
             else -> 0f
         }
 
-        // Einige Pads liefern leichte Offsets – normalisieren
+        // Some pads report slight offsets — normalize
         val lt = if (abs(rawLT) < 0.02f) 0f else rawLT.coerceIn(0f, 1f)
         val rt = if (abs(rawRT) < 0.02f) 0f else rawRT.coerceIn(0f, 1f)
 
-        // Analog → digital mit Hysterese
+        // Analog → digital with hysteresis
         if (!leftTriggerPressed && lt >= pressThreshold) {
             leftTriggerPressed = true
             KenjinxNative.inputSetButtonPressed(GamePadButtonInputId.LeftTrigger.ordinal, controllerId)
@@ -103,7 +103,7 @@ class PhysicalControllerManager(val activity: MainActivity) {
             KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.RightTrigger.ordinal, controllerId)
         }
 
-        // --- DPAD als HAT (wie gehabt) ---
+        // --- DPAD as HAT (as before) ---
         device?.apply {
             if (sources and InputDevice.SOURCE_DPAD != InputDevice.SOURCE_DPAD) {
                 val dPadHor  = ev.getAxisValue(MotionEvent.AXIS_HAT_X)
@@ -146,7 +146,7 @@ class PhysicalControllerManager(val activity: MainActivity) {
 
     fun disconnect() {
         controllerId = -1
-        // Falls ein Trigger beim Disconnect "hing", sicherheitshalber releasen
+        // If a trigger was "stuck" on disconnect, release it just in case
         if (leftTriggerPressed) {
             leftTriggerPressed = false
             KenjinxNative.inputSetButtonReleased(GamePadButtonInputId.LeftTrigger.ordinal, controllerId)
@@ -160,13 +160,13 @@ class PhysicalControllerManager(val activity: MainActivity) {
     private fun getGamePadButtonInputId(keycode: Int): GamePadButtonInputId {
         val quickSettings = QuickSettings(activity)
         return when (keycode) {
-            // ABXY (Switch/Xbox Layout
+            // ABXY (Switch/Xbox layout)
             KeyEvent.KEYCODE_BUTTON_A -> if (!quickSettings.useSwitchLayout) GamePadButtonInputId.A else GamePadButtonInputId.B
             KeyEvent.KEYCODE_BUTTON_B -> if (!quickSettings.useSwitchLayout) GamePadButtonInputId.B else GamePadButtonInputId.A
             KeyEvent.KEYCODE_BUTTON_X -> if (!quickSettings.useSwitchLayout) GamePadButtonInputId.X else GamePadButtonInputId.Y
             KeyEvent.KEYCODE_BUTTON_Y -> if (!quickSettings.useSwitchLayout) GamePadButtonInputId.Y else GamePadButtonInputId.X
 
-            // Shoulder & Trigger (falls ein Pad sie doch als Keys sendet)
+            // Shoulder & Trigger (if a pad sends them as key events)
             KeyEvent.KEYCODE_BUTTON_L1 -> GamePadButtonInputId.LeftShoulder
             KeyEvent.KEYCODE_BUTTON_L2 -> GamePadButtonInputId.LeftTrigger
             KeyEvent.KEYCODE_BUTTON_R1 -> GamePadButtonInputId.RightShoulder
